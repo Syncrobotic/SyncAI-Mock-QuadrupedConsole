@@ -111,6 +111,8 @@ export interface TelemetryFrame {
   gait: Gait;
   posture: Posture;
   teleopHolder: { role: Role; phone: string; mine: boolean } | null;
+  queue: QueueItem[];
+  confirms: PendingConfirm[];
   estop: { by: string; at: number } | null;
   fault: { code: string; message: string; advice: string } | null;
   run: RunProgress | null;
@@ -118,6 +120,10 @@ export interface TelemetryFrame {
 
 export interface RunProgress {
   missionId: string;
+  cause: RunCause;
+  priority: Priority;
+  /** Response missions: where the event was. */
+  target?: { x: number; y: number };
   state: "running" | "paused";
   pausedReason?: string;
   currentWp: number;
@@ -131,11 +137,12 @@ export type EventLevel = "info" | "warning" | "critical";
 export interface DogEvent {
   id: string;
   at: number;
-  kind: "perception" | "system" | "mission" | "fence" | "estop" | "teleop" | "revoked" | "approval" | "missions_changed";
+  kind: "perception" | "system" | "mission" | "fence" | "estop" | "teleop" | "revoked" | "approval" | "missions_changed" | "confirm_request";
   level: EventLevel;
   text: string;
   /** For approval requests: the requesting phone. */
   ref?: string;
+  detection?: Detection;
 }
 
 export interface MapChunk {
@@ -202,12 +209,133 @@ export type Action =
   | { type: "announce"; clipId: string }
   | { type: "plugin"; pluginId: string; actionId: string; params: Record<string, unknown> };
 
-export type Trigger =
+// ── Rules: WHEN and WHY a mission runs (docs/2026-09-23-mission-triggers-design.md)
+
+/** 0 emergency · 1 event response · 2 routine patrol · 3 maintenance. Lower wins. */
+export type Priority = 0 | 1 | 2 | 3;
+
+export interface TimeWindow {
+  from: string; // "22:00"
+  to: string; // "06:00" — may wrap past midnight
+}
+
+/** Structured for the visual picker; `toRRule` renders RFC 5545 for storage/interop. */
+export type Schedule =
   | { type: "once"; at: number }
   | { type: "daily"; time: string }
   | { type: "weekly"; days: number[]; time: string }
-  | { type: "interval"; minutes: number }
-  | { type: "event"; eventType: "perception" | "fence"; filter: string };
+  | { type: "interval"; minutes: number; window: TimeWindow | null };
+
+export interface TimeTrigger {
+  kind: "time";
+  schedule: Schedule;
+  /** ± random offset, minutes — a patrol that runs on the dot can be timed. */
+  jitterMin: number;
+  /** When the slot comes and the dog cannot run it. */
+  missed: "skip" | "catch_up";
+  graceMin: number;
+}
+
+export type EventSource = "ai" | "system" | "sensor" | "external";
+
+export type EventType =
+  | "person"
+  | "intrusion"
+  | "fall"
+  | "smoke"
+  | "abandoned"
+  | "door_open"
+  | "thermal"
+  | "low_battery"
+  | "fence_breach"
+  | "mission_failed"
+  | "gas_high";
+
+export interface EventTrigger {
+  kind: "event";
+  source: EventSource;
+  type: EventType;
+  /** Zone ids from the floor plan; empty = anywhere. */
+  zones: string[];
+  minConfidence: number;
+  /** Must be seen continuously this long — filters the one-frame false positive. */
+  persistSec: number;
+  /** Or: seen N times within S seconds. null = off. */
+  countWithin: { n: number; sec: number } | null;
+  activeWindow: TimeWindow | null;
+}
+
+export type Trigger = TimeTrigger | EventTrigger;
+
+export interface Rule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  trigger: Trigger;
+  missionId: string;
+  priority: Priority;
+  /** auto: run · confirm: ask the phones first · notify: record + tell, do not move. */
+  mode: "auto" | "confirm" | "notify";
+  confirmTimeoutSec: number;
+  onTimeout: "run" | "cancel";
+  minBattery: number;
+  cooldownSec: number;
+  maxPerHour: number;
+  onPreempted: "resume" | "restart" | "drop";
+  /** An activation waiting longer than this is dropped — a late response is no response. */
+  queueTtlSec: number;
+}
+
+export type RuleOutcome = "started" | "queued" | "skipped" | "expired" | "preempted" | "awaiting" | "cancelled" | "notified" | "filtered";
+
+export interface RuleLogEntry {
+  id: string;
+  at: number;
+  ruleId: string;
+  outcome: RuleOutcome;
+  reason: string;
+}
+
+export interface RunCause {
+  kind: "time" | "event" | "manual";
+  ruleId?: string;
+  /** "AI 偵測到人員 @ 南走廊（0.87）" / "排程 22:30" */
+  text: string;
+  confirmedBy?: string;
+}
+
+export interface Detection {
+  type: EventType;
+  zoneId: string;
+  confidence: number;
+  x: number;
+  y: number;
+  trackId: string;
+}
+
+export interface PendingConfirm {
+  activationId: string;
+  ruleId: string;
+  ruleName: string;
+  missionName: string;
+  cause: string;
+  priority: Priority;
+  expiresAt: number;
+  onTimeout: "run" | "cancel";
+  detection?: Detection;
+}
+
+export interface QueueItem {
+  activationId: string;
+  ruleId: string;
+  missionId: string;
+  priority: Priority;
+  cause: string;
+  enqueuedAt: number;
+  expiresAt: number;
+  /** A suspended run waiting to resume after a preemption. */
+  resumed?: boolean;
+}
 
 export interface MissionPolicy {
   onLowBattery: "return_to_dock" | "pause";
@@ -216,12 +344,17 @@ export interface MissionPolicy {
   allowTeleopPreempt: boolean;
 }
 
+/**
+ * WHAT to do — a reusable template. When/why lives in `Rule`.
+ * `patrol` follows `route`; `response` goes to the location of the event that
+ * triggered it and does `responseActions` there.
+ */
 export interface Mission {
   id: string;
   name: string;
-  enabled: boolean;
+  kind: "patrol" | "response";
   route: Waypoint[];
-  trigger: Trigger;
+  response: { approachM: number; actions: Action[] };
   policy: MissionPolicy;
   returnToDock: boolean;
 }
@@ -235,6 +368,8 @@ export interface RunRecord {
   result: RunResult;
   reason?: string;
   arrivals: { wp: number; at: number }[];
+  cause: RunCause;
+  priority: Priority;
 }
 
 export interface Fence {

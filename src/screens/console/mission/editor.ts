@@ -19,9 +19,9 @@ export function blankMission(): Mission {
   return {
     id: id("m"),
     name: "新任務",
-    enabled: true,
+    kind: "patrol",
     route: [],
-    trigger: { type: "daily", time: "21:00" },
+    response: { approachM: 1.5, actions: [{ type: "snapshot", camera: "front" }] },
     policy: { onLowBattery: "return_to_dock", onObstacle: "reroute", waitSec: 10, allowTeleopPreempt: true },
     returnToDock: true,
   };

@@ -189,7 +189,13 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
     },
     "mission.list": () => {
       need("view");
-      return { missions: structuredClone(world.missions), fences: structuredClone(world.fences), history: structuredClone(world.history) };
+      return {
+        missions: structuredClone(world.missions),
+        fences: structuredClone(world.fences),
+        history: structuredClone(world.history),
+        rules: structuredClone(world.rules),
+        ruleLog: structuredClone(world.engine.log.slice(0, 100)),
+      };
     },
     "mission.validate": (m) => ({ issues: validate(m) }),
     "mission.save": (m) => {
@@ -205,22 +211,50 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
     },
     "mission.delete": ({ id }) => {
       need("mission.rw");
+      if (world.rules.some((r) => r.missionId === id)) throw new RpcError("invalid", "還有規則使用這個任務，請先修改或刪除那些規則");
       world.missions = world.missions.filter((m) => m.id !== id);
-      world.emitMissionsChanged();
-    },
-    "mission.setEnabled": ({ id, enabled }) => {
-      need("mission.rw");
-      const m = world.missions.find((x) => x.id === id);
-      if (m) m.enabled = enabled;
       world.emitMissionsChanged();
     },
     "mission.start": ({ id }) => {
       need("mission.rw");
       if (!world.hasFeature("mission")) throw new RpcError("forbidden", "任務排程未授權");
       if (["ESTOP", "FAULT"].includes(world.mode)) throw new RpcError("invalid", "目前狀態不能啟動任務");
-      world.startMission(id);
+      if (world.missions.find((m) => m.id === id)?.kind === "response") throw new RpcError("invalid", "事件回應任務需要由事件觸發");
+      world.startMission(id, session?.role === "owner" ? "擁有者" : "操作員");
       world.emitMissionsChanged();
     },
+    "rule.save": (r) => {
+      need("mission.rw");
+      if (!world.hasFeature("mission")) throw new RpcError("forbidden", "任務排程未授權");
+      // §11 decision 1: P0/P1 rules are the Owner's.
+      if (r.priority <= 1) need("admin");
+      if (r.trigger.kind === "event" && ["person", "intrusion", "fall", "smoke", "abandoned", "door_open", "thermal"].includes(r.trigger.type) && !world.hasFeature("ai"))
+        throw new RpcError("forbidden", "License 不含 AI 辨識");
+      const idx = world.rules.findIndex((x) => x.id === r.id);
+      if (idx >= 0) world.rules[idx] = structuredClone(r);
+      else world.rules.push(structuredClone(r));
+      world.emitMissionsChanged();
+    },
+    "rule.delete": ({ id }) => {
+      need("mission.rw");
+      const r = world.rules.find((x) => x.id === id);
+      if (r && r.priority <= 1) need("admin");
+      world.rules = world.rules.filter((x) => x.id !== id);
+      world.emitMissionsChanged();
+    },
+    "rule.setEnabled": ({ id, enabled }) => {
+      need("mission.rw");
+      const r = world.rules.find((x) => x.id === id);
+      if (r && r.priority <= 1) need("admin");
+      if (r) r.enabled = enabled;
+      world.emitMissionsChanged();
+    },
+    "rule.confirm": ({ activationId, approve }) => {
+      need("mission.rw");
+      world.confirmActivation(activationId, approve, session?.role === "owner" ? "擁有者 · 本機" : "操作員 · 本機");
+    },
+    "rule.test": (r) => ({ verdict: world.dryRun(r) }),
+    "dev.detect": ({ type, zoneId, confidence, durationSec }) => world.injectDetection(type, zoneId, confidence, durationSec),
     "mission.pause": ({ reason }) => {
       need("mission.rw");
       world.pauseRun(reason);
@@ -253,11 +287,15 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
       need("admin");
       world.phones = world.phones.filter((p) => p.id !== phoneId || p.mine);
     },
-    "device.approve": ({ phoneId, approve }) => {
+    "device.approve": ({ phoneId, approve, role }) => {
       need("admin");
       world.phones = approve
-        ? world.phones.map((p) => (p.id === phoneId ? { ...p, pending: false } : p))
+        ? world.phones.map((p) => (p.id === phoneId ? { ...p, pending: false, role: role ?? p.role } : p))
         : world.phones.filter((p) => p.id !== phoneId);
+    },
+    "device.pairingMode": ({ on }) => {
+      need("admin");
+      return { until: world.setPairingMode(on) };
     },
     "device.setSafety": (patch) => {
       need("admin");
@@ -282,11 +320,9 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
 
   function validate(m: RpcMap["mission.validate"][0]) {
     return validateMission(m, {
-      others: world.missions,
       fences: world.fences,
       battery: world.battery,
       from: world.pose,
-      now: Date.now(),
     });
   }
 

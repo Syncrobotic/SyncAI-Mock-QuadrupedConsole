@@ -1,6 +1,6 @@
 "use client";
 
-import { Bluetooth, ChevronRight, Download, FlaskConical, KeyRound, Pencil, Power, RefreshCw, Smartphone, Upload, Wifi } from "lucide-react";
+import { Bluetooth, ChevronRight, Download, Plus, FlaskConical, KeyRound, Pencil, Power, RefreshCw, Smartphone, Upload, Wifi } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -194,6 +194,7 @@ function Phones({ owner }: { owner: boolean }) {
   const phones = useStore((s) => s.phones);
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const target = phones.find((p) => p.id === selected);
 
   const close = () => {
@@ -205,7 +206,19 @@ function Phones({ owner }: { owner: boolean }) {
   // sheet that opens. Inline controls squeezed the nickname to "夜班 · Pi…".
   return (
     <section className="space-y-2">
-      <SectionTitle description="信任單位是手機的公鑰，不是帳號">已配對手機 · {phones.length}</SectionTitle>
+      <SectionTitle
+        description="信任單位是手機的公鑰，不是帳號"
+        action={
+          owner && (
+            <Button size="sm" variant="ghost" className="text-primary-accent -mr-2" onClick={() => setInviting(true)}>
+              <Plus />
+              加入新手機
+            </Button>
+          )
+        }
+      >
+        已配對手機 · {phones.length}
+      </SectionTitle>
       <Card className="divide-y p-0">
         {phones.map((p) => {
           const actionable = owner && !p.mine && (p.pending || p.role !== "owner");
@@ -233,6 +246,8 @@ function Phones({ owner }: { owner: boolean }) {
           );
         })}
       </Card>
+
+      <InviteModal open={inviting} onClose={() => setInviting(false)} />
 
       <Modal open={!!target} onClose={close}>
         {target && !confirmRevoke && (
@@ -292,6 +307,65 @@ function Phones({ owner }: { owner: boolean }) {
         )}
       </Modal>
     </section>
+  );
+}
+
+/**
+ * How a second phone gets control: it pairs like the first one did, and the
+ * Owner approves it with a role. The Owner opens the pairing window here so
+ * the dog advertises; the approval then pops up on this phone.
+ */
+function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [until, setUntil] = useState<number | null>(null);
+  const now = useNow(1000);
+  const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : 0;
+  const steps = [
+    ["在新手機安裝 SyncAI App", "開啟後選「連接你的 SyncAI-Dog」，靠近狗 5 m 內。"],
+    ["開啟配對模式", "狗會廣播 3 分鐘，新手機才掃描得到。"],
+    ["核准並選擇角色", "新手機完成配對後，這支手機會跳出核准，選擇操作員或檢視者。"],
+  ];
+  return (
+    <Modal open={open} onClose={onClose}>
+      <p className="text-[16px] font-semibold">加入新手機</p>
+      <p className="text-muted-foreground mt-0.5">讓另一支手機也能操控這隻狗。</p>
+      <ol className="mt-3 space-y-2.5">
+        {steps.map(([t, d], i) => (
+          <li key={t} className="flex gap-2.5">
+            <span className={cn("grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold", i === 1 && until ? "bg-status-ok text-white" : "bg-primary/15 text-primary-accent")}>{i + 1}</span>
+            <span>
+              <span className="block text-[13px] font-medium">{t}</span>
+              <span className="text-muted-foreground block text-[11px]">{d}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Button variant="outline" onClick={onClose}>
+          關閉
+        </Button>
+        {left > 0 ? (
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              await rpc("device.pairingMode", { on: false });
+              setUntil(null);
+            }}
+          >
+            關閉配對 · {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}
+          </Button>
+        ) : (
+          <Button
+            onClick={async () => {
+              const r = await rpc("device.pairingMode", { on: true });
+              if (r) setUntil(r.until);
+            }}
+          >
+            開啟配對模式
+          </Button>
+        )}
+      </div>
+      <p className="text-muted-foreground mt-2 text-[11px]">也可以在狗身上短按配對鍵開啟（燈號藍色慢閃）。</p>
+    </Modal>
   );
 }
 

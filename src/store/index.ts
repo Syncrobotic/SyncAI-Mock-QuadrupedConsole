@@ -11,6 +11,8 @@ import type {
   Mission,
   OccupancyGrid,
   PairedPhone,
+  Rule,
+  RuleLogEntry,
   RunRecord,
   Session,
   TelemetryFrame,
@@ -67,6 +69,12 @@ export interface State {
   history: RunRecord[];
   editor: Editor | null;
   detailMissionId: string | null;
+  rules: Rule[];
+  ruleLog: RuleLogEntry[];
+  /** Mission tab sub-view: rules (when/why) · missions (what) · agenda (next 24 h). */
+  missionView: "rules" | "missions" | "agenda";
+  ruleEditor: { draft: Rule; isNew: boolean; verdict: string | null } | null;
+  detailRuleId: string | null;
 
   // device
   device: DeviceInfo | null;
@@ -124,6 +132,11 @@ export const useStore = create<State>(() => ({
   history: [],
   editor: null,
   detailMissionId: null,
+  rules: [],
+  ruleLog: [],
+  missionView: "rules",
+  ruleEditor: null,
+  detailRuleId: null,
 
   device: null,
   phones: [],

@@ -1,7 +1,7 @@
 "use client";
 
 import { Bluetooth, Loader2, RefreshCw, ShieldAlert, TriangleAlert, WifiOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useNow } from "@/hooks/use-now";
 
 import { cn } from "@/lib/utils";
 import { set, useStore } from "@/store";
@@ -171,11 +171,4 @@ function Chip({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useNow(interval: number) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), interval);
-    return () => clearInterval(t);
-  }, [interval]);
-  return now;
-}
+export { useNow };

@@ -1,9 +1,12 @@
 "use client";
 
-import { Camera, OctagonAlert, RefreshCw, SearchX, Smartphone } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Camera, OctagonAlert, RefreshCw, SearchX, Smartphone, Sparkles } from "lucide-react";
 
-import { Modal } from "@/components/kit";
+import { Modal, Segmented } from "@/components/kit";
 import { Button } from "@/components/ui/button";
+import { IS_MOCK } from "@/lib/env";
 import { formatClock } from "@/lib/utils";
 import { set, useStore } from "@/store";
 import { refreshPhones, retry, rpc } from "@/store/controller";
@@ -20,6 +23,7 @@ export function Overlays() {
     <>
       <Unreachable />
       <Approval />
+      <ConfirmRequest />
       <SnapshotViewer />
     </>
   );
@@ -74,26 +78,38 @@ function Unreachable() {
 
 function Approval() {
   const req = useStore((s) => s.approval);
+  const [role, setRole] = useState<"operator" | "viewer">("operator");
   const answer = async (approve: boolean) => {
     if (!req?.ref) return;
     set({ approval: null });
-    await rpc("device.approve", { phoneId: req.ref, approve });
+    await rpc("device.approve", { phoneId: req.ref, approve, role });
     await refreshPhones();
+    if (approve) toast.success(`已核准為${role === "operator" ? "操作員" : "檢視者"}`);
   };
   return (
     <Modal open={!!req} dismissable={false}>
-      <div className="bg-primary/15 text-primary-accent mb-3 grid size-11 place-items-center rounded-xl">
+      <div className="bg-primary/15 text-primary-accent mb-3 grid size-10 place-items-center rounded-xl">
         <Smartphone className="size-5" />
       </div>
       <h2 className="text-[16px] font-semibold">有手機請求加入</h2>
-      <p className="text-muted-foreground mt-1 text-[14px]">{req?.text}。核准後它可以操控、排任務與通話，但不能管理裝置。</p>
-      <div className="mt-5 grid grid-cols-2 gap-2">
-        <Button variant="outline"  onClick={() => void answer(false)}>
+      <p className="text-muted-foreground mt-1">{req?.text}</p>
+      <p className="mt-3 mb-1.5 text-[12px] font-medium">給它的角色</p>
+      <Segmented
+        value={role}
+        options={[
+          { value: "operator", label: "操作員" },
+          { value: "viewer", label: "檢視者" },
+        ]}
+        onChange={setRole}
+      />
+      <p className="text-muted-foreground mt-1.5 text-[11px]">
+        {role === "operator" ? "可以操控、排任務、通話；不能管理裝置、不能解除 E-Stop。" : "只能看地圖與影像，其他功能鎖定。"}
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Button variant="outline" onClick={() => void answer(false)}>
           拒絕
         </Button>
-        <Button  onClick={() => void answer(true)}>
-          核准為操作員
-        </Button>
+        <Button onClick={() => void answer(true)}>核准</Button>
       </div>
     </Modal>
   );
@@ -114,6 +130,70 @@ function SnapshotViewer() {
             <p className="text-muted-foreground text-sm">{formatClock(snap.at)} · 已存至狗端 artifacts</p>
           </div>
         </div>
+      )}
+    </Modal>
+  );
+}
+
+/**
+ * §4.4 confirm mode: a rule wants to send the dog and asks the phones first.
+ * Same push-style dialog as the join request; the countdown and what happens
+ * at zero are on the dialog, because "nobody answered" is itself a decision.
+ */
+function ConfirmRequest() {
+  const confirms = useStore((s) => s.telemetry?.confirms);
+  const canAnswer = useStore((s) => !!s.session?.scopes.includes("mission.rw"));
+  const zones = useStore((s) => s.plan?.zones);
+  const now = useNow(250);
+  const req = canAnswer ? confirms?.[0] : undefined;
+  const left = req ? Math.max(0, Math.ceil((req.expiresAt - now) / 1000)) : 0;
+  const rules = useStore((s) => s.rules);
+  const total = (req && rules.find((r) => r.id === req.ruleId)?.confirmTimeoutSec) || 30;
+  const answer = (approve: boolean) => req && void rpc("rule.confirm", { activationId: req.activationId, approve });
+
+  return (
+    <Modal open={!!req} dismissable={false}>
+      {req && (
+        <>
+          <div className="flex items-start gap-3">
+            <span className="bg-severity-warning/15 text-severity-warning grid size-10 shrink-0 place-items-center rounded-xl">
+              <Sparkles className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold">{req.cause}</p>
+              <p className="text-muted-foreground text-[12px]">
+                規則「{req.ruleName}」要派狗去「{req.missionName}」
+              </p>
+            </div>
+            {/* Countdown ring */}
+            <span className="relative grid size-10 shrink-0 place-items-center">
+              <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90">
+                <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted" />
+                <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={94.2} strokeDashoffset={94.2 * (1 - Math.min(1, left / total))} className="text-severity-warning transition-[stroke-dashoffset] duration-200" />
+              </svg>
+              <span className="text-[12px] font-bold tabular-nums">{left}</span>
+            </span>
+          </div>
+          <div className="relative mt-3 grid aspect-video place-items-center overflow-hidden rounded-lg" style={{ background: "linear-gradient(135deg,#2a2350,#1b1d2a)" }}>
+            <Camera className="size-7 text-white/35" />
+            {req.detection && (
+              <span className="absolute top-1.5 left-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                {zones?.find((z) => z.id === req.detection!.zoneId)?.name} · 信心 {Math.round(req.detection.confidence * 100)}%
+              </span>
+            )}
+            {IS_MOCK && <span className="absolute right-1.5 bottom-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/70">MOCK · 偵測快照</span>}
+          </div>
+          <p className="text-muted-foreground mt-2 text-[12px]">
+            {left} 秒內沒人回應會{req.onTimeout === "run" ? "自動派狗前往" : "取消"}。
+            {confirms && confirms.length > 1 ? ` 還有 ${confirms.length - 1} 則等待確認。` : ""}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={() => answer(false)}>
+              忽略
+            </Button>
+            <Button onClick={() => answer(true)}>派狗前往</Button>
+          </div>
+        </>
       )}
     </Modal>
   );

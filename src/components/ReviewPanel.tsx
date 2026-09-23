@@ -9,9 +9,12 @@ import { useState } from "react";
 
 import { mockWorld } from "@/link";
 import { SCENARIOS, SCENARIO_IDS } from "@/link/mock/scenarios";
+import { EVENT_TYPES } from "@/lib/rules";
 import { cn } from "@/lib/utils";
+
+import type { EventType } from "@/proto/types";
 import { useStore } from "@/store";
-import { changeScenario, clearLocalPairing, refreshDevice, refreshPhones } from "@/store/controller";
+import { changeScenario, clearLocalPairing, refreshDevice, refreshPhones, rpc } from "@/store/controller";
 import { CONN_LABEL, MODE_LABEL } from "@/store/logic";
 
 /**
@@ -114,6 +117,8 @@ export function ReviewPanel() {
           </Group>
         )}
 
+        {world && <DetectPanel />}
+
         {world && (
           <Group title="配對模擬">
             <Toggle label="擁有者手機在線（第二隻狗核准）" on={world.dev.ownerOnline} onChange={act(() => (world.dev.ownerOnline = !world.dev.ownerOnline))} />
@@ -189,5 +194,55 @@ function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange:
         <span className={cn("absolute top-0.5 size-3 rounded-full bg-white transition-[left]", on ? "left-3.5" : "left-0.5")} />
       </span>
     </button>
+  );
+}
+
+const AI_TYPES: EventType[] = ["person", "intrusion", "fall", "smoke", "abandoned", "door_open", "thermal"];
+
+/** Put a detection into the world as if perceptiond saw it — drives the rule engine end to end. */
+function DetectPanel() {
+  const zones = useStore((s) => s.plan?.zones) ?? [];
+  const [type, setType] = useState<EventType>("person");
+  const [zone, setZone] = useState("corr-s");
+  const [conf, setConf] = useState(0.9);
+  const [dur, setDur] = useState(5);
+  const sel = "h-8 w-full rounded-md border border-white/10 bg-white/5 px-1.5 text-[12px] text-white";
+  return (
+    <Group title="模擬 AI 偵測">
+      <div className="grid grid-cols-2 gap-1.5">
+        <select className={sel} value={type} onChange={(e) => setType(e.target.value as EventType)} aria-label="偵測類型">
+          {AI_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {EVENT_TYPES[t].label}
+            </option>
+          ))}
+        </select>
+        <select className={sel} value={zone} onChange={(e) => setZone(e.target.value)} aria-label="區域">
+          {zones.map((z) => (
+            <option key={z.id} value={z.id}>
+              {z.name}
+            </option>
+          ))}
+        </select>
+        <select className={sel} value={conf} onChange={(e) => setConf(Number(e.target.value))} aria-label="信心">
+          {[0.6, 0.75, 0.85, 0.95].map((c) => (
+            <option key={c} value={c}>
+              信心 {Math.round(c * 100)}%
+            </option>
+          ))}
+        </select>
+        <select className={sel} value={dur} onChange={(e) => setDur(Number(e.target.value))} aria-label="持續秒數">
+          {[1, 3, 5, 10].map((d) => (
+            <option key={d} value={d}>
+              持續 {d} 秒
+            </option>
+          ))}
+        </select>
+      </div>
+      <Action className="mt-1.5 w-full" onClick={() => void rpc("dev.detect", { type, zoneId: zone, confidence: conf, durationSec: dur })}>
+        送出偵測
+      </Action>
+      <p className="mt-1 text-[10px] leading-relaxed text-white/40">範例：「走廊人員查看」要南/北走廊、東側大廳，信心 ≥ 80%、持續 3 秒，會先詢問；「限制區入侵」選資料室或核心區會直接出動（P0）。</p>
+    </Group>
   );
 }

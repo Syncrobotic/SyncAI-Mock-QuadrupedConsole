@@ -226,6 +226,13 @@ function onEvent(e: DogEvent) {
     return;
   }
   set({ events: [e, ...get().events].slice(0, 200) });
+  // Confirm requests are answered from the dialog, which reads the live list
+  // in telemetry; the event only refreshes the rule log.
+  if (e.kind === "confirm_request") {
+    navigator.vibrate?.([60, 40, 60]);
+    void refreshMissions();
+    return;
+  }
   if (e.kind === "approval") {
     if (get().session?.scopes.includes("admin")) set({ approval: e });
     void refreshPhones();
@@ -244,7 +251,7 @@ export async function refreshAll() {
 
 export async function refreshMissions() {
   const r = await rpc("mission.list", undefined, { quiet: true });
-  if (r) set({ missions: r.missions, fences: r.fences, history: r.history });
+  if (r) set({ missions: r.missions, fences: r.fences, history: r.history, rules: r.rules, ruleLog: r.ruleLog });
 }
 
 export async function refreshDevice() {

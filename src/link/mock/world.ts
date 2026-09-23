@@ -1,15 +1,20 @@
 import { clamp } from "@/lib/utils";
-import { actionSeconds, nextTrigger, PATROL_SPEED } from "@/lib/schedule";
+import { EVENT_TYPES } from "@/lib/rules";
+import { actionSeconds, PATROL_SPEED } from "@/lib/schedule";
+
+import { RuleEngine, type Activation, type Decision, type EngineCtx } from "./engine";
 
 import { Emitter } from "./emitter";
-import { seedDevice, seedHistory, seedMissions, seedPhones, uid, DEFAULT_FENCE } from "./fixtures";
-import { buildPointCloud, DOCK, GRID, insidePolygon, isFree, PLAN } from "./floor";
+import { seedDevice, seedHistory, seedMissions, seedPhones, seedRules, uid, DEFAULT_FENCE } from "./fixtures";
+import { buildPointCloud, DOCK, GRID, insidePolygon, isFree, PLAN, snapToFree } from "./floor";
 import { licenseFor, mockActivate } from "@/lib/license";
 import { SCENARIOS, type ScenarioId } from "./scenarios";
 
 import type {
+  Detection,
   DeviceInfo,
   DogEvent,
+  EventType,
   DogMode,
   EventLevel,
   Fence,
@@ -22,7 +27,10 @@ import type {
   PairedPhone,
   Pose,
   Posture,
+  Priority,
   Role,
+  Rule,
+  RunCause,
   RunRecord,
   TelemetryFrame,
 } from "@/proto/types";
@@ -38,6 +46,10 @@ import type {
 
 interface InternalRun {
   mission: Mission;
+  act: Activation | null;
+  cause: RunCause;
+  priority: Priority;
+  target?: { x: number; y: number };
   targets: { x: number; y: number; wpIndex: number | null }[];
   idx: number;
   phase: "moving" | "acting";
@@ -54,12 +66,6 @@ export interface MockDevSettings {
   bleFlaky: boolean;
 }
 
-const PERCEPTION = [
-  { text: "偵測到人員 · 南側走廊", level: "warning" as EventLevel },
-  { text: "偵測到未關閉的門 · 會議室 3", level: "info" as EventLevel },
-  { text: "異常聲響 · 機房", level: "warning" as EventLevel },
-  { text: "偵測到遺留物品 · 大廳", level: "info" as EventLevel },
-];
 
 export class MockWorld {
   readonly scenario;
@@ -92,8 +98,14 @@ export class MockWorld {
   license: LicenseInfo;
   phones: PairedPhone[] = [];
   eventLog: DogEvent[] = [];
-  private lastRunAt: Record<string, number> = {};
-  private lastScheduleCheck = Date.now();
+  rules: Rule[] = seedRules();
+  engine = new RuleEngine(Date.now());
+  /** Preempted runs waiting to resume, by activation id. */
+  private suspended = new Map<string, InternalRun>();
+  private lastRuleTick = 0;
+  private detections: { det: Detection; endsAt: number }[] = [];
+  private nextDetectionAt = Date.now() + 20_000 + Math.random() * 30_000;
+  private lowBatteryFired = false;
 
   // Transport state
   gatewayState: GatewayHealth["state"] = "up";
@@ -101,7 +113,6 @@ export class MockWorld {
   myRole: Role = "owner";
   private connectedAt = 0;
   private firedTimeline = new Set<number>();
-  private nextPerceptionAt = Date.now() + 30_000 + Math.random() * 60_000;
   private timer: ReturnType<typeof setInterval> | null = null;
   private healthTimer: ReturnType<typeof setInterval> | null = null;
   private lastTick = Date.now();
@@ -283,15 +294,44 @@ export class MockWorld {
 
   // ── Missions ─────────────────────────────────────────────────────────────
 
-  startMission(id: string, why = "手動啟動") {
-    const mission = this.missions.find((m) => m.id === id);
-    if (!mission || mission.route.length === 0) return;
-    if (this.run) this.finishRun("aborted", "被新任務取代");
+  /** Start a mission for an activation (or a resumed run). */
+  private startRun(act: Activation) {
+    const resumed = this.suspended.get(act.id);
+    if (resumed) {
+      this.suspended.delete(act.id);
+      this.run = { ...resumed, paused: null, phase: "moving" };
+      this.charging = false;
+      this.setMode(this.teleopHolder ? "TELEOP" : "MISSION");
+      this.emitEvent("mission", "info", `任務「${resumed.mission.name}」從中斷處繼續`);
+      this.emitMissionsChanged();
+      return;
+    }
+    const template = this.missions.find((m) => m.id === act.rule.missionId);
+    if (!template) return;
+    let mission = template;
+    let target: { x: number; y: number } | undefined;
+    if (template.kind === "response") {
+      // §4.3: go to where the event is. Stand off `approachM` along the line
+      // from the dog, on free floor.
+      const d = act.detection;
+      target = d ? { x: d.x, y: d.y } : { x: this.pose.x, y: this.pose.y };
+      const dx = this.pose.x - target.x;
+      const dy = this.pose.y - target.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const k = Math.min(1, template.response.approachM / len);
+      const stand = snapToFree(GRID, target.x + dx * k, target.y + dy * k);
+      mission = { ...template, route: [{ id: "event", x: stand.x, y: stand.y, toleranceM: 0.5, actions: template.response.actions }] };
+    }
+    if (mission.route.length === 0) return;
     const targets = mission.route.map((wp, i) => ({ x: wp.x, y: wp.y, wpIndex: i as number | null }));
     if (mission.returnToDock) targets.push({ x: DOCK.x, y: DOCK.y, wpIndex: null });
     this.charging = false;
     this.run = {
       mission,
+      act,
+      cause: act.cause,
+      priority: act.rule.priority,
+      target,
       targets,
       idx: 0,
       phase: "moving",
@@ -302,10 +342,78 @@ export class MockWorld {
       snapshots: [],
       startedAt: Date.now(),
     };
-    this.lastRunAt[id] = Date.now();
     if (this.mode !== "TELEOP") this.setMode("MISSION");
     else this.run.paused = "操控中";
-    this.emitEvent("mission", "info", `任務「${mission.name}」開始（${why}）`);
+    this.emitEvent("mission", "info", `任務「${mission.name}」開始 · ${act.cause.text}`);
+    this.emitMissionsChanged();
+  }
+
+  /** Manual "run now" goes through the same engine (P1, may preempt a patrol). */
+  startMission(id: string, by = "本機") {
+    this.applyDecisions(this.engine.manual(this.engineCtx(Date.now()), id, by));
+  }
+
+  confirmActivation(activationId: string, approve: boolean, by: string) {
+    this.engine.confirm(this.engineCtx(Date.now()), activationId, approve, by);
+    this.applyDecisions(this.engine.tickQueue(this.engineCtx(Date.now())));
+    this.emitMissionsChanged();
+  }
+
+  dryRun(rule: Rule) {
+    return RuleEngine.dryRun(this.engineCtx(Date.now()), rule);
+  }
+
+  private engineCtx(now: number): EngineCtx {
+    return {
+      now,
+      rules: this.rules,
+      missions: this.missions,
+      running: this.run ? { priority: this.run.priority, ruleId: this.run.act?.rule.id } : null,
+      blocked: this.mode === "ESTOP" ? "estop" : this.mode === "FAULT" ? "fault" : this.teleopHolder ? "teleop" : null,
+      battery: this.battery,
+      licensed: (f) => this.hasFeature(f),
+      zoneName: (id) => PLAN.zones.find((z) => z.id === id)?.name ?? id,
+    };
+  }
+
+  private applyDecisions(ds: Decision[]) {
+    for (const d of ds) {
+      if (d.do === "start") this.startRun(d.act);
+      else if (d.do === "preempt") {
+        const cur = this.run;
+        if (cur) {
+          const policy = cur.act?.rule.onPreempted ?? "resume";
+          const ctx = this.engineCtx(Date.now());
+          if (policy === "drop" || !cur.act) this.finishRun("aborted", `被 ${d.act.rule.name} 取代`);
+          else {
+            if (policy === "resume") {
+              this.suspended.set(cur.act.id, { ...cur, paused: "被打斷" });
+              this.engine.requeueResumed(ctx, cur.act);
+            } else this.engine.requeueResumed(ctx, { ...cur.act, id: `${cur.act.id}-r` });
+            this.run = null;
+            this.emitEvent("mission", "info", `任務「${cur.mission.name}」被「${d.act.rule.name}」打斷`);
+          }
+        }
+        this.startRun(d.act);
+      } else if (d.do === "confirm") {
+        this.emitEvent("confirm_request", "warning", `${d.act.cause.text} · 要執行「${d.act.rule.name}」嗎？`, d.act.id, d.act.detection);
+      } else if (d.do === "notify") {
+        this.emitEvent("perception", "warning", `${d.act.rule.name}：${d.act.cause.text}`, undefined, d.act.detection);
+      }
+    }
+    if (ds.length) this.emitMissionsChanged();
+  }
+
+  /** Dev / review: put a detection into the world as if perceptiond saw it. */
+  injectDetection(type: EventType, zoneId: string, confidence: number, durationSec: number) {
+    const zone = PLAN.zones.find((z) => z.id === zoneId) ?? PLAN.zones[0];
+    const r = zone.rect;
+    const p = snapToFree(GRID, r.x1 + (r.x2 - r.x1) * (0.3 + Math.random() * 0.4), r.y1 + (r.y2 - r.y1) * (0.3 + Math.random() * 0.4));
+    const det: Detection = { type, zoneId: zone.id, confidence, x: p.x, y: p.y, trackId: uid("trk") };
+    this.detections.push({ det, endsAt: Date.now() + durationSec * 1000 });
+    const level: EventLevel = ["intrusion", "fall", "smoke"].includes(type) ? "critical" : type === "person" ? "warning" : "info";
+    this.emitEvent("perception", level, `${EVENT_TYPES[type].label} · ${zone.name}（${Math.round(confidence * 100)}%）`, undefined, det);
+    this.stepDetections(Date.now());
   }
 
   pauseRun(reason: string) {
@@ -328,6 +436,46 @@ export class MockWorld {
     this.finishRun("aborted", "使用者中止");
   }
 
+  // ── Rules ────────────────────────────────────────────────────────────────
+
+  private stepRules(now: number) {
+    if (now - this.lastRuleTick < 500) return;
+    this.lastRuleTick = now;
+    const ctx = this.engineCtx(now);
+    this.applyDecisions(this.engine.tickTime(ctx));
+    this.stepDetections(now);
+    // Low battery as a system event, once per crossing.
+    if (this.battery < 20 && !this.lowBatteryFired) {
+      this.lowBatteryFired = true;
+      this.applyDecisions(this.engine.onSystemEvent(ctx, "low_battery", `電量 ${Math.round(this.battery)}%`));
+    }
+    if (this.battery > 25) this.lowBatteryFired = false;
+    this.applyDecisions(this.engine.tickQueue(this.engineCtx(now)));
+  }
+
+  /** perceptiond, mocked: detections last a few seconds and are re-sighted each second. */
+  private stepDetections(now: number) {
+    if (this.hasFeature("ai") && now > this.nextDetectionAt) {
+      this.nextDetectionAt = now + 25_000 + Math.random() * 35_000;
+      const roll = Math.random();
+      const type: EventType =
+        roll < 0.5 ? "person" : roll < 0.62 ? "door_open" : roll < 0.72 ? "abandoned" : roll < 0.82 ? "intrusion" : roll < 0.9 ? "thermal" : roll < 0.96 ? "smoke" : "fall";
+      const zones = type === "intrusion" ? ["s3", "core"] : PLAN.zones.map((z) => z.id);
+      const zone = zones[Math.floor(Math.random() * zones.length)];
+      this.injectDetection(type, zone, 0.55 + Math.random() * 0.42, 1 + Math.random() * 11);
+      return;
+    }
+    const ctx = this.engineCtx(now);
+    this.detections = this.detections.filter(({ det, endsAt }) => {
+      if (now > endsAt) {
+        this.engine.endTrack(ctx, det.trackId);
+        return false;
+      }
+      this.applyDecisions(this.engine.onDetection(ctx, det));
+      return true;
+    });
+  }
+
   private finishRun(result: RunRecord["result"], reason?: string) {
     const run = this.run;
     if (!run) return;
@@ -339,6 +487,8 @@ export class MockWorld {
       result,
       reason,
       arrivals: run.arrivals,
+      cause: run.cause,
+      priority: run.priority,
     });
     this.history = this.history.slice(0, 60);
     this.run = null;
@@ -349,6 +499,7 @@ export class MockWorld {
       result === "success" ? `任務「${run.mission.name}」完成` : `任務「${run.mission.name}」${result === "aborted" ? "中止" : "失敗"}：${reason}`
     );
     this.emitMissionsChanged();
+    if (result === "failed") this.applyDecisions(this.engine.onSystemEvent(this.engineCtx(Date.now()), "mission_failed", `「${run.mission.name}」失敗`));
   }
 
   /** Not a user-facing event: tells the phone to re-fetch `mission.list`. */
@@ -414,6 +565,23 @@ export class MockWorld {
     this.health.emit({ state: "up" });
   }
 
+  pairingUntil: number | null = null;
+  private pairingTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Owner opens a 3-minute pairing window (the dog advertises for enrolment).
+   * Mock: a new phone "arrives" 6 s later and asks to join.
+   */
+  setPairingMode(on: boolean) {
+    if (this.pairingTimer) clearTimeout(this.pairingTimer);
+    this.pairingUntil = on ? Date.now() + 180_000 : null;
+    if (on) {
+      this.emitEvent("system", "info", "配對模式已開啟 3 分鐘");
+      this.pairingTimer = setTimeout(() => this.pairingUntil && this.simulateJoinRequest(), 6000);
+    }
+    return this.pairingUntil;
+  }
+
   simulateJoinRequest() {
     const phone: PairedPhone = {
       id: uid("phone"),
@@ -434,8 +602,8 @@ export class MockWorld {
     this.mode = mode;
   }
 
-  emitEvent(kind: DogEvent["kind"], level: EventLevel, text: string, ref?: string) {
-    const e: DogEvent = { id: uid("ev"), at: Date.now(), kind, level, text, ref };
+  emitEvent(kind: DogEvent["kind"], level: EventLevel, text: string, ref?: string, detection?: Detection) {
+    const e: DogEvent = { id: uid("ev"), at: Date.now(), kind, level, text, ref, detection };
     this.eventLog = [e, ...this.eventLog].slice(0, 200);
     if (this.wsOpen) this.events.emit(e);
   }
@@ -464,8 +632,7 @@ export class MockWorld {
     else this.decelerate(dt);
 
     this.checkFence();
-    this.maybeSchedule(now);
-    this.maybePerception(now);
+    this.stepRules(now);
 
     // Low battery policy during a run.
     if (this.run && !this.run.paused && this.battery < 15) {
@@ -583,41 +750,12 @@ export class MockWorld {
 
   private checkFence() {
     const outside = this.fences.some((f) => !insidePolygon(f.points, this.pose.x, this.pose.y));
-    if (outside && !this.outsideFence) this.emitEvent("fence", "critical", "狗已離開圍欄「巡邏區」");
+    if (outside && !this.outsideFence) {
+      this.emitEvent("fence", "critical", "狗已離開圍欄「巡邏區」");
+      this.applyDecisions(this.engine.onSystemEvent(this.engineCtx(Date.now()), "fence_breach", "狗離開圍欄「巡邏區」"));
+    }
     if (!outside && this.outsideFence) this.emitEvent("fence", "info", "狗已回到圍欄內");
     this.outsideFence = outside;
-  }
-
-  private maybeSchedule(now: number) {
-    if (now - this.lastScheduleCheck < 1000) return;
-    const from = this.lastScheduleCheck;
-    this.lastScheduleCheck = now;
-    if (!this.hasFeature("mission") || this.run) return;
-    if (!["IDLE", "CHARGING"].includes(this.mode)) return;
-    for (const m of this.missions) {
-      if (!m.enabled || m.trigger.type === "event") continue;
-      const next = nextTrigger(m.trigger, from, this.lastRunAt[m.id]);
-      if (next !== null && next <= now) {
-        this.startMission(m.id, "排程觸發");
-        return;
-      }
-    }
-  }
-
-  private maybePerception(now: number) {
-    if (now < this.nextPerceptionAt) return;
-    // Perception events ARE the AI feature: an unlicensed dog does not raise them.
-    if (!this.hasFeature("ai")) {
-      this.nextPerceptionAt = now + 30_000;
-      return;
-    }
-    this.nextPerceptionAt = now + 30_000 + Math.random() * 60_000;
-    const p = PERCEPTION[Math.floor(Math.random() * PERCEPTION.length)];
-    this.emitEvent("perception", p.level, p.text);
-    if (!this.run && ["IDLE", "CHARGING"].includes(this.mode) && p.text.startsWith("偵測到人員")) {
-      const m = this.missions.find((x) => x.enabled && x.trigger.type === "event" && x.trigger.eventType === "perception");
-      if (m) this.startMission(m.id, "事件觸發");
-    }
   }
 
   private frame(now: number): TelemetryFrame {
@@ -633,7 +771,10 @@ export class MockWorld {
       }
       const currentWp = run.targets[run.idx]?.wpIndex ?? run.mission.route.length - 1;
       runProgress = {
-        missionId: run.mission.id,
+        missionId: run.act?.rule.missionId ?? run.mission.id,
+        cause: run.cause,
+        priority: run.priority,
+        target: run.target,
         state: run.paused ? "paused" : "running",
         pausedReason: run.paused ?? undefined,
         currentWp,
@@ -660,6 +801,8 @@ export class MockWorld {
       estop: this.estop,
       fault: this.fault,
       run: runProgress,
+      queue: this.engine.queueItems(),
+      confirms: this.engine.pendingConfirms(this.missions),
     };
   }
 }

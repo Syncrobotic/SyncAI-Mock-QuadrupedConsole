@@ -1,6 +1,6 @@
 import { DEFAULT_FENCE, GRID, snapToFree } from "./floor";
 
-import type { DeviceInfo, DogAdvert, Mission, PairedPhone, PluginManifest, RunRecord, Waypoint } from "@/proto/types";
+import type { DeviceInfo, DogAdvert, Mission, PairedPhone, PluginManifest, Rule, RunRecord, Waypoint } from "@/proto/types";
 
 export const DOGS: DogAdvert[] = [
   { id: "dog-a", serial: "SD2026-0917-7F3A", name: "SyncAI-Dog 7F3A", rssi: -58, hasOwner: false, pairingMode: true },
@@ -73,12 +73,16 @@ export const THERMAL_PLUGIN: PluginManifest = {
   ],
 };
 
+const POLICY = { onLowBattery: "return_to_dock", onObstacle: "reroute", waitSec: 10, allowTeleopPreempt: true } as const;
+const NO_RESPONSE = { approachM: 1.5, actions: [] };
+
+/** WHAT the dog does — reusable templates. WHEN lives in `seedRules`. */
 export function seedMissions(): Mission[] {
   return [
     {
       id: "m-loop",
-      name: "夜間巡邏 · 走廊一圈",
-      enabled: true,
+      name: "走廊巡邏一圈",
+      kind: "patrol",
       route: [
         wp(-13, -2.75),
         wp(-2, -2.75, [{ type: "snapshot", camera: "front" }]),
@@ -87,43 +91,156 @@ export function seedMissions(): Mission[] {
         wp(2, 2.75, [{ type: "snapshot", camera: "front" }]),
         wp(-13, 2.75, [{ type: "wait", sec: 3 }]),
       ],
-      trigger: { type: "daily", time: "22:00" },
-      policy: { onLowBattery: "return_to_dock", onObstacle: "reroute", waitSec: 10, allowTeleopPreempt: true },
+      response: NO_RESPONSE,
+      policy: POLICY,
       returnToDock: true,
     },
     {
       id: "m-server",
       name: "機房熱像巡檢",
-      enabled: true,
+      kind: "patrol",
       route: [
         wp(-13, -2.75),
         wp(9, -2.75),
         wp(9, -5.5, [{ type: "thermal" }, { type: "plugin", pluginId: GAS_PLUGIN.id, actionId: "gas.sample", params: { gas: "CO", duration: 15, alarm_ppm: 35, notify: true } }]),
         wp(9, -2.75),
       ],
-      trigger: { type: "weekly", days: [1, 4], time: "02:00" },
-      policy: { onLowBattery: "pause", onObstacle: "wait", waitSec: 20, allowTeleopPreempt: false },
+      response: NO_RESPONSE,
+      policy: { ...POLICY, onLowBattery: "pause", onObstacle: "wait", waitSec: 20, allowTeleopPreempt: false },
       returnToDock: true,
     },
     {
       id: "m-lobby",
-      name: "大廳定時廣播",
-      enabled: false,
+      name: "大廳閉館廣播",
+      kind: "patrol",
       route: [wp(15, 0, [{ type: "announce", clipId: "clip-closing" }])],
-      trigger: { type: "interval", minutes: 30 },
-      policy: { onLowBattery: "return_to_dock", onObstacle: "abort", waitSec: 10, allowTeleopPreempt: true },
+      response: NO_RESPONSE,
+      policy: { ...POLICY, onObstacle: "abort" },
       returnToDock: false,
+    },
+    {
+      id: "m-investigate",
+      name: "前往查看",
+      kind: "response",
+      route: [],
+      response: { approachM: 1.5, actions: [{ type: "snapshot", camera: "front" }, { type: "thermal" }] },
+      policy: POLICY,
+      returnToDock: true,
+    },
+    {
+      id: "m-deter",
+      name: "驅離廣播",
+      kind: "response",
+      route: [],
+      response: { approachM: 3, actions: [{ type: "snapshot", camera: "front" }, { type: "announce", clipId: "clip-restricted" }] },
+      policy: POLICY,
+      returnToDock: true,
+    },
+  ];
+}
+
+const RULE_BASE = {
+  enabled: true,
+  mode: "auto",
+  confirmTimeoutSec: 30,
+  onTimeout: "run",
+  minBattery: 25,
+  cooldownSec: 300,
+  maxPerHour: 6,
+  onPreempted: "resume",
+  queueTtlSec: 300,
+} as const;
+
+/** WHEN and WHY — see docs/2026-09-23-mission-triggers-design.md. */
+export function seedRules(): Rule[] {
+  return [
+    {
+      ...RULE_BASE,
+      id: "r-day",
+      name: "日間例行巡邏",
+      trigger: { kind: "time", schedule: { type: "interval", minutes: 120, window: { from: "08:00", to: "20:00" } }, jitterMin: 10, missed: "catch_up", graceMin: 15 },
+      missionId: "m-loop",
+      priority: 2,
+      queueTtlSec: 1800,
+    },
+    {
+      ...RULE_BASE,
+      id: "r-night",
+      name: "夜間巡邏",
+      trigger: { kind: "time", schedule: { type: "interval", minutes: 45, window: { from: "22:00", to: "06:00" } }, jitterMin: 10, missed: "catch_up", graceMin: 15 },
+      missionId: "m-loop",
+      priority: 2,
+      queueTtlSec: 1800,
+    },
+    {
+      ...RULE_BASE,
+      id: "r-server",
+      name: "機房巡檢",
+      trigger: { kind: "time", schedule: { type: "weekly", days: [1, 4], time: "02:00" }, jitterMin: 0, missed: "skip", graceMin: 0 },
+      missionId: "m-server",
+      priority: 2,
+      minBattery: 40,
+    },
+    {
+      ...RULE_BASE,
+      id: "r-lobby",
+      name: "閉館廣播",
+      enabled: false,
+      trigger: { kind: "time", schedule: { type: "daily", time: "21:30" }, jitterMin: 0, missed: "skip", graceMin: 0 },
+      missionId: "m-lobby",
+      priority: 3,
+    },
+    {
+      ...RULE_BASE,
+      id: "r-person",
+      name: "走廊人員查看",
+      trigger: { kind: "event", source: "ai", type: "person", zones: ["corr-n", "corr-s", "lobby-e"], minConfidence: 0.8, persistSec: 3, countWithin: null, activeWindow: null },
+      missionId: "m-investigate",
+      priority: 1,
+      mode: "confirm",
+      confirmTimeoutSec: 30,
+      onTimeout: "run",
+    },
+    {
+      ...RULE_BASE,
+      id: "r-intrusion",
+      name: "限制區入侵",
+      trigger: { kind: "event", source: "ai", type: "intrusion", zones: ["s3", "core"], minConfidence: 0.75, persistSec: 2, countWithin: null, activeWindow: null },
+      missionId: "m-deter",
+      priority: 0,
+      cooldownSec: 120,
+      minBattery: 15,
+    },
+    {
+      ...RULE_BASE,
+      id: "r-fall",
+      name: "人員倒地",
+      trigger: { kind: "event", source: "ai", type: "fall", zones: [], minConfidence: 0.7, persistSec: 5, countWithin: null, activeWindow: null },
+      missionId: "m-investigate",
+      priority: 0,
+      minBattery: 10,
+    },
+    {
+      ...RULE_BASE,
+      id: "r-door",
+      name: "門未關提醒",
+      trigger: { kind: "event", source: "ai", type: "door_open", zones: [], minConfidence: 0.7, persistSec: 10, countWithin: null, activeWindow: { from: "20:00", to: "07:00" } },
+      missionId: "m-investigate",
+      priority: 1,
+      mode: "notify",
     },
   ];
 }
 
 export function seedHistory(now: number): RunRecord[] {
   const day = 86_400_000;
+  const time = (text: string, ruleId: string) => ({ kind: "time" as const, ruleId, text });
   return [
-    { id: "r1", missionId: "m-loop", startedAt: now - day + 3_600_000, endedAt: now - day + 3_700_000, result: "success", arrivals: [0, 1, 2, 3, 4, 5].map((i) => ({ wp: i, at: now - day + 3_600_000 + i * 15_000 })) },
-    { id: "r2", missionId: "m-server", startedAt: now - 2 * day, endedAt: now - 2 * day + 40_000, result: "aborted", reason: "障礙物等待逾時（20 秒）@ 航點 3", arrivals: [0, 1].map((i) => ({ wp: i, at: now - 2 * day + i * 18_000 })) },
-    { id: "r3", missionId: "m-loop", startedAt: now - 2 * day + 3_600_000, endedAt: now - 2 * day + 3_690_000, result: "success", arrivals: [0, 1, 2, 3, 4, 5].map((i) => ({ wp: i, at: now - 2 * day + 3_600_000 + i * 15_000 })) },
-    { id: "r4", missionId: "m-lobby", startedAt: now - 3 * day, endedAt: now - 3 * day + 20_000, result: "failed", reason: "喇叭無回應（mediad 0x21）", arrivals: [] },
+    { id: "r1", missionId: "m-loop", startedAt: now - day + 3_600_000, endedAt: now - day + 3_700_000, result: "success", arrivals: [0, 1, 2, 3, 4, 5].map((i) => ({ wp: i, at: now - day + 3_600_000 + i * 15_000 })), cause: time("排程 22:45", "r-night"), priority: 2 },
+    { id: "r5", missionId: "m-investigate", startedAt: now - day + 3_750_000, endedAt: now - day + 3_800_000, result: "success", arrivals: [{ wp: 0, at: now - day + 3_780_000 }], cause: { kind: "event", ruleId: "r-person", text: "偵測到人員 @ 南走廊（88%）", confirmedBy: "夜班 · Pixel 8" }, priority: 1 },
+    { id: "r2", missionId: "m-server", startedAt: now - 2 * day, endedAt: now - 2 * day + 40_000, result: "aborted", reason: "障礙物等待逾時（20 秒）@ 航點 3", arrivals: [0, 1].map((i) => ({ wp: i, at: now - 2 * day + i * 18_000 })), cause: time("排程 02:00", "r-server"), priority: 2 },
+    { id: "r3", missionId: "m-loop", startedAt: now - 2 * day + 3_600_000, endedAt: now - 2 * day + 3_690_000, result: "success", arrivals: [0, 1, 2, 3, 4, 5].map((i) => ({ wp: i, at: now - 2 * day + 3_600_000 + i * 15_000 })), cause: time("排程 23:30", "r-night"), priority: 2 },
+    { id: "r4", missionId: "m-lobby", startedAt: now - 3 * day, endedAt: now - 3 * day + 20_000, result: "failed", reason: "喇叭無回應（mediad 0x21）", arrivals: [], cause: time("排程 21:30", "r-lobby"), priority: 3 },
   ];
 }
 

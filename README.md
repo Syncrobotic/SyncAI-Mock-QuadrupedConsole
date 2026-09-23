@@ -35,6 +35,7 @@ Licence key (required, entered before Wi-Fi; decides which features the dog runs
 - **No LED pairing code** (§4 step 4): this dog pairs without one.
 - **Onboarding adds the licence key (required)**: after enrolment, before Wi-Fi, bound over BLE. The licence decides which features the dog runs (teleop / map / missions / talk / AI); a dog without one runs only the E-Stop. QR scanning removed from the scan step.
 - **The map defaults to the floor plan**: drawn like the dashboard (zone plates in `--map-unit-*`, walls). The point cloud is a layer, off by default (§6 says on).
+- **Missions are split into templates (what) and rules (when/why)** — see `docs/2026-09-23-mission-triggers-design.md`. Time rules (interval-in-window, jitter, missed-run policy) and event rules (AI / system; confidence, persistence, zones, cooldown), priorities P0–P3 with preemption, auto / confirm / notify modes, a 24 h agenda, and a per-rule decision log. The review panel can inject AI detections.
 - **Point cloud is generated from a floor plan**: there is no recorded `.ply` yet (§15). The plan is shaped to support testing: loop corridor (drive the dog one lap), a sealed core (unreachable waypoints), north offices outside the fence (out-of-fence case).
 
 ## Not done in v1 (known)

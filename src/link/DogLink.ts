@@ -5,6 +5,7 @@ import type {
   DogEvent,
   Endpoint,
   Enrollment,
+  EventType,
   Fence,
   Gait,
   GatewayHealth,
@@ -16,6 +17,8 @@ import type {
   PairSession,
   Posture,
   Role,
+  Rule,
+  RuleLogEntry,
   RunRecord,
   Session,
   TelemetryFrame,
@@ -56,11 +59,19 @@ export interface RpcMap {
   "teleop.release": [void, void];
   /** Ask the current holder to hand over; granted if they do not refuse within 5 s (§2). */
   "teleop.request": [void, { granted: boolean }];
-  "mission.list": [void, { missions: Mission[]; fences: Fence[]; history: RunRecord[] }];
+  "mission.list": [void, { missions: Mission[]; fences: Fence[]; history: RunRecord[]; rules: Rule[]; ruleLog: RuleLogEntry[] }];
   "mission.save": [Mission, { issues: ValidationIssue[] }];
   "mission.validate": [Mission, { issues: ValidationIssue[] }];
   "mission.delete": [{ id: string }, void];
-  "mission.setEnabled": [{ id: string; enabled: boolean }, void];
+  "rule.save": [Rule, void];
+  "rule.delete": [{ id: string }, void];
+  "rule.setEnabled": [{ id: string; enabled: boolean }, void];
+  /** Answer a confirm-mode activation (§4.4). */
+  "rule.confirm": [{ activationId: string; approve: boolean }, void];
+  /** Dry run: what the rule would do right now, without moving the dog (§7.4). */
+  "rule.test": [Rule, { verdict: string }];
+  /** Review/dev: inject a detection as if perceptiond saw it. */
+  "dev.detect": [{ type: EventType; zoneId: string; confidence: number; durationSec: number }, void];
   "mission.start": [{ id: string }, void];
   "mission.pause": [{ reason: string }, void];
   "mission.resume": [void, void];
@@ -71,7 +82,9 @@ export interface RpcMap {
   "device.phones": [void, PairedPhone[]];
   "device.setRole": [{ phoneId: string; role: Role }, void];
   "device.revoke": [{ phoneId: string }, void];
-  "device.approve": [{ phoneId: string; approve: boolean }, void];
+  "device.approve": [{ phoneId: string; approve: boolean; role?: Role }, void];
+  /** Owner: open the dog's pairing window so a new phone can join (BLE advertising + approval). */
+  "device.pairingMode": [{ on: boolean }, { until: number | null }];
   "device.setSafety": [Partial<DeviceInfo["safety"]>, void];
   "device.setPlugin": [{ id: string; enabled: boolean }, void];
   "license.activate": [{ key: string }, LicenseActivation];

@@ -3,26 +3,17 @@
 import { ArrowDown, ArrowUp, Camera, ChevronDown, CircleAlert, Clock, FlaskConical, Gauge, Lock, Megaphone, Plus, Thermometer, Trash2, TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
 
-import { Field, SectionTitle, Segmented, Select, inputClass } from "@/components/kit";
+import { Field, SectionTitle, Segmented, Select, Slider, inputClass } from "@/components/kit";
 import { SchemaForm, defaultsFor } from "@/components/SchemaForm";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { estimateMission, toCron } from "@/lib/schedule";
+import { estimateMission } from "@/lib/schedule";
 import { cn, formatDuration } from "@/lib/utils";
 import { set, useStore } from "@/store";
 
-import {
-  addAction,
-  closeEditor,
-  moveWaypointOrder,
-  patchDraft,
-  removeAction,
-  removeWaypoint,
-  saveDraft,
-  updateAction,
-} from "./editor";
+import { closeEditor, moveWaypointOrder, patchDraft, removeWaypoint, saveDraft, updateWaypoint } from "./editor";
 
-import type { Action, Mission, PluginManifest, Trigger, Waypoint } from "@/proto/types";
+import type { Action, Mission, PluginManifest, Waypoint } from "@/proto/types";
 
 /** §8 Sheet 90%: mission editor. Returning is closing the sheet, not "back". */
 export function MissionEditor() {
@@ -43,7 +34,7 @@ export function MissionEditor() {
         <p className="flex-1 truncate text-[14px] font-semibold">{editor.isNew ? "新任務" : "編輯任務"}</p>
         <Button
           loading={saving}
-          disabled={errors.length > 0 || d.route.length === 0}
+          disabled={errors.length > 0 || (d.kind === "patrol" && d.route.length === 0)}
           onClick={async () => {
             setSaving(true);
             await saveDraft();
@@ -59,17 +50,42 @@ export function MissionEditor() {
       <div className="flex flex-1 flex-col gap-5 px-3 pt-3 pb-8">
         {/* 1 基本 */}
         <section className="order-2 space-y-3">
-          <SectionTitle>1 · 基本</SectionTitle>
+          <SectionTitle description="任務只定義「做什麼」；什麼時候、為什麼執行，在「規則」設定">1 · 基本</SectionTitle>
           <Field label="名稱">
             <input className={inputClass} value={d.name} onChange={(e) => patchDraft({ name: e.target.value })} />
           </Field>
-          <label className="flex min-h-10 items-center justify-between text-[13px]">
-            <span className="text-[14px]">啟用</span>
-            <Switch checked={d.enabled} onCheckedChange={(v) => patchDraft({ enabled: v })} />
-          </label>
+          <Segmented
+            value={d.kind}
+            options={[
+              { value: "patrol", label: "巡邏路線" },
+              { value: "response", label: "事件回應" },
+            ]}
+            onChange={(kind) => patchDraft({ kind })}
+          />
+          <p className="text-muted-foreground text-[11px]">
+            {d.kind === "patrol" ? "沿固定航點巡邏，由時間或事件規則啟動。" : "前往觸發事件的位置，到場後執行動作。只能由事件規則啟動。"}
+          </p>
         </section>
 
+        {d.kind === "response" && (
+          <section className="order-1 space-y-3">
+            <SectionTitle description="狗會規劃路徑到事件位置附近，停在安全距離外">2 · 到場後</SectionTitle>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[13px]">
+                停在距離事件
+                <span className="font-semibold tabular-nums">{d.response.approachM.toFixed(1)} m</span>
+              </div>
+              <Slider label="靠近距離" min={0.5} max={6} step={0.5} value={d.response.approachM} onChange={(v) => patchDraft({ response: { ...d.response, approachM: v } })} />
+            </div>
+            <ActionList
+              actions={d.response.actions}
+              onChange={(actions) => patchDraft({ response: { ...d.response, actions } })}
+            />
+          </section>
+        )}
+
         {/* 2 路線 */}
+        {d.kind === "patrol" && (
         <section className="order-1 space-y-2">
           <SectionTitle>2 · 路線 · {d.route.length} 個航點</SectionTitle>
           <p className="text-muted-foreground text-xs">
@@ -84,23 +100,18 @@ export function MissionEditor() {
             ))}
           </ol>
         </section>
-
-        {/* 3 觸發 */}
-        <section className="order-3 space-y-3">
-          <SectionTitle>3 · 觸發</SectionTitle>
-          <TriggerEditor trigger={d.trigger} onChange={(trigger) => patchDraft({ trigger })} />
-        </section>
+        )}
 
         {/* 4 策略 */}
         <section className="order-4 space-y-1">
-          <SectionTitle>4 · 策略</SectionTitle>
+          <SectionTitle>3 · 策略</SectionTitle>
           <PolicyEditor mission={d} />
         </section>
 
         {/* 5 驗證 */}
         <section className="order-5 space-y-2">
-          <SectionTitle>5 · 儲存前驗證</SectionTitle>
-          {editor.issues.length === 0 && d.route.length > 0 && <p className="text-status-ok text-[13px]">航點可達、無時間重疊、電量足夠</p>}
+          <SectionTitle>4 · 儲存前驗證</SectionTitle>
+          {editor.issues.length === 0 && (d.kind === "response" || d.route.length > 0) && <p className="text-status-ok text-[13px]">航點可達、電量足夠</p>}
           {[...errors, ...warnings].map((issue, i) => (
             <button
               key={i}
@@ -138,7 +149,6 @@ function WaypointItem({ wp, index, last }: { wp: Waypoint; index: number; last: 
   const selected = useStore((s) => s.editor?.selectedWp === wp.id);
   const error = useStore((s) => s.editor?.issues.some((i) => i.level === "error" && i.waypointId === wp.id));
   const plugins = useStore((s) => s.device?.plugins);
-  const [menu, setMenu] = useState(false);
 
   return (
     <li
@@ -175,68 +185,8 @@ function WaypointItem({ wp, index, last }: { wp: Waypoint; index: number; last: 
 
       {selected && (
         <div className="space-y-2 border-t px-3 py-3">
-          {wp.actions.map((a, i) => (
-            <ActionItem key={i} wpId={wp.id} index={i} action={a} plugins={plugins ?? []} />
-          ))}
-          <div className="relative">
-            <Button variant="outline" size="sm" className="h-10 w-full" onClick={() => setMenu((m) => !m)}>
-              <Plus />
-              加入節點動作
-            </Button>
-            {menu && (
-              <div className="bg-popover mt-1.5 space-y-2 rounded-xl border p-2 shadow-lg">
-                <div className="grid grid-cols-4 gap-1">
-                  {BUILTIN.map((b) => (
-                    <button
-                      key={b.label}
-                      onClick={() => {
-                        addAction(wp.id, b.make());
-                        setMenu(false);
-                      }}
-                      className="hover:bg-accent flex h-14 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg text-[11px]"
-                    >
-                      <b.icon className="size-4" />
-                      {b.label}
-                    </button>
-                  ))}
-                </div>
-                {/* §11: plugin actions after the built-ins, grouped by plugin. */}
-                {(plugins ?? []).map((p) => (
-                  <div key={p.id}>
-                    <p className="text-muted-foreground px-1 pt-1 text-[10px] font-semibold tracking-wider uppercase">
-                      {p.name} · v{p.version}
-                    </p>
-                    {p.missionActions.map((a) => {
-                      const Icon = PLUGIN_ICON[a.icon] ?? FlaskConical;
-                      const missing = a.requires.filter((r) => !p.capabilities.includes(r));
-                      const locked = !p.enabled || missing.length > 0;
-                      return (
-                        <button
-                          key={a.id}
-                          disabled={locked}
-                          onClick={() => {
-                            addAction(wp.id, { type: "plugin", pluginId: p.id, actionId: a.id, params: defaultsFor(a.schema) });
-                            setMenu(false);
-                          }}
-                          className="hover:bg-accent flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Icon className="size-4" />
-                          {a.label}
-                          {locked && (
-                            <span className="text-muted-foreground ml-auto flex items-center gap-1 text-[11px]">
-                              <Lock className="size-3" />
-                              {!p.enabled ? "plugin 已停用" : `缺少 ${missing.join("、")}`}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <Button variant="ghost" size="sm" className="text-status-error h-10 w-full" onClick={() => removeWaypoint(wp.id)}>
+          <ActionList actions={wp.actions} onChange={(actions) => updateWaypoint(wp.id, { actions })} />
+          <Button variant="ghost" size="sm" className="text-status-error w-full" onClick={() => removeWaypoint(wp.id)}>
             <Trash2 />
             刪除航點
           </Button>
@@ -263,7 +213,89 @@ function actionLabel(plugins: PluginManifest[] | undefined) {
   };
 }
 
-function ActionItem({ wpId, index, action, plugins }: { wpId: string; index: number; action: Action; plugins: PluginManifest[] }) {
+/** A list of actions with an add menu — used by waypoints and by response missions. */
+function ActionList({ actions, onChange }: { actions: Action[]; onChange: (a: Action[]) => void }) {
+  const plugins = useStore((s) => s.device?.plugins) ?? [];
+  const [menu, setMenu] = useState(false);
+  const add = (a: Action) => {
+    onChange([...actions, a]);
+    setMenu(false);
+  };
+  return (
+    <div className="space-y-2">
+      {actions.map((a, i) => (
+        <ActionItem
+          key={i}
+          index={i}
+          action={a}
+          plugins={plugins}
+          onChange={(next) => onChange(actions.map((x, j) => (j === i ? next : x)))}
+          onRemove={() => onChange(actions.filter((_, j) => j !== i))}
+        />
+      ))}
+      <Button variant="outline" size="sm" className="w-full" onClick={() => setMenu((m) => !m)}>
+        <Plus />
+        加入動作
+      </Button>
+      {menu && (
+        <div className="bg-popover space-y-2 rounded-xl border p-2 shadow-lg">
+          <div className="grid grid-cols-4 gap-1">
+            {BUILTIN.map((b) => (
+              <button key={b.label} onClick={() => add(b.make())} className="hover:bg-accent flex h-12 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg text-[11px]">
+                <b.icon className="size-4" />
+                {b.label}
+              </button>
+            ))}
+          </div>
+          {/* §11: plugin actions after the built-ins, grouped by plugin. */}
+          {plugins.map((p) => (
+            <div key={p.id}>
+              <p className="text-muted-foreground px-1 pt-1 text-[10px] font-semibold">
+                {p.name} · v{p.version}
+              </p>
+              {p.missionActions.map((a) => {
+                const Icon = PLUGIN_ICON[a.icon] ?? FlaskConical;
+                const missing = a.requires.filter((r) => !p.capabilities.includes(r));
+                const locked = !p.enabled || missing.length > 0;
+                return (
+                  <button
+                    key={a.id}
+                    disabled={locked}
+                    onClick={() => add({ type: "plugin", pluginId: p.id, actionId: a.id, params: defaultsFor(a.schema) })}
+                    className="hover:bg-accent flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Icon className="size-4" />
+                    {a.label}
+                    {locked && (
+                      <span className="text-muted-foreground ml-auto flex items-center gap-1 text-[11px]">
+                        <Lock className="size-3" />
+                        {!p.enabled ? "plugin 已停用" : `缺少 ${missing.join("、")}`}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionItem({
+  index,
+  action,
+  plugins,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  action: Action;
+  plugins: PluginManifest[];
+  onChange: (a: Action) => void;
+  onRemove: () => void;
+}) {
   const clips = useStore((s) => s.device?.clips);
   const [open, setOpen] = useState(action.type === "plugin");
   const plugin = action.type === "plugin" ? plugins.find((p) => p.id === action.pluginId) : undefined;
@@ -276,7 +308,7 @@ function ActionItem({ wpId, index, action, plugins }: { wpId: string; index: num
           {index + 1}. {actionLabel(plugins)(action)}
           {plugin && <span className="text-muted-foreground ml-1.5 text-[11px] font-normal">{plugin.name}</span>}
         </button>
-        <Button size="icon-sm" variant="ghost" onClick={() => removeAction(wpId, index)} aria-label="移除動作">
+        <Button size="icon-sm" variant="ghost" onClick={onRemove} aria-label="移除動作">
           <X />
         </Button>
       </div>
@@ -284,7 +316,7 @@ function ActionItem({ wpId, index, action, plugins }: { wpId: string; index: num
         <div className="border-t px-3 py-2.5">
           {action.type === "wait" && (
             <Field label="等待秒數">
-              <input className={inputClass} type="number" min={1} max={600} value={action.sec} onChange={(e) => updateAction(wpId, index, { ...action, sec: Number(e.target.value) })} />
+              <input className={inputClass} type="number" min={1} max={600} value={action.sec} onChange={(e) => onChange({ ...action, sec: Number(e.target.value) })} />
             </Field>
           )}
           {action.type === "snapshot" && (
@@ -294,7 +326,7 @@ function ActionItem({ wpId, index, action, plugins }: { wpId: string; index: num
                 { value: "front", label: "前鏡頭" },
                 { value: "rear", label: "後鏡頭" },
               ]}
-              onChange={(camera) => updateAction(wpId, index, { ...action, camera })}
+              onChange={(camera) => onChange({ ...action, camera })}
             />
           )}
           {action.type === "thermal" && <p className="text-muted-foreground text-xs">在此航點做 360° 熱像掃描，約 4 秒。</p>}
@@ -303,12 +335,12 @@ function ActionItem({ wpId, index, action, plugins }: { wpId: string; index: num
               label="廣播音檔"
               value={action.clipId}
               options={(clips ?? []).map((c) => ({ value: c.id, label: `${c.name}（${c.sec}s）` }))}
-              onChange={(clipId) => updateAction(wpId, index, { ...action, clipId })}
+              onChange={(clipId) => onChange({ ...action, clipId })}
             />
           )}
           {action.type === "plugin" &&
             (contribution ? (
-              <SchemaForm schema={contribution.schema} value={action.params} onChange={(params) => updateAction(wpId, index, { ...action, params })} />
+              <SchemaForm schema={contribution.schema} value={action.params} onChange={(params) => onChange({ ...action, params })} />
             ) : (
               <p className="text-muted-foreground text-xs">此 plugin 已移除</p>
             ))}
@@ -316,118 +348,6 @@ function ActionItem({ wpId, index, action, plugins }: { wpId: string; index: num
       )}
     </div>
   );
-}
-
-// ── Trigger (§8: 三選一分段控制；Cron 用視覺化選擇器，進階才露 cron 字串) ─────────
-
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
-
-function TriggerEditor({ trigger, onChange }: { trigger: Trigger; onChange: (t: Trigger) => void }) {
-  const kind = trigger.type === "once" ? "once" : trigger.type === "event" ? "event" : "cron";
-  const [advanced, setAdvanced] = useState(false);
-  const cron = toCron(trigger);
-
-  return (
-    <div className="space-y-3">
-      <Segmented
-        value={kind}
-        options={[
-          { value: "once", label: "單次" },
-          { value: "cron", label: "週期" },
-          { value: "event", label: "事件" },
-        ]}
-        onChange={(k) =>
-          onChange(
-            k === "once"
-              ? { type: "once", at: Date.now() + 3_600_000 }
-              : k === "event"
-                ? { type: "event", eventType: "perception", filter: "person" }
-                : { type: "daily", time: "21:00" }
-          )
-        }
-      />
-
-      {trigger.type === "once" && (
-        <Field label="執行時間（狗的時鐘）">
-          <input
-            className={inputClass}
-            type="datetime-local"
-            value={toLocalInput(trigger.at)}
-            onChange={(e) => onChange({ type: "once", at: new Date(e.target.value).getTime() })}
-          />
-        </Field>
-      )}
-
-      {kind === "cron" && (
-        <>
-          <Segmented
-            value={trigger.type as "daily" | "weekly" | "interval"}
-            options={[
-              { value: "daily", label: "每日" },
-              { value: "weekly", label: "每週" },
-              { value: "interval", label: "間隔" },
-            ]}
-            onChange={(t) =>
-              onChange(t === "daily" ? { type: "daily", time: timeOf(trigger) } : t === "weekly" ? { type: "weekly", days: [1, 2, 3, 4, 5], time: timeOf(trigger) } : { type: "interval", minutes: 30 })
-            }
-          />
-          {trigger.type === "weekly" && (
-            <div className="grid grid-cols-7 gap-1">
-              {WEEKDAYS.map((w, d) => {
-                const on = trigger.days.includes(d);
-                return (
-                  <button
-                    key={d}
-                    aria-pressed={on}
-                    onClick={() => onChange({ ...trigger, days: on ? trigger.days.filter((x) => x !== d) : [...trigger.days, d].sort() })}
-                    className={cn("h-10 cursor-pointer rounded-lg border text-[13px] font-medium", on ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent")}
-                  >
-                    {w}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {(trigger.type === "daily" || trigger.type === "weekly") && (
-            <Field label="時間（狗的時鐘）">
-              <input className={inputClass} type="time" value={trigger.time} onChange={(e) => onChange({ ...trigger, time: e.target.value })} />
-            </Field>
-          )}
-          {trigger.type === "interval" && (
-            <Field label="每隔幾分鐘">
-              <input className={inputClass} type="number" min={5} max={1440} value={trigger.minutes} onChange={(e) => onChange({ type: "interval", minutes: Number(e.target.value) })} />
-            </Field>
-          )}
-          <button onClick={() => setAdvanced((a) => !a)} className="text-muted-foreground cursor-pointer text-xs underline-offset-2 hover:underline">
-            {advanced ? "隱藏進階" : "進階"}
-          </button>
-          {advanced && cron && <code className="bg-muted block rounded-md px-3 py-2 font-mono text-[13px]">{cron}</code>}
-        </>
-      )}
-
-      {trigger.type === "event" && (
-        <Select
-          label="事件"
-          value={trigger.eventType}
-          options={[
-            { value: "perception", label: "偵測到人員" },
-            { value: "fence", label: "圍欄越界" },
-          ]}
-          onChange={(eventType) => onChange({ ...trigger, eventType })}
-        />
-      )}
-    </div>
-  );
-}
-
-function timeOf(t: Trigger) {
-  return t.type === "daily" || t.type === "weekly" ? t.time : "21:00";
-}
-
-function toLocalInput(ms: number) {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ── Policy ──────────────────────────────────────────────────────────────────

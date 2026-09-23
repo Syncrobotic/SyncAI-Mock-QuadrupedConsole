@@ -15,6 +15,7 @@ import * as THREE from "three";
 
 import { getDogLink } from "@/link";
 import { insidePolygon, snapToFree } from "@/lib/geometry";
+import { useNow } from "@/hooks/use-now";
 import { useStore, set, get } from "@/store";
 
 import { useMapColors, type MapColors } from "./colors";
@@ -73,6 +74,7 @@ export function Scene({ onLongPress, labelHost }: { onLongPress: (x: number, y: 
       {layers.trail && <Trail pose={pose} color={colors.trail} />}
       {layers.fence && <Fences pose={pose} colors={colors} />}
       <Route colors={colors} controls={controls} />
+      <Detections colors={colors} />
       <Robot pose={pose} colors={colors} />
       <CameraFrustum pose={pose} color={colors.camera} />
       <Measure pose={pose} colors={colors} />
@@ -304,6 +306,71 @@ function Occupancy({ colors }: { colors: MapColors }) {
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial color={colors.dark ? "#4a4f6e" : "#9aa1bb"} />
     </instancedMesh>
+  );
+}
+
+// ── AI detections & response targets ────────────────────────────────────────
+
+const RECENT_MS = 3 * 60_000;
+
+/**
+ * Where perception saw something in the last three minutes — a pulsing ring
+ * and a thin beam, coloured by what it was (same severity ramp as the
+ * dashboard's map). The target of a running response mission gets a ring of
+ * its own, so "where is it going and why" is on the map, not only in text.
+ */
+function Detections({ colors }: { colors: MapColors }) {
+  const events = useStore((s) => s.events);
+  const target = useStore((s) => s.telemetry?.run?.target);
+  const group = useRef<THREE.Group>(null);
+  const now = useNow(5000);
+  const recent = events.filter((e) => e.detection && now - e.at < RECENT_MS).slice(0, 12);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    group.current?.children.forEach((c, i) => {
+      const ring = c.children[0];
+      if (!ring) return;
+      const k = 1 + ((t * 0.8 + i * 0.37) % 1) * 0.8;
+      ring.scale.set(k, k, k);
+      const m = (ring as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      m.opacity = 0.75 * (1 - ((t * 0.8 + i * 0.37) % 1));
+    });
+  });
+
+  const tone = (type: string) => (["intrusion", "fall", "smoke"].includes(type) ? colors.critical : type === "person" ? colors.warning : colors.camera);
+
+  return (
+    <>
+      <group ref={group}>
+        {recent.map((e) => {
+          const d = e.detection!;
+          const c = tone(d.type);
+          return (
+            <group key={e.id} position={toV(d.x, d.y, PLATE + 0.03)}>
+              <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.45, 0.6, 32]} />
+                <meshBasicMaterial color={c} transparent opacity={0.7} depthWrite={false} />
+              </mesh>
+              <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[0.18, 20]} />
+                <meshBasicMaterial color={c} />
+              </mesh>
+              <mesh position={[0, 0.9, 0]}>
+                <cylinderGeometry args={[0.025, 0.025, 1.8, 6]} />
+                <meshBasicMaterial color={c} transparent opacity={0.6} />
+              </mesh>
+            </group>
+          );
+        })}
+      </group>
+      {target && (
+        <mesh position={toV(target.x, target.y, PLATE + 0.04)} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.8, 0.95, 4, 1, Math.PI / 4]} />
+          <meshBasicMaterial color={colors.selected} transparent opacity={0.9} />
+        </mesh>
+      )}
+    </>
   );
 }
 
