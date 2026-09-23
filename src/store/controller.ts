@@ -35,7 +35,7 @@ function go(to: ConnState, patch: Partial<ReturnType<typeof get>> = {}) {
 
 export function boot() {
   const link = getDogLink();
-  // Dev handles for the Playwright UI audit (.playwright-mcp/audit.js). Mock only.
+  // Dev handles for the Playwright UI audit (scripts/ui-audit.js). Mock only.
   const w = window as unknown as Record<string, unknown>;
   w.__qcSet = set;
   w.__qcFire = (what: "estop_remote" | "gateway_down" | "revoked" | "fault") => mockWorld()?.fire(what);
