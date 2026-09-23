@@ -130,7 +130,7 @@ export class MockWorld {
     this.battery = this.scenario.battery;
     this.history = seedHistory(now);
     this._device = seedDevice(now, this.scenario.missionLicense);
-    this.license = loadLicense() ?? licenseFor("pro", "SYNC-PRO1-2026-DEMO", now);
+    this.license = loadLicense() ?? fullLicense(now);
     if (scenarioId === "low_battery") {
       this.mode = "CHARGING";
       this.charging = true;
@@ -164,6 +164,13 @@ export class MockWorld {
   resetAsNewDog() {
     this.license = licenseFor("none", null, Date.now());
     saveLicense(this.license);
+  }
+
+  /** Review shortcut: every feature on (Pro), whatever was activated before. */
+  grantAllFeatures() {
+    this.license = fullLicense(Date.now());
+    saveLicense(this.license);
+    this.emitEvent("system", "info", "License 已切換為專業版（全功能）");
   }
 
   activateLicense(key: string): LicenseActivation {
@@ -823,7 +830,13 @@ function cloudFor(budget: number) {
   return c;
 }
 
-const LICENSE_KEY = "qc.mock.dog.license";
+// v2: licences stored by earlier builds (often a CTRL/BASE key from testing) are dropped, so
+// everyone starts on the full-feature edition again.
+const LICENSE_KEY = "qc.mock.dog.license.v2";
+
+function fullLicense(now: number) {
+  return licenseFor("pro", "SYNC-PRO1-2026-DEMO", now);
+}
 
 function loadLicense(): LicenseInfo | null {
   try {

@@ -600,7 +600,8 @@ export function LicenseEntry({
   onActivated: (l: LicenseInfo) => void;
   activate?: (key: string) => Promise<LicenseActivation | null>;
 }) {
-  const [key, setKey] = useState("");
+  // Mock builds start with the full-feature key filled in so every flow can be reviewed.
+  const [key, setKey] = useState(IS_MOCK ? "SYNCPRO12026DEMO" : "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -653,7 +654,7 @@ export function LicenseEntry({
       </div>
       <MockHint>
         <code className="font-mono">SYNC-…</code> 專業版 · <code className="font-mono">BASE-…</code> 標準版（無 AI）· <code className="font-mono">CTRL-…</code> 操控版 · 含{" "}
-        <code className="font-mono">0000</code> 已綁定 · <code className="font-mono">EXPD-…</code> 過期。試試{" "}
+        <code className="font-mono">0000</code> 已綁定 · <code className="font-mono">EXPD-…</code> 過期。預填的是全功能金鑰；試操控版用{" "}
         <button className="cursor-pointer font-mono underline underline-offset-2" onClick={() => setKey("CTRL01AB2026DEMO")}>
           {formatKey("CTRL01AB2026DEMO")}
         </button>

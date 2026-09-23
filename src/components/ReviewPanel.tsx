@@ -99,6 +99,14 @@ export function ReviewPanel() {
               <Action onClick={act(() => world.otherPhoneTakesTeleop())}>他機搶操控</Action>
               <Action
                 onClick={act(() => {
+                  world.grantAllFeatures();
+                  void refreshDevice();
+                })}
+              >
+                全功能 License
+              </Action>
+              <Action
+                onClick={act(() => {
                   world.resetAsNewDog();
                   void refreshDevice();
                 })}
