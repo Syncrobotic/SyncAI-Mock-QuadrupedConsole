@@ -171,7 +171,7 @@ function Health({ owner }: { owner: boolean }) {
             onPointerUp={cancel}
             onPointerLeave={cancel}
             onContextMenu={(e) => e.preventDefault()}
-            className="bg-card relative flex h-10 w-full cursor-pointer items-center justify-center gap-2 text-[13px] overflow-hidden rounded-xl border text-[14px] font-medium select-none disabled:cursor-default"
+            className="bg-card relative flex h-9 w-full cursor-pointer items-center justify-center gap-2 text-[13px] overflow-hidden rounded-xl border text-[14px] font-medium select-none disabled:cursor-default"
           >
             {holding && <span aria-hidden className="bg-status-error/20 absolute inset-0 origin-left" style={{ animation: "hold-fill 2000ms linear forwards" }} />}
             <span className="relative flex items-center gap-2">
@@ -227,7 +227,7 @@ function Phones({ owner }: { owner: boolean }) {
             <Tag
               key={p.id}
               onClick={actionable ? () => setSelected(p.id) : undefined}
-              className={cn("flex min-h-12 w-full items-center gap-2.5 px-3 py-1.5 text-left", actionable && "hover:bg-accent/50 cursor-pointer")}
+              className={cn("flex min-h-11 w-full items-center gap-2.5 px-3 py-1.5 text-left", actionable && "hover:bg-accent/50 cursor-pointer")}
             >
               <span className="bg-muted relative grid size-8 shrink-0 place-items-center rounded-full">
                 <Smartphone className="size-3.5" />
@@ -252,7 +252,7 @@ function Phones({ owner }: { owner: boolean }) {
       <Modal open={!!target} onClose={close}>
         {target && !confirmRevoke && (
           <>
-            <p className="text-[16px] font-semibold">{target.nickname}</p>
+            <p className="text-[15px] font-semibold">{target.nickname}</p>
             <p className="text-muted-foreground mt-0.5 mb-4 text-sm">{target.pending ? "請求加入為操作員" : `目前角色：${ROLE_LABEL[target.role]}`}</p>
             {target.pending ? (
               <div className="grid grid-cols-2 gap-2">
@@ -285,7 +285,7 @@ function Phones({ owner }: { owner: boolean }) {
         )}
         {target && confirmRevoke && (
           <>
-            <p className="text-[16px] font-semibold">撤銷「{target.nickname}」？</p>
+            <p className="text-[15px] font-semibold">撤銷「{target.nickname}」？</p>
             <p className="text-muted-foreground mt-1 text-sm">立即生效。對方的連線會被關閉並清除本機憑證，要再使用必須重新配對。</p>
             <div className="mt-5 grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={() => setConfirmRevoke(false)}>
@@ -326,7 +326,7 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   ];
   return (
     <Modal open={open} onClose={onClose}>
-      <p className="text-[16px] font-semibold">加入新手機</p>
+      <p className="text-[15px] font-semibold">加入新手機</p>
       <p className="text-muted-foreground mt-0.5">讓另一支手機也能操控這隻狗。</p>
       <ol className="mt-3 space-y-2.5">
         {steps.map(([t, d], i) => (
@@ -411,7 +411,7 @@ function WifiModal({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <Modal open={open} onClose={onClose}>
-      <p className="mb-4 text-[16px] font-semibold">換 Wi-Fi</p>
+      <p className="mb-4 text-[15px] font-semibold">換 Wi-Fi</p>
       <div className="space-y-3">
         <Field label="SSID">
           <input className={inputClass} value={ssid} onChange={(e) => setSsid(e.target.value)} />
@@ -536,7 +536,7 @@ function License({ owner }: { owner: boolean }) {
         </Button>
       )}
       <Modal open={open} onClose={() => setOpen(false)}>
-        <p className="text-[16px] font-semibold">{none ? "輸入 License 金鑰" : "更換 License 金鑰"}</p>
+        <p className="text-[15px] font-semibold">{none ? "輸入 License 金鑰" : "更換 License 金鑰"}</p>
         <p className="text-muted-foreground mt-1 mb-4 text-sm">4 組、每組 4 個英數字，可以整串貼上。</p>
         <KeyInput
           value={key}
@@ -685,7 +685,7 @@ function Local() {
         </Card>
       )}
       <Modal open={confirm} onClose={() => setConfirm(false)}>
-        <p className="text-[16px] font-semibold">清除本機配對資料？</p>
+        <p className="text-[15px] font-semibold">清除本機配對資料？</p>
         <p className="text-muted-foreground mt-1 text-sm">這支手機會忘記這隻狗並退回 Onboarding。狗上的配對紀錄要由擁有者撤銷。</p>
         <div className="mt-5 grid grid-cols-2 gap-2">
           <Button variant="outline"  onClick={() => setConfirm(false)}>

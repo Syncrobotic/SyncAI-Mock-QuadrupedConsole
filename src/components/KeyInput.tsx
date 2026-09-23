@@ -59,7 +59,7 @@ export function KeyInput({
               if (e.key === "Backspace" && g.length === 0 && i > 0) refs.current[i - 1]?.focus();
             }}
             className={cn(
-              "bg-background h-12 w-full min-w-0 rounded-lg border text-center font-mono text-[17px] font-semibold tracking-[0.12em] uppercase outline-none",
+              "bg-background h-11 w-full min-w-0 rounded-lg border text-center font-mono text-[16px] font-semibold tracking-[0.12em] uppercase outline-none",
               "focus-visible:border-primary focus-visible:ring-primary/30 focus-visible:ring-2 disabled:opacity-50",
               invalid ? "border-status-error/60" : "border-input"
             )}

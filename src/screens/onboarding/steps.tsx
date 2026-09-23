@@ -65,7 +65,7 @@ function Screen({
               <Icon className="size-5" />
             </span>
           )}
-          <h1 className="text-[20px] leading-tight font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-[18px] leading-tight font-semibold tracking-tight">{title}</h1>
           {lead && <p className="text-muted-foreground mt-1.5 max-w-[320px] text-[13px] leading-relaxed">{lead}</p>}
         </div>
         <div className="mt-5 space-y-3">{children}</div>
@@ -89,7 +89,7 @@ function ActionBar({ children }: { children: React.ReactNode }) {
 }
 
 function Primary(props: React.ComponentProps<typeof Button>) {
-  return <Button {...props} className={cn("h-11 w-full rounded-lg text-[14px]", props.className)} />;
+  return <Button {...props} className={cn("h-10 w-full rounded-lg text-[14px]", props.className)} />;
 }
 
 /** The login page's account row: letter tile, two lines, a badge, an arrow. */
@@ -162,7 +162,7 @@ export function StepWelcome({ go }: StepProps) {
       <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-5 pt-12 pb-4">
         <div className="flex flex-col items-center text-center">
           <BrandGlyph className="size-10" />
-          <h1 className="mt-6 text-[22px] font-semibold tracking-tight">連接你的 SyncAI-Dog</h1>
+          <h1 className="mt-6 text-[20px] font-semibold tracking-tight">連接你的 SyncAI-Dog</h1>
           <p className="text-muted-foreground mt-1.5 max-w-[300px] text-[13px] leading-relaxed">不用帳號。靠近狗、用藍牙配對，這支手機就是它的遙控器。</p>
         </div>
 
@@ -447,7 +447,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
             </Button>
             <Button
               variant="ghost"
-              className="h-11 w-full"
+              className="h-10 w-full"
               onClick={() => {
                 abort.current?.abort();
                 go("scan");
@@ -474,7 +474,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
             <KeyRound className="size-6" />
           </span>
           <p className="text-muted-foreground text-sm">你在這隻狗上的角色</p>
-          <p className="text-3xl font-bold tracking-tight">{ROLE_LABEL[granted.role]}</p>
+          <p className="text-2xl font-bold tracking-tight">{ROLE_LABEL[granted.role]}</p>
           <p className="text-muted-foreground max-w-[260px] text-center text-xs">
             {granted.role === "owner"
               ? "第一支配對的手機。可以核准其他手機、解除 E-Stop、管理裝置。"
@@ -672,7 +672,7 @@ export function LicenseCard({ license }: { license: LicenseInfo }) {
       </div>
       <ul className="divide-y">
         {license.features.map((f) => (
-          <li key={f.feature} className="flex h-11 items-center justify-between gap-2 px-4 text-[14px]">
+          <li key={f.feature} className="flex h-10 items-center justify-between gap-2 px-4 text-[13px]">
             <span className={cn("min-w-0", !f.granted && "text-muted-foreground")}>
               {FEATURE_LABEL[f.feature]}
               <span className="text-muted-foreground ml-2 text-[11px]">{FEATURE_HINT[f.feature]}</span>
@@ -741,7 +741,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
       <MockHint>網路名稱含 fail → 密碼錯；none → 找不到；slow → 25 秒才連上</MockHint>
 
       <Modal open={skipAsk} onClose={() => setSkipAsk(false)}>
-        <p className="text-[16px] font-semibold">先不設 Wi-Fi？</p>
+        <p className="text-[15px] font-semibold">先不設 Wi-Fi？</p>
         <p className="text-muted-foreground mt-1 text-sm">只剩藍牙：看不到地圖、不能操控、不能通話。E-Stop 與裝置頁可用，之後可以在裝置頁設定 Wi-Fi。</p>
         <div className="mt-5 grid grid-cols-2 gap-2">
           <Button variant="outline" onClick={() => setSkipAsk(false)}>

@@ -328,9 +328,14 @@ function WindowRow({ window, onChange, label }: { window: { from: string; to: st
       </label>
       {window && (
         <div className="flex items-center gap-2">
-          <input aria-label="開始" className={inputClass} type="time" value={window.from} onChange={(e) => onChange({ ...window, from: e.target.value })} />
+          {/* The label's 2px padding makes the tap area 44 without a taller field. */}
+          <label className="-my-0.5 min-w-0 flex-1 py-0.5">
+            <input aria-label="開始" className={inputClass} type="time" value={window.from} onChange={(e) => onChange({ ...window, from: e.target.value })} />
+          </label>
           <span className="text-muted-foreground">–</span>
-          <input aria-label="結束" className={inputClass} type="time" value={window.to} onChange={(e) => onChange({ ...window, to: e.target.value })} />
+          <label className="-my-0.5 min-w-0 flex-1 py-0.5">
+            <input aria-label="結束" className={inputClass} type="time" value={window.to} onChange={(e) => onChange({ ...window, to: e.target.value })} />
+          </label>
         </div>
       )}
     </div>
@@ -367,19 +372,13 @@ function EventEditor({ t }: { t: EventTrigger }) {
                 patchTrigger({ source: src, type: first, zones: [] });
               }}
               className={cn(
-                "relative flex h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border text-[11px] font-medium disabled:cursor-not-allowed disabled:opacity-45",
+                "relative flex h-9 cursor-pointer items-center justify-center gap-1 rounded-lg border text-[12px] font-medium disabled:cursor-not-allowed disabled:opacity-45",
                 on ? "border-primary bg-primary/10 text-primary-accent" : "bg-card hover:bg-accent"
               )}
             >
-              {src === "ai" && <Sparkles className="size-4" />}
-              {src !== "ai" && <Zap className="size-4" />}
+              {locked ? <Lock className="size-3.5" /> : src === "ai" ? <Sparkles className="size-3.5" /> : <Zap className="size-3.5" />}
               {SOURCE_LABEL[src]}
-              {locked && (
-                <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
-                  <Lock className="size-2.5" />
-                  {src === "external" ? "第二期" : "未授權"}
-                </span>
-              )}
+              {locked && <span className="sr-only">（{src === "external" ? "第二期" : "未授權"}）</span>}
             </button>
           );
         })}
@@ -392,13 +391,14 @@ function EventEditor({ t }: { t: EventTrigger }) {
             key={k}
             onClick={() => patchTrigger({ type: k })}
             aria-pressed={t.type === k}
-            className={cn("cursor-pointer rounded-lg border px-2.5 py-1.5 text-left", t.type === k ? "border-primary bg-primary/10" : "bg-card hover:bg-accent")}
+            className={cn("h-9 cursor-pointer truncate rounded-lg border px-2.5 text-left text-[13px] font-medium", t.type === k ? "border-primary bg-primary/10 text-primary-accent" : "bg-card hover:bg-accent")}
           >
-            <span className="block text-[13px] font-medium">{EVENT_TYPES[k].label}</span>
-            <span className="text-muted-foreground block text-[11px] leading-tight">{EVENT_TYPES[k].hint}</span>
+            {EVENT_TYPES[k].label}
           </button>
         ))}
       </div>
+      {/* The hint for the chosen type only — one line instead of one per tile. */}
+      <p className="text-muted-foreground -mt-1.5 text-[11px]">{EVENT_TYPES[t.type].hint}</p>
 
       {/* Where */}
       {info.located && (
@@ -482,7 +482,7 @@ function PrioritySection({ r }: { r: Rule }) {
               onClick={() => patchRule({ priority: p })}
               aria-pressed={r.priority === p}
               className={cn(
-                "flex h-12 cursor-pointer flex-col items-center justify-center rounded-lg border text-[11px] disabled:cursor-not-allowed disabled:opacity-45",
+                "flex h-10 cursor-pointer flex-col items-center justify-center rounded-lg border text-[11px] leading-tight disabled:cursor-not-allowed disabled:opacity-45",
                 r.priority === p ? "border-primary bg-primary/10" : "bg-card hover:bg-accent"
               )}
             >

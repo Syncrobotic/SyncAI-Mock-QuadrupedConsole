@@ -184,13 +184,13 @@ function MoreSheet({ open, onClose, micDisabled }: { open: boolean; onClose: () 
     if (r) toast.success("快照已存到手機與狗端 artifacts");
   };
 
-  const item = "hover:bg-accent flex h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left text-[14px] [&_svg]:size-4 [&_svg]:text-muted-foreground";
+  const item = "hover:bg-accent flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left text-[13px] [&_svg]:size-4 [&_svg]:text-muted-foreground";
 
   return (
     <Modal open={open} onClose={onClose}>
       {!broadcast ? (
         <>
-          <p className="mb-2 text-[16px] font-semibold">通話選項</p>
+          <p className="mb-2 text-[15px] font-semibold">通話選項</p>
           <div className="space-y-0.5">
             <button className={item} aria-pressed={call.thermal} onClick={() => set((s) => ({ call: { ...s.call, thermal: !s.call.thermal } }))}>
               <Thermometer />
@@ -227,7 +227,7 @@ function MoreSheet({ open, onClose, micDisabled }: { open: boolean; onClose: () 
         </>
       ) : (
         <>
-          <p className="mb-3 text-[16px] font-semibold">從狗的喇叭播放</p>
+          <p className="mb-3 text-[15px] font-semibold">從狗的喇叭播放</p>
           <div className="space-y-1.5">
             {(clips ?? []).map((c) => (
               <button
@@ -238,7 +238,7 @@ function MoreSheet({ open, onClose, micDisabled }: { open: boolean; onClose: () 
                   const ok = await rpc("media.broadcast", { clipId: c.id });
                   if (ok !== null) toast(`正在播放「${c.name}」`);
                 }}
-                className="hover:bg-accent flex h-11 w-full cursor-pointer items-center justify-between rounded-lg border px-3 text-left text-[13px]"
+                className="hover:bg-accent flex h-10 w-full cursor-pointer items-center justify-between rounded-lg border px-3 text-left text-[13px]"
               >
                 {c.name}
                 <span className="text-muted-foreground text-xs tabular-nums">{c.sec}s</span>

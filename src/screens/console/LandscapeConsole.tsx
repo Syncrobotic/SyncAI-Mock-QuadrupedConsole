@@ -66,7 +66,7 @@ export function LandscapeConsole() {
               <p className="text-muted-foreground mt-1 text-sm">把手機轉回直向，或切到操控。E-Stop 在上方隨時可用。</p>
               <button
                 onClick={() => set({ tab: "teleop" })}
-                className="bg-primary text-primary-foreground mt-3 inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg px-4 text-[13px] font-medium"
+                className="bg-primary text-primary-foreground mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-4 text-[13px] font-medium"
               >
                 <Gamepad2 className="size-4" />
                 切到操控

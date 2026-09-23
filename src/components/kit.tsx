@@ -116,7 +116,7 @@ export function PanelHeader({ icon, title, subtitle, action }: { icon: LucideIco
     <div className="flex items-center gap-3">
       <IconPlate icon={icon} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[16px] leading-tight font-semibold">{title}</p>
+        <p className="truncate text-[15px] leading-tight font-semibold">{title}</p>
         {subtitle && <p className="text-muted-foreground mt-0.5 truncate text-[12px]">{subtitle}</p>}
       </div>
       {action}
@@ -285,7 +285,7 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 }
 
 export const inputClass =
-  "bg-background border-input h-11 w-full rounded-lg border px-3 text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 aria-invalid:border-destructive";
+  "bg-background border-input h-10 w-full rounded-lg border px-3 text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 aria-invalid:border-destructive";
 
 export function Select<T extends string>({
   value,
@@ -333,10 +333,10 @@ export function Select<T extends string>({
   );
 }
 
-/** A list row: label left, value/control right. 44pt minimum. */
+/** A list row: label left, value/control right. Controls in it carry their own 44px hit area. */
 export function Row({ label, sub, children, className }: { label: ReactNode; sub?: ReactNode; children?: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex min-h-11 items-center justify-between gap-3 py-1", className)}>
+    <div className={cn("flex min-h-9 items-center justify-between gap-3 py-1", className)}>
       <div className="min-w-0">
         <p className="truncate text-[13px]">{label}</p>
         {sub && <p className="text-muted-foreground truncate text-[11px]">{sub}</p>}

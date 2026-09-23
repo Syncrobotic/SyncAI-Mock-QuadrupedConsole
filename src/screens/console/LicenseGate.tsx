@@ -24,7 +24,7 @@ export function LicenseGate() {
         <span className="bg-muted grid size-12 place-items-center rounded-2xl">
           <Lock className="size-5" />
         </span>
-        <p className="text-[18px] font-semibold">這隻狗還沒啟用 License</p>
+        <p className="text-[16px] font-semibold">這隻狗還沒啟用 License</p>
         <p className="text-muted-foreground text-sm">必須由擁有者輸入 License 金鑰後才能使用。E-Stop 仍然可用。</p>
         <Button variant="outline" className="mt-2" onClick={clearLocalPairing}>
           改配對別隻狗

@@ -241,8 +241,8 @@ function ActionList({ actions, onChange }: { actions: Action[]; onChange: (a: Ac
         <div className="bg-popover space-y-2 rounded-xl border p-2 shadow-lg">
           <div className="grid grid-cols-4 gap-1">
             {BUILTIN.map((b) => (
-              <button key={b.label} onClick={() => add(b.make())} className="hover:bg-accent flex h-12 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg text-[11px]">
-                <b.icon className="size-4" />
+              <button key={b.label} onClick={() => add(b.make())} className="hover:bg-accent flex h-10 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg text-[11px]">
+                <b.icon className="size-3.5" />
                 {b.label}
               </button>
             ))}

@@ -20,16 +20,17 @@ const buttonVariants = cva(
         link: "text-primary-accent underline-offset-4 hover:underline",
       },
       // Phone app: no `md:` shrink (≥768px here means a tablet, still a
-      // finger). Sized for density after review ("buttons too big, too little
-      // information"): 40px default, 36px for secondary inline actions. The
-      // safety-critical controls (E-Stop 56pt, joysticks) keep their size.
+      // finger). Sized for density after two reviews ("buttons too big"):
+      // 36px default, 32px for secondary inline actions. The 44px tap target
+      // comes from the global invisible hit-slop (globals.css), not the look.
+      // The safety-critical controls (E-Stop 56pt, joysticks) keep their size.
       size: {
-        default: "h-10 px-3.5 py-2 text-[13px] has-[>svg]:px-3",
-        sm: "h-9 rounded-md gap-1.5 px-3 text-[13px] has-[>svg]:px-2.5",
-        lg: "h-11 rounded-md px-5 has-[>svg]:px-4",
-        icon: "size-10",
-        "icon-sm": "size-9",
-        "icon-lg": "size-11",
+        default: "h-9 px-3 py-1.5 text-[13px] has-[>svg]:px-2.5",
+        sm: "h-8 rounded-md gap-1.5 px-2.5 text-[12px] has-[>svg]:px-2",
+        lg: "h-10 rounded-md px-4 text-[14px] has-[>svg]:px-3.5",
+        icon: "size-9",
+        "icon-sm": "size-8",
+        "icon-lg": "size-10",
       },
     },
     defaultVariants: {

@@ -149,7 +149,7 @@ function RunCard() {
       </div>
       {queue && queue.length > 0 && <QueueList />}
       <Modal open={confirmAbort} onClose={() => setConfirmAbort(false)}>
-        <p className="text-[16px] font-semibold">中止任務？</p>
+        <p className="text-[15px] font-semibold">中止任務？</p>
         <p className="text-muted-foreground mt-1">狗會停在原地，這次執行會記為「中止」。排隊中的任務會接著執行。</p>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button variant="outline" onClick={() => setConfirmAbort(false)}>
@@ -388,7 +388,7 @@ function RuleDetail({ rule }: { rule: Rule }) {
       )}
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)}>
-        <p className="text-[16px] font-semibold">刪除規則「{rule.name}」？</p>
+        <p className="text-[15px] font-semibold">刪除規則「{rule.name}」？</p>
         <p className="text-muted-foreground mt-1">任務範本會保留，只是不再由這條規則啟動。</p>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button variant="outline" onClick={() => setConfirmDelete(false)}>
@@ -507,7 +507,7 @@ function MissionDetail({ mission }: { mission: Mission }) {
       </div>
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)}>
-        <p className="text-[16px] font-semibold">刪除「{mission.name}」？</p>
+        <p className="text-[15px] font-semibold">刪除「{mission.name}」？</p>
         <p className="text-muted-foreground mt-1">{usedBy.length ? `還有 ${usedBy.length} 條規則使用它，需要先修改那些規則。` : "任務範本會從狗上移除，執行紀錄保留。"}</p>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button variant="outline" onClick={() => setConfirmDelete(false)}>

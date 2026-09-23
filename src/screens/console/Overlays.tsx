@@ -91,7 +91,7 @@ function Approval() {
       <div className="bg-primary/15 text-primary-accent mb-3 grid size-10 place-items-center rounded-xl">
         <Smartphone className="size-5" />
       </div>
-      <h2 className="text-[16px] font-semibold">有手機請求加入</h2>
+      <h2 className="text-[15px] font-semibold">有手機請求加入</h2>
       <p className="text-muted-foreground mt-1">{req?.text}</p>
       <p className="mt-3 mb-1.5 text-[12px] font-medium">給它的角色</p>
       <Segmented
