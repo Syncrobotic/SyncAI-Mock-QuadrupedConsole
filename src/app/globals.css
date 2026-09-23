@@ -1,0 +1,87 @@
+/* Design tokens are shared verbatim with OrchestrationDashboard (spec §16:
+   "先抽成 tokens.css，兩個 repo 共用"). Until it becomes a workspace package
+   this is a copy — do not drift the values, change them upstream. */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../styles/tokens.css";
+
+/* ── Console-only tokens ─────────────────────────────────────── */
+:root {
+  /* E-Stop is not "destructive" (a delete button): it must read as the one red
+     thing on screen in sunlight, so it is its own, fully saturated token. */
+  --estop: oklch(0.58 0.235 27);
+  --estop-pressed: oklch(0.42 0.17 27);
+  --map-bg: #e9ebf2;
+}
+.dark {
+  --map-bg: #0b0c12;
+}
+
+@theme inline {
+  --color-estop: var(--estop);
+  --color-estop-pressed: var(--estop-pressed);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  a,
+  [role="button"],
+  [role="tab"],
+  label {
+    touch-action: manipulation;
+  }
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* The same dark-plate decoration the dashboard's command strip uses. */
+.plate-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* E-Stop stripes — hazard tape, drawn in the estop hue so it survives greyscale. */
+.estop-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(0, 0, 0, 0.22) 0 10px,
+    transparent 10px 20px
+  );
+}
+
+@keyframes hold-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

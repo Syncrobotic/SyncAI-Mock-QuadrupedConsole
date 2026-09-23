@@ -1,0 +1,213 @@
+
+/* `dark:` applies under a `.dark` ancestor, but is neutralised inside a `.light`
+   scope so a forced-light subtree stays light even when nested in a dark page. */
+@custom-variant dark (&:is(.dark *):not(.light *));
+
+/* ─────────────────────────────────────────────────────────────
+   Design tokens — ported verbatim from the Portal so the two
+   products read as one system. Do not drift these values.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --background: oklch(0.98 0.003 285);
+  --foreground: oklch(0.145 0 0);
+  --surface: oklch(0.99 0.002 285);
+  --surface-sunken: oklch(0.955 0.004 285);
+  --card: oklch(1 0 0);
+  /* An UNREAD row's tint, pre-composited over --card so it is OPAQUE.
+     It has to be: the tint is mirrored onto sticky cells, and a sticky cell
+     that is not opaque lets the columns scrolling under it show through. A
+     translucent `bg-primary/4` cannot be both the row's tint and the sticky
+     column's cover; this token is. */
+  --row-unread: oklch(0.976 0.006 285);
+  /* The DARK PLATE: the near-black ground the overview's command strip and the
+     landing page's feature panels sit on. It is the same surface in both
+     places and was a raw `#12141c` hex in both — two literals with nothing
+     tying them together, so a change to one would have quietly split them.
+     It does NOT flip with the theme: this is brand art that is dark on
+     purpose, which is why it is one token rather than a `--surface-*` pair. */
+  --plate: oklch(0.19 0.012 275);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.464 0.15 285);
+  --primary-foreground: oklch(0.985 0 0);
+  /* Primary used as *foreground* (text/icons/accents). Equals --primary in
+     light; a lighter shade in dark so it stays readable on dark surfaces. */
+  --primary-accent: oklch(0.464 0.15 285);
+  --secondary: oklch(0.97 0.005 285);
+  --secondary-foreground: oklch(0.205 0.02 285);
+  --muted: oklch(0.97 0.005 285);
+  --muted-foreground: oklch(0.5 0.01 285);
+  --accent: oklch(0.97 0.005 285);
+  --accent-foreground: oklch(0.205 0.02 285);
+  --destructive: oklch(0.55 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.464 0.15 285);
+  --radius: 0.625rem;
+
+  /* Severity ramp — this product has four levels where the Portal has one
+     destructive. Used by SeverityBar, EventCard and the map alike. */
+  /* 🔴 這五個是 *淺色* 值，2026-09-08 下修。原本的值是在深色 console 上調的，
+     當文字用時對淺色卡只有 2.5–3.7:1——低於每一條門檻，而它們正是「有東西不對」
+     的那個顏色。現在全部 ≥4.6:1，色相不動、色域內。深色值一個都沒改。
+     status-busy 順手移到 hue 250，否則下修後會跟 severity-info 撞成同一個值。 */
+  --severity-info: oklch(0.55 0.125 240);
+  --severity-warning: oklch(0.56 0.115 75);
+  --severity-critical: oklch(0.58 0.22 28);
+  --severity-emergency: oklch(0.5 0.26 12);
+
+  /* Entity status ramp — device / task / agent share it. */
+  --status-ok: oklch(0.54 0.145 150);
+  --status-busy: oklch(0.56 0.14 250);
+  --status-charging: oklch(0.75 0.15 90);
+  --status-offline: oklch(0.56 0.01 285);
+  --status-error: oklch(0.58 0.22 28);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.145 0.008 285);
+  --foreground: oklch(0.93 0.008 285);
+  --surface: oklch(0.175 0.008 285);
+  --surface-sunken: oklch(0.12 0.008 285);
+  --card: oklch(0.205 0.008 285);
+  --row-unread: oklch(0.222 0.014 285);
+  --plate: oklch(0.165 0.012 275);
+  --card-foreground: oklch(0.93 0.008 285);
+  --popover: oklch(0.175 0.008 285);
+  --popover-foreground: oklch(0.93 0.008 285);
+  --primary: oklch(0.464 0.15 285);
+  --primary-foreground: oklch(0.985 0 0);
+  --primary-accent: oklch(0.72 0.13 285);
+  --secondary: oklch(0.22 0.01 285);
+  --secondary-foreground: oklch(0.93 0.008 285);
+  --muted: oklch(0.22 0.01 285);
+  --muted-foreground: oklch(0.75 0.015 285);
+  --accent: oklch(0.22 0.01 285);
+  --accent-foreground: oklch(0.93 0.008 285);
+  --destructive: oklch(0.55 0.22 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.464 0.15 285);
+
+  --severity-info: oklch(0.7 0.13 240);
+  --severity-warning: oklch(0.78 0.15 75);
+  --severity-critical: oklch(0.65 0.21 28);
+  --severity-emergency: oklch(0.6 0.25 12);
+
+  --status-ok: oklch(0.72 0.16 150);
+  --status-busy: oklch(0.72 0.16 240);
+  --status-charging: oklch(0.8 0.15 90);
+  --status-offline: oklch(0.6 0.015 285);
+  --status-error: oklch(0.65 0.21 28);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Map palette — sRGB hex, deliberately NOT oklch.
+
+   deck.gl takes [r, g, b, a] number arrays, so every colour the
+   canvas draws has to survive a parse into integers.
+   `getComputedStyle` hands back whatever the author wrote, and
+   converting the oklch design tokens in JS would mean shipping a
+   colour-space converter to do it correctly.
+
+   So the map gets its own small palette in a format that parses
+   with a regex. `use-map-theme.ts` reads these and nothing else.
+   Keep it small: this is the map's palette, not a second design
+   system.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --map-ground: #eef0f5;
+  --map-unit-line: #98a0b8;
+  --map-unit-office: #dfe3ee;
+  --map-unit-corridor: #e8ebf3;
+  --map-unit-lobby: #d8e0f2;
+  --map-unit-restricted: #f2d9dc;
+  --map-unit-public: #dcecdf;
+  --map-unit-utility: #e6e3dc;
+  --map-path-planned: #c08a1e;
+  --map-path-trail: #7b6fd0;
+  --map-camera: #2f6fd0;
+  --map-quadruped: #1f8a54;
+  --map-delivery: #7b52c9;
+  --map-iot: #6b7280;
+  --map-poi: #4b5563;
+  --map-selected: #111827;
+  --map-severity-info: #2f6fd0;
+  --map-severity-warning: #c08a1e;
+  --map-severity-critical: #d24b3c;
+  --map-severity-emergency: #a41f2e;
+}
+
+.dark {
+  --map-ground: #12131a;
+  --map-unit-line: #949cb6;
+  --map-unit-office: #343a4d;
+  --map-unit-corridor: #2c313f;
+  --map-unit-lobby: #3a4257;
+  --map-unit-restricted: #5c3034;
+  --map-unit-public: #2f4438;
+  --map-unit-utility: #3d3a33;
+  --map-path-planned: #ffc85a;
+  --map-path-trail: #a99cf0;
+  --map-camera: #6eaaff;
+  --map-quadruped: #82e6a0;
+  --map-delivery: #c2a3ff;
+  --map-iot: #9aa3b2;
+  --map-poi: #c8cedb;
+  --map-selected: #ffffff;
+  --map-severity-info: #6eaaff;
+  --map-severity-warning: #ffc85a;
+  --map-severity-critical: #ff6e64;
+  --map-severity-emergency: #ff3b52;
+}
+
+@theme inline {
+  /* §2 of the requirements spec draws its responsive line at 1440, which is not
+     one of Tailwind's defaults. `wide:` is that line: at and above it the
+     inspector sits in the layout; below it the inspector becomes an overlay. */
+  --breakpoint-wide: 90rem;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-brand: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-row-unread: var(--row-unread);
+  --color-plate: var(--plate);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-accent: var(--primary-accent);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-severity-info: var(--severity-info);
+  --color-severity-warning: var(--severity-warning);
+  --color-severity-critical: var(--severity-critical);
+  --color-severity-emergency: var(--severity-emergency);
+  --color-status-ok: var(--status-ok);
+  --color-status-busy: var(--status-busy);
+  --color-status-charging: var(--status-charging);
+  --color-status-offline: var(--status-offline);
+  --color-status-error: var(--status-error);
+  --radius: var(--radius);
+}
+

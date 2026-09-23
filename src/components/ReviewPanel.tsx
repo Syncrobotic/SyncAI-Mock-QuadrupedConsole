@@ -1,0 +1,173 @@
+"use client";
+// Reads the mock world's mutable fields directly (dev tooling), which the
+// compiler would memoize into stale values.
+"use no memo";
+
+import { FlaskConical, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useState } from "react";
+
+import { mockWorld } from "@/link";
+import { SCENARIOS, SCENARIO_IDS } from "@/link/mock/scenarios";
+import { cn } from "@/lib/utils";
+import { useStore } from "@/store";
+import { changeScenario, clearLocalPairing, refreshPhones } from "@/store/controller";
+import { CONN_LABEL, MODE_LABEL } from "@/store/logic";
+
+/**
+ * Design-review panel — desktop only, outside the phone. Not part of the
+ * product: on a device the same switches live in the device tab's hidden dev
+ * menu (§12 Mock 注入). Styled as the dashboard's command strip so it reads
+ * as tooling, not as app UI.
+ */
+export function ReviewPanel() {
+  const conn = useStore((s) => s.conn);
+  const mode = useStore((s) => s.telemetry?.mode);
+  const role = useStore((s) => s.session?.role ?? s.credential?.role);
+  const [, force] = useState(0);
+  const scenario = useStore((s) => s.scenario);
+  const world = mockWorld();
+  const { theme, setTheme } = useTheme();
+
+  const act = (fn: () => void) => () => {
+    fn();
+    force((n) => n + 1);
+  };
+
+  return (
+    <aside className="bg-plate relative hidden max-h-[844px] w-[300px] shrink-0 flex-col overflow-hidden rounded-xl border border-white/8 text-white shadow-lg lg:flex">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-violet-500/60 to-transparent" />
+      <div className="flex items-center justify-between border-b border-white/6 px-4 py-3">
+        <p className="flex items-center gap-2 text-sm font-semibold">
+          <FlaskConical className="size-4 text-violet-300" />
+          Mock 審查面板
+        </p>
+        <button
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="grid size-8 cursor-pointer place-items-center rounded-md text-white/60 hover:bg-white/8 hover:text-white"
+          aria-label="切換深淺色"
+        >
+          {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </button>
+      </div>
+
+      <div className="scrollbar-none flex-1 space-y-5 overflow-y-auto px-4 py-4">
+        <div className="grid grid-cols-3 gap-2">
+          <Readout label="連線" value={CONN_LABEL[conn]} sub={conn} />
+          <Readout label="狗" value={mode ? MODE_LABEL[mode] : "—"} sub={mode ?? "no telemetry"} />
+          <Readout label="角色" value={role ?? "—"} sub="scopes" />
+        </div>
+
+        <Group title="場景 ?scenario=">
+          <div className="space-y-1">
+            {SCENARIO_IDS.map((id) => (
+              <button
+                key={id}
+                onClick={act(() => changeScenario(id))}
+                className={cn(
+                  "flex w-full cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors",
+                  scenario === id ? "bg-violet-500/20 ring-1 ring-violet-400/40" : "hover:bg-white/6"
+                )}
+              >
+                <span className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", scenario === id ? "bg-violet-300" : "bg-white/25")} />
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-medium">
+                    {SCENARIOS[id].label} <span className="font-mono text-[11px] text-white/40">{id}</span>
+                  </span>
+                  <span className="block text-[11px] text-white/45">{SCENARIOS[id].verifies}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </Group>
+
+        {world && (
+          <Group title="觸發">
+            <div className="grid grid-cols-2 gap-1.5">
+              <Action onClick={act(() => world.fire("estop_remote"))}>遠端 E-Stop</Action>
+              <Action onClick={act(() => world.fire("gateway_down"))}>Gateway 掛掉</Action>
+              <Action onClick={act(() => world.fire("fault"))}>FAULT 0x42</Action>
+              <Action onClick={act(() => world.fire("revoked"))}>撤銷本機</Action>
+              <Action onClick={act(() => world.otherPhoneTakesTeleop())}>他機搶操控</Action>
+              <Action
+                onClick={act(() => {
+                  world.simulateJoinRequest();
+                  void refreshPhones();
+                })}
+              >
+                新手機請求加入
+              </Action>
+            </div>
+          </Group>
+        )}
+
+        {world && (
+          <Group title="配對模擬">
+            <Toggle label="Owner 手機在線（第二隻狗核准）" on={world.dev.ownerOnline} onChange={act(() => (world.dev.ownerOnline = !world.dev.ownerOnline))} />
+            <Toggle label="BLE 不穩（前兩次連線失敗）" on={world.dev.bleFlaky} onChange={act(() => (world.dev.bleFlaky = !world.dev.bleFlaky))} />
+            <Action onClick={act(() => clearLocalPairing())} className="mt-2 w-full">
+              清除本機配對 → 重走 Onboarding
+            </Action>
+          </Group>
+        )}
+
+        <Group title="提示">
+          <ul className="space-y-1 text-[11px] leading-relaxed text-white/55">
+            <li>
+              確認碼：<code className="font-mono text-white/80">123456</code>，其他碼算錯
+            </li>
+            <li>
+              Wi-Fi 名稱含 <code className="font-mono text-white/80">fail</code> → 密碼錯；
+              <code className="font-mono text-white/80">none</code> → 找不到；
+              <code className="font-mono text-white/80">slow</code> → 25 秒才連上
+            </li>
+            <li>任務 tab 開編輯器時，在地圖上長按 0.5 秒放航點</li>
+            <li>點地圖任一點顯示與狗的直線距離</li>
+          </ul>
+        </Group>
+      </div>
+    </aside>
+  );
+}
+
+function Readout({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="rounded-lg bg-white/4 px-2.5 py-2">
+      <p className="text-[10px] tracking-wide text-white/45 uppercase">{label}</p>
+      <p className="mt-0.5 truncate text-[13px] font-semibold">{value}</p>
+      <p className="truncate font-mono text-[10px] text-white/35">{sub}</p>
+    </div>
+  );
+}
+
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="mb-2 text-[11px] tracking-wider text-white/40 uppercase">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function Action({ className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      className={cn(
+        "cursor-pointer rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[12px] text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-violet-400/50 focus-visible:outline-none",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: () => void }) {
+  return (
+    <button onClick={onChange} className="flex w-full cursor-pointer items-center justify-between gap-2 py-1 text-left text-[12px] text-white/75">
+      {label}
+      <span className={cn("relative h-4 w-7 shrink-0 rounded-full transition-colors", on ? "bg-violet-500" : "bg-white/15")}>
+        <span className={cn("absolute top-0.5 size-3 rounded-full bg-white transition-[left]", on ? "left-3.5" : "left-0.5")} />
+      </span>
+    </button>
+  );
+}
