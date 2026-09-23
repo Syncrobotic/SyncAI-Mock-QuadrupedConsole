@@ -8,6 +8,8 @@ import type {
   Fence,
   Gait,
   GatewayHealth,
+  LicenseActivation,
+  LicenseInfo,
   MapChunk,
   Mission,
   PairedPhone,
@@ -72,6 +74,7 @@ export interface RpcMap {
   "device.approve": [{ phoneId: string; approve: boolean }, void];
   "device.setSafety": [Partial<DeviceInfo["safety"]>, void];
   "device.setPlugin": [{ id: string; enabled: boolean }, void];
+  "license.activate": [{ key: string }, LicenseActivation];
   "media.broadcast": [{ clipId: string }, void];
   "media.snapshot": [void, { artifactId: string }];
   "diag.events": [void, DogEvent[]];
@@ -97,6 +100,10 @@ export interface BleChannel {
   /** Resolves when the Owner phone answers (or the requester gives up). */
   awaitApproval(dogId: string, signal: AbortSignal): Promise<Enrollment>;
   requestViewer(dogId: string): Promise<Enrollment>;
+  /** Licence state as the dog knows it (readable before Wi-Fi). */
+  readLicense(): Promise<LicenseInfo>;
+  /** Owner only: bind a licence key to this dog. Goes over BLE — the dog may have no network yet. */
+  activateLicense(key: string): Promise<LicenseActivation>;
   provisionWifi(ssid: string, psk: string): AsyncIterable<WifiStatus>;
   readEndpoint(): Promise<Endpoint>;
   estop(): Promise<void>;

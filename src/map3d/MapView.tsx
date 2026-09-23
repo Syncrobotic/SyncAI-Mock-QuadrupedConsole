@@ -15,15 +15,13 @@ import { Scene } from "./Scene";
  * The main viewport (§5): the 3D map fills everything above the E-Stop.
  * Floating view buttons sit right, per the §5 wireframe.
  */
-export function MapView({ bottomInset }: { bottomInset: number }) {
+export function MapView() {
   const conn = useStore((s) => s.conn);
   const view = useStore((s) => s.view);
   const stale = !isLive(conn);
 
   return (
-    // Only the visible band above the E-Stop: the camera's centre is then the
-    // centre of what the guard can see, so "follow" keeps the dog in view.
-    <div className="absolute inset-x-0 top-0 transition-[bottom] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]" style={{ bottom: bottomInset }}>
+    <div className="absolute inset-0">
       {/* §13: BleOnly / Unreachable show the last cache, greyed. */}
       <div className={cn("absolute inset-0 transition-[filter,opacity] duration-300", stale && "opacity-60 grayscale")}>
         <Canvas
@@ -57,6 +55,7 @@ function ViewButtons({ view }: { view: MapViewMode }) {
         <div className="bg-surface/95 w-40 space-y-0.5 rounded-xl border p-1.5 shadow-lg backdrop-blur">
           {(
             [
+              ["plan", "樓層平面"],
               ["cloud", "點雲"],
               ["grid", "佔據柵格"],
               ["trail", "軌跡 60 秒"],

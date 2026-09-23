@@ -1,7 +1,7 @@
 import { cellOf, insidePolygon, isFree, snapToFree } from "@/lib/geometry";
 import { mulberry32 } from "@/lib/utils";
 
-import type { Fence, OccupancyGrid } from "@/proto/types";
+import type { Fence, FloorPlan, OccupancyGrid, Zone } from "@/proto/types";
 
 /**
  * The mock dog's world: one office floor, 36 × 22 m.
@@ -24,13 +24,7 @@ import type { Fence, OccupancyGrid } from "@/proto/types";
 export const FLOOR = { minX: -18, maxX: 18, minY: -11, maxY: 11, wallHeight: 2.6 };
 export const DOCK = { x: -15.5, y: 0, yaw: 0 };
 
-interface Rect {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  h: number;
-}
+type Rect = import("@/proto/types").Box2;
 
 const DOOR = 1.6;
 const WALL = 0.2;
@@ -105,6 +99,28 @@ function buildFurniture(): Rect[] {
 
 export const WALLS = buildWalls();
 export const FURNITURE = buildFurniture();
+
+/** Named zones, the same unit vocabulary the dashboard's floor plans use. */
+function buildZones(): Zone[] {
+  const { minX, maxX, minY, maxY } = FLOOR;
+  const north = ["會議室 A", "會議室 B", "開放辦公區 A", "主管辦公室", "茶水間"];
+  const northType: Zone["type"][] = ["office", "office", "office", "office", "public"];
+  const south = ["開放辦公區 B", "開放辦公區 C", "機房", "資料室", "印刷室"];
+  const southType: Zone["type"][] = ["office", "office", "utility", "restricted", "utility"];
+  const zones: Zone[] = [];
+  for (let i = 0; i < ROOM_XS.length - 1; i++) {
+    zones.push({ id: `n${i}`, name: north[i], type: northType[i], rect: { x1: ROOM_XS[i], y1: 4, x2: ROOM_XS[i + 1], y2: maxY, h: 0 } });
+    zones.push({ id: `s${i}`, name: south[i], type: southType[i], rect: { x1: ROOM_XS[i], y1: minY, x2: ROOM_XS[i + 1], y2: -4, h: 0 } });
+  }
+  zones.push({ id: "lobby-w", name: "西側大廳", type: "lobby", rect: { x1: minX, y1: -4, x2: -10, y2: 4, h: 0 } });
+  zones.push({ id: "lobby-e", name: "東側大廳", type: "lobby", rect: { x1: 10, y1: -4, x2: maxX, y2: 4, h: 0 } });
+  zones.push({ id: "corr-n", name: "北走廊", type: "corridor", rect: { x1: -10, y1: 1.5, x2: 10, y2: 4, h: 0 } });
+  zones.push({ id: "corr-s", name: "南走廊", type: "corridor", rect: { x1: -10, y1: -4, x2: 10, y2: -1.5, h: 0 } });
+  zones.push({ id: "core", name: "核心區（電梯・管道）", type: "restricted", rect: { x1: -10, y1: -1.5, x2: 10, y2: 1.5, h: 0 } });
+  return zones;
+}
+
+export const PLAN: FloorPlan = { zones: buildZones(), walls: WALLS, furniture: FURNITURE };
 
 export { insidePolygon, isFree, snapToFree };
 

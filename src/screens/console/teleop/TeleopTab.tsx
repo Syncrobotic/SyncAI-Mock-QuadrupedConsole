@@ -1,12 +1,12 @@
 "use client";
 
-import { BatteryCharging, Hand, Loader2, OctagonX, PauseCircle, PlayCircle, Radio } from "lucide-react";
+import { BatteryCharging, Hand, Loader2, OctagonX, PauseCircle, PlayCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { LockedPanel, Select, Slider } from "@/components/kit";
+import { LockedPanel, Readouts, Select, Slider } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { getDogLink } from "@/link";
-import { cn, formatClock } from "@/lib/utils";
+import { formatClock } from "@/lib/utils";
 import { get, set, useStore } from "@/store";
 import { rpc } from "@/store/controller";
 import { effectiveSpeedCap, shapeAxis, stickLock } from "@/store/logic";
@@ -270,29 +270,24 @@ function Controls() {
         </div>
       )}
 
+      <Readouts
+        items={[
+          { label: "延遲", value: t?.rttMs ?? "—", unit: "ms", tone: rtt === "poor" ? "bad" : rtt === "fair" ? "warn" : "neutral" },
+          { label: "速度", value: (t?.speed ?? 0).toFixed(1), unit: "m/s" },
+          { label: "上限", value: cap.toFixed(1), unit: "m/s", tone: rtt === "fair" ? "warn" : "neutral" },
+          { label: "電量", value: Math.round(t?.battery ?? 0), unit: "%", tone: (t?.battery ?? 100) < 20 ? "bad" : (t?.battery ?? 100) < 35 ? "warn" : "neutral" },
+        ]}
+      />
+      <span className="sr-only">連線品質：{rttText}</span>
+
       <div className="flex items-center gap-3">
-        <span
-          className={cn(
-            "flex shrink-0 items-center gap-1.5 text-[12px] font-semibold tabular-nums",
-            rtt === "good" ? "text-foreground" : rtt === "fair" ? "text-severity-warning" : "text-status-error"
-          )}
-        >
-          <Radio className="size-3.5" />
-          {t?.rttMs ?? "—"} ms
-          <span className={cn("size-2 rounded-full", rtt === "good" ? "bg-status-ok" : rtt === "fair" ? "bg-severity-warning" : "bg-status-error")} />
-          <span className="sr-only">{rttText}</span>
-        </span>
         <span className="text-muted-foreground shrink-0 text-[12px]">速度上限</span>
         <Slider label="速度上限" min={0.2} max={1.5} step={0.1} value={userCap} cap={globalCap} onChange={(v) => set({ userSpeedCap: v })} />
-        <span className="w-14 shrink-0 text-right text-[12px] font-semibold tabular-nums">{cap.toFixed(1)} m/s</span>
+        <span className="w-14 shrink-0 text-right text-[12px] font-semibold tabular-nums">{userCap.toFixed(1)} m/s</span>
       </div>
 
-      <div className="relative flex items-start justify-between px-1">
+      <div className="relative flex items-start justify-around">
         <Joystick label="移動搖桿：前後左右" hint="前後 · 平移" onChange={onLeft} disabled={!!lock} />
-        <div className="flex flex-col items-center gap-1 pt-10 text-center">
-          <span className="text-2xl font-bold tabular-nums">{(t?.speed ?? 0).toFixed(1)}</span>
-          <span className="text-muted-foreground text-[11px]">m/s</span>
-        </div>
         <Joystick label="轉向搖桿：轉向與相機俯仰" hint="轉向 · 俯仰" onChange={onRight} disabled={!!lock} />
         {lock && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center">

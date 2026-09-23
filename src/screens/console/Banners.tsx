@@ -31,7 +31,7 @@ export function Banners() {
   const pct = mapTotal ? Math.round((mapLoaded / mapTotal) * 100) : 0;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-1.5 p-2">
+    <>
       {restartingUntil && (
         <Banner tone="info" icon={<Loader2 className="size-4 animate-spin" />}>
           Gateway 重啟中 · 約 {Math.max(0, Math.ceil((restartingUntil - now) / 1000))} 秒 · 其他分頁暫時鎖定
@@ -53,12 +53,12 @@ export function Banners() {
           icon={<Bluetooth className="size-4" />}
           action={
             hasEndpoint ? (
-              <button onClick={() => void retry()} className="pointer-events-auto flex h-8 cursor-pointer items-center gap-1 rounded-md bg-white/10 px-2 text-[12px] font-semibold hover:bg-white/20">
+              <button onClick={() => void retry()} className="pointer-events-auto bg-secondary hover:bg-accent flex h-8 cursor-pointer items-center gap-1 rounded-md border px-2 text-[12px] font-semibold">
                 <RefreshCw className="size-3.5" />
                 重試
               </button>
             ) : (
-              <button onClick={() => set({ tab: "device", snap: 2 })} className="pointer-events-auto h-8 cursor-pointer rounded-md bg-white/10 px-2 text-[12px] font-semibold hover:bg-white/20">
+              <button onClick={() => set({ tab: "device", snap: 2 })} className="pointer-events-auto bg-secondary hover:bg-accent h-8 cursor-pointer rounded-md border px-2 text-[12px] font-semibold">
                 設定 Wi-Fi
               </button>
             )
@@ -93,14 +93,14 @@ export function Banners() {
         {live && mapTotal === 0 && <Chip>地圖載入中…</Chip>}
         {tab === "mission" && editor && <Chip>長按地圖放航點 · 拖曳航點移動</Chip>}
       </div>
-    </div>
+    </>
   );
 }
 
 const TONES = {
-  info: "bg-plate/95 text-white border-white/10",
-  warn: "bg-amber-950/90 text-amber-100 border-amber-400/30",
-  bad: "bg-red-950/90 text-red-100 border-red-400/30",
+  info: "bg-surface/90 text-foreground",
+  warn: "bg-surface/90 text-foreground [&>span:first-child]:text-severity-warning border-severity-warning/40",
+  bad: "bg-surface/90 text-foreground [&>span:first-child]:text-status-error border-status-error/40",
 };
 
 function Banner({ tone, icon, action, children }: { tone: keyof typeof TONES; icon: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {

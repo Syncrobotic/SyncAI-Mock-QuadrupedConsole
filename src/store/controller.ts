@@ -64,7 +64,7 @@ function wire() {
       set({ telemetry: f, lastTelemetryAt: now, rtt });
     }),
     link.gateway.events.subscribe(onEvent),
-    link.gateway.map.subscribe((c) => set({ mapLoaded: c.loaded, mapTotal: c.total, occupancy: c.occupancy })),
+    link.gateway.map.subscribe((c) => set({ mapLoaded: c.loaded, mapTotal: c.total, occupancy: c.occupancy, plan: c.plan ?? null })),
     link.gateway.closed.subscribe(({ reason }) => {
       if (reason === "revoked") {
         link.keystore.clear();

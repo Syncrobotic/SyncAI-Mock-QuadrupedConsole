@@ -4,8 +4,8 @@ import { useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-const SIZE = 132;
-const KNOB = 56;
+const SIZE = 124;
+const KNOB = 52;
 const TRAVEL = (SIZE - KNOB) / 2;
 
 /**
@@ -69,7 +69,7 @@ export function Joystick({
         onLostPointerCapture={() => active.current !== null && release()}
         className={cn(
           "relative touch-none rounded-full border-2 select-none",
-          disabled ? "bg-muted/60 border-border cursor-not-allowed" : "bg-surface-sunken border-primary/30 cursor-grab"
+          disabled ? "bg-muted/60 border-border cursor-not-allowed" : "bg-surface-sunken border-border cursor-grab"
         )}
         style={{ width: SIZE, height: SIZE }}
       >
@@ -81,7 +81,7 @@ export function Joystick({
           aria-hidden
           className={cn(
             "absolute top-1/2 left-1/2 rounded-full shadow-lg",
-            disabled ? "bg-muted-foreground/30" : "from-primary to-primary/80 bg-linear-to-b ring-4 ring-white/10"
+            disabled ? "bg-muted-foreground/30" : "bg-linear-to-br from-violet-500 to-violet-600 shadow-violet-600/30 ring-1 ring-white/20"
           )}
           style={{
             width: KNOB,

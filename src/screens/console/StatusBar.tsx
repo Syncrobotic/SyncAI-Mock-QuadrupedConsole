@@ -1,91 +1,91 @@
 "use client";
 
 import { AnimatePresence, m } from "framer-motion";
-import { Battery, BatteryCharging, BatteryLow, BatteryMedium, Bluetooth, ChevronDown, Radio } from "lucide-react";
+import { BatteryCharging, BatteryLow, BatteryMedium, Bluetooth, ChevronDown, Dog, Radio } from "lucide-react";
 
+import { IconPlate } from "@/components/kit";
 import { cn, formatClock } from "@/lib/utils";
 import { ROLE_LABEL } from "@/proto/types";
 import { useStore } from "@/store";
 import { CONN_LABEL, MODE_LABEL, rawRttLevel } from "@/store/logic";
 
 /**
- * The status strip (§5). Built on the dashboard's dark plate — the same
- * surface as its command strip, for the same reason: it is read at a glance,
- * and colour appears only when a reading is bad. "78%" stays white; 18% goes
- * red. RTT is the one exception the spec asks for (three bands, with text so
- * colour is never the only carrier — §14 可存取性).
+ * The status strip of §5, drawn as the dashboard's `/map` corner header: the
+ * avatar / title / subtitle triple on a blurred surface card, floating on the
+ * canvas rather than taking a band from it.
+ *
+ * Colour rule from the dashboard's command strip: a reading is neutral until
+ * it is bad. 78% battery is plain text; 18% is red. RTT keeps its three bars
+ * because §7 asks for bands — with the number beside them, so colour is never
+ * the only carrier (§14).
  */
-export function StatusBar() {
+export function DogHeader() {
   const t = useStore((s) => s.telemetry);
   const conn = useStore((s) => s.conn);
   const role = useStore((s) => s.session?.role ?? s.credential?.role ?? null);
+  const name = useStore((s) => s.device?.name ?? s.credential?.dogName ?? "SyncAI-Dog");
   const open = useStore((s) => s.statusOpen);
   const rttLevel = useStore((s) => s.rtt.level);
   const live = conn === "Online" || conn === "Degraded";
 
+  const mode = live ? (t?.mode ?? null) : null;
+  const modeBad = mode === "ESTOP" || mode === "FAULT";
+  const subtitle = [mode ? MODE_LABEL[mode] : CONN_LABEL[conn], role ? ROLE_LABEL[role] : null].filter(Boolean).join(" · ");
+
   const battery = t?.battery ?? null;
-  const BatteryIcon = t?.charging ? BatteryCharging : battery === null ? Battery : battery < 20 ? BatteryLow : BatteryMedium;
-  const batteryTone = battery === null ? "text-white/50" : battery < 20 ? "text-red-400" : battery < 35 ? "text-amber-300" : "text-white";
+  const BatteryIcon = t?.charging ? BatteryCharging : battery !== null && battery < 20 ? BatteryLow : BatteryMedium;
+  const batteryTone = battery === null ? "text-muted-foreground" : battery < 20 ? "text-status-error" : battery < 35 ? "text-severity-warning" : "text-foreground";
 
   const rtt = t?.rttMs;
-  const level = rtt !== undefined ? rawRttLevel(rtt) : null;
-  const rttTone = !live ? "text-white/50" : rttLevel === "poor" ? "text-red-400" : rttLevel === "fair" ? "text-amber-300" : "text-white";
-  const bars = level === "good" ? 3 : level === "fair" ? 2 : 1;
+  const bars = rtt === undefined ? 0 : rawRttLevel(rtt) === "good" ? 3 : rawRttLevel(rtt) === "fair" ? 2 : 1;
+  const rttTone = !live ? "text-muted-foreground" : rttLevel === "poor" ? "text-status-error" : rttLevel === "fair" ? "text-severity-warning" : "text-foreground";
+  const barTone = rttLevel === "poor" ? "bg-status-error" : rttLevel === "fair" ? "bg-severity-warning" : "bg-status-ok";
 
-  const mode = t?.mode ?? null;
-  const modeTone =
-    mode === "ESTOP" || mode === "FAULT"
-      ? "bg-red-500/20 text-red-300 ring-red-400/40"
-      : mode === "PAUSED"
-        ? "bg-amber-400/15 text-amber-200 ring-amber-300/30"
-        : "bg-white/8 text-white/85 ring-white/10";
+  const toggle = () => useStore.setState({ statusOpen: !open });
 
   return (
-    <div className="bg-plate relative z-30 shrink-0 text-white">
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-violet-500/50 to-transparent" />
-      <button
-        onClick={() => useStore.setState({ statusOpen: !open })}
-        aria-expanded={open}
-        className="flex h-12 w-full cursor-pointer items-center gap-3 px-3.5 text-left focus-visible:ring-2 focus-visible:ring-violet-400/50 focus-visible:outline-none focus-visible:ring-inset"
-      >
-        <span className={cn("flex items-center gap-1 text-[13px] font-semibold tabular-nums", batteryTone)}>
-          <BatteryIcon className="size-4" />
-          {battery !== null ? `${Math.round(battery)}%` : "—"}
-        </span>
-
-        <span className={cn("flex items-center gap-1.5 text-[13px] font-semibold tabular-nums", rttTone)}>
-          {live ? (
-            <span aria-hidden className="flex h-3 items-end gap-[2px]">
-              {[1, 2, 3].map((b) => (
-                <span
-                  key={b}
-                  className={cn(
-                    "w-[3px] rounded-[1px]",
-                    b <= bars ? (level === "good" ? "bg-emerald-400" : level === "fair" ? "bg-amber-300" : "bg-red-400") : "bg-white/20"
-                  )}
-                  style={{ height: `${b * 4}px` }}
-                />
-              ))}
+    <div className="pointer-events-auto">
+      <div className="flex items-stretch gap-1.5">
+        <button
+          onClick={toggle}
+          aria-expanded={open}
+          className="bg-surface/85 hover:bg-surface flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left shadow-sm backdrop-blur transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+        >
+          <IconPlate icon={Dog} size="sm" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] leading-tight font-semibold">{name}</span>
+            <span className={cn("block truncate text-[11px] leading-tight", modeBad ? "text-status-error font-semibold" : mode === "PAUSED" ? "text-severity-warning" : "text-muted-foreground")}>
+              {subtitle}
             </span>
-          ) : conn === "BleOnly" ? (
-            <Bluetooth className="size-3.5" />
-          ) : (
-            <Radio className="size-3.5" />
-          )}
-          {live && rtt !== undefined ? `${rtt}ms` : CONN_LABEL[conn]}
-        </span>
+          </span>
+          <ChevronDown className={cn("text-muted-foreground size-4 shrink-0 transition-transform", open && "rotate-180")} />
+        </button>
 
-        <span className="ml-auto flex items-center gap-2">
-          {mode && live && <span className={cn("rounded-md px-2 py-0.5 text-[12px] font-semibold ring-1", modeTone)}>{MODE_LABEL[mode]}</span>}
-          {role && (
-            <span className="flex items-center gap-1 text-[12px] text-white/70">
-              <span className="size-1.5 rounded-full bg-violet-300" />
-              {ROLE_LABEL[role]}
-            </span>
-          )}
-          <ChevronDown className={cn("size-4 text-white/40 transition-transform", open && "rotate-180")} />
-        </span>
-      </button>
+        <button
+          onClick={toggle}
+          className="bg-surface/85 hover:bg-surface flex shrink-0 cursor-pointer items-center gap-3 rounded-xl border px-3 shadow-sm backdrop-blur transition-colors"
+          aria-label="電量與連線"
+        >
+          <span className={cn("flex items-center gap-1 text-[13px] font-semibold tabular-nums", batteryTone)}>
+            <BatteryIcon className="size-4" />
+            {battery !== null ? `${Math.round(battery)}%` : "—"}
+          </span>
+          <span className={cn("flex items-center gap-1.5 text-[13px] font-semibold tabular-nums", rttTone)}>
+            {live ? (
+              <span aria-hidden className="flex h-3 items-end gap-[2px]">
+                {[1, 2, 3].map((b) => (
+                  <span key={b} className={cn("w-[3px] rounded-[1px]", b <= bars ? barTone : "bg-muted-foreground/25")} style={{ height: b * 4 }} />
+                ))}
+              </span>
+            ) : conn === "BleOnly" ? (
+              <Bluetooth className="size-3.5" />
+            ) : (
+              <Radio className="size-3.5" />
+            )}
+            {live && rtt !== undefined ? rtt : "—"}
+          </span>
+        </button>
+      </div>
 
       <AnimatePresence>{open && <Details />}</AnimatePresence>
     </div>
@@ -100,17 +100,17 @@ function Details() {
   const device = useStore((s) => s.device);
   const events = useStore((s) => s.events);
   const lastError = useStore((s) => s.lastError);
-  const channel = conn === "Online" || conn === "Degraded" ? "WS（TLS pinned）" : conn === "BleOnly" ? "BLE" : "—";
+  const channel = conn === "Online" || conn === "Degraded" ? "WS · TLS pinned" : conn === "BleOnly" ? "BLE" : "—";
 
   return (
     <m.div
-      initial={{ opacity: 0, y: -6 }}
+      initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.18 }}
-      className="bg-plate absolute inset-x-0 top-12 border-t border-white/6 px-3.5 pt-2 pb-3.5 shadow-2xl"
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.15 }}
+      className="bg-popover/95 mt-1.5 rounded-xl border p-3 shadow-xl backdrop-blur"
     >
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
         <Item k="通道" v={channel} />
         <Item k="狀態" v={`${CONN_LABEL[conn]} · ${conn}`} />
         <Item k="端點" v={cred?.endpoint ? `${cred.endpoint.ip}:${cred.endpoint.port}` : "—"} />
@@ -120,16 +120,18 @@ function Details() {
         <Item k="電量預估" v={t ? `約 ${t.batteryMinutes} 分鐘` : "—"} />
         <Item k="最近錯誤" v={lastError ?? "—"} />
       </dl>
-      <p className="mt-3 mb-1.5 text-[10px] tracking-wider text-white/40 uppercase">最近 5 條系統事件</p>
-      <ul className="space-y-1">
-        {events.slice(0, 5).map((e) => (
-          <li key={e.id} className="flex gap-2 text-[12px]">
-            <span className="shrink-0 text-white/40 tabular-nums">{formatClock(e.at)}</span>
-            <span className={cn("truncate", e.level === "critical" ? "text-red-300" : e.level === "warning" ? "text-amber-200" : "text-white/80")}>{e.text}</span>
-          </li>
-        ))}
-        {events.length === 0 && <li className="text-[12px] text-white/40">還沒有事件</li>}
-      </ul>
+      <div className="mt-3 border-t pt-2.5">
+        <p className="text-muted-foreground mb-1.5 text-[11px] font-medium">最近 5 條系統事件</p>
+        <ul className="space-y-1">
+          {events.slice(0, 5).map((e) => (
+            <li key={e.id} className="flex gap-2 text-[12px]">
+              <span className="text-muted-foreground shrink-0 tabular-nums">{formatClock(e.at)}</span>
+              <span className={cn("truncate", e.level === "critical" ? "text-status-error" : e.level === "warning" ? "text-severity-warning" : "")}>{e.text}</span>
+            </li>
+          ))}
+          {events.length === 0 && <li className="text-muted-foreground text-[12px]">還沒有事件</li>}
+        </ul>
+      </div>
     </m.div>
   );
 }
@@ -137,8 +139,8 @@ function Details() {
 function Item({ k, v }: { k: string; v: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] tracking-wide text-white/40 uppercase">{k}</dt>
-      <dd className="truncate text-white/90 tabular-nums">{v}</dd>
+      <dt className="text-muted-foreground text-[11px]">{k}</dt>
+      <dd className="truncate font-medium tabular-nums">{v}</dd>
     </div>
   );
 }

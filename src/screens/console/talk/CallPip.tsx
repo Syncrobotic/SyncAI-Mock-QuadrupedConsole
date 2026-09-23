@@ -12,7 +12,7 @@ import { Video } from "./Video";
  * in-picture at the map's top right. Audio keeps going. Tapping returns to
  * the call. This is the patrol mode — video beside the joysticks.
  */
-export function CallPip({ bottomOffset }: { bottomOffset: number }) {
+export function CallPip() {
   const active = useStore((s) => s.call.active);
   const tab = useStore((s) => s.tab);
   const mic = useStore((s) => s.call.mic || s.call.ptt);
@@ -23,8 +23,7 @@ export function CallPip({ bottomOffset }: { bottomOffset: number }) {
   return (
     <button
       onClick={() => set({ tab: "talk" })}
-      className="absolute right-3 z-20 aspect-video w-36 cursor-pointer overflow-hidden rounded-xl border-2 border-white/80 bg-black shadow-2xl"
-      style={{ top: 64, maxHeight: `calc(100% - ${bottomOffset + 80}px)` }}
+      className="absolute top-[68px] right-2 z-20 aspect-video w-36 cursor-pointer overflow-hidden rounded-xl border bg-black shadow-2xl ring-1 ring-white/15"
       aria-label="回到通話"
     >
       <Video stream={session.stream} mirror={facing === "user"} />

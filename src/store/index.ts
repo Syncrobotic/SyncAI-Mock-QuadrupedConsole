@@ -6,6 +6,7 @@ import type {
   DeviceInfo,
   DogEvent,
   Fence,
+  FloorPlan,
   GatewayHealth,
   Mission,
   OccupancyGrid,
@@ -58,6 +59,7 @@ export interface State {
   mapLoaded: number;
   mapTotal: number;
   occupancy: OccupancyGrid | null;
+  plan: FloorPlan | null;
 
   // missions
   missions: Mission[];
@@ -77,7 +79,7 @@ export interface State {
   snap: SheetSnap;
   statusOpen: boolean;
   view: MapView;
-  layers: { cloud: boolean; grid: boolean; trail: boolean; fence: boolean };
+  layers: { plan: boolean; cloud: boolean; grid: boolean; trail: boolean; fence: boolean };
   measure: { x: number; y: number } | null;
   call: {
     active: boolean;
@@ -111,6 +113,7 @@ export const useStore = create<State>(() => ({
   mapLoaded: 0,
   mapTotal: 0,
   occupancy: null,
+  plan: null,
 
   missions: [],
   fences: [],
@@ -127,7 +130,7 @@ export const useStore = create<State>(() => ({
   snap: 1,
   statusOpen: false,
   view: "free",
-  layers: { cloud: true, grid: false, trail: true, fence: true },
+  layers: { plan: true, cloud: false, grid: false, trail: true, fence: true },
   measure: null,
   call: { active: false, mic: false, ptt: false, speaker: true, thermal: false, thermalOpacity: 60, facing: "user" },
   userSpeedCap: 0.8,

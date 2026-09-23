@@ -11,13 +11,11 @@
      thing on screen in sunlight, so it is its own, fully saturated token. */
   --estop: oklch(0.58 0.235 27);
   --estop-pressed: oklch(0.42 0.17 27);
-  --map-bg: #e9ebf2;
-}
-.dark {
-  --map-bg: #0b0c12;
 }
 
+
 @theme inline {
+  --color-map-ground: var(--map-ground);
   --color-estop: var(--estop);
   --color-estop-pressed: var(--estop-pressed);
 }
@@ -58,14 +56,6 @@
   background-size: 28px 28px;
 }
 
-/* E-Stop stripes — hazard tape, drawn in the estop hue so it survives greyscale. */
-.estop-stripes {
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(0, 0, 0, 0.22) 0 10px,
-    transparent 10px 20px
-  );
-}
 
 @keyframes hold-fill {
   from {
@@ -84,4 +74,17 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* The dashboard's auth backdrop grid. */
+.bg-grid-soft {
+  background-image:
+    linear-gradient(rgba(120, 120, 140, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 120, 140, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.dark .bg-grid-soft {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
 }

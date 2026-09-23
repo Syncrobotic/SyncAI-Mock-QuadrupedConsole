@@ -42,11 +42,13 @@ export function EStopBar() {
       }}
       aria-label={route === "ble" ? "緊急停止（經由藍牙）" : "緊急停止"}
       className={cn(
-        "estop-stripes relative flex h-14 w-full shrink-0 cursor-pointer items-center justify-center gap-2.5 text-[17px] font-black tracking-[0.2em] text-white uppercase shadow-[0_-4px_16px_rgba(0,0,0,0.25)] transition-[background-color,transform] duration-100 select-none active:scale-[0.99]",
-        "bg-estop active:bg-estop-pressed focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none focus-visible:ring-inset",
-        disabled && "cursor-not-allowed bg-neutral-600 [background-image:none] text-white/60"
+        "relative flex h-14 w-full shrink-0 cursor-pointer items-center justify-center gap-2.5 overflow-hidden rounded-xl text-[17px] font-black tracking-[0.18em] text-white uppercase select-none",
+        "from-estop to-estop-pressed bg-linear-to-b shadow-lg ring-1 shadow-red-900/30 ring-white/15 transition-[filter,transform] duration-100 hover:brightness-110 active:scale-[0.99] active:brightness-90",
+        "focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none",
+        disabled && "bg-muted text-muted-foreground cursor-not-allowed bg-none shadow-none ring-0"
       )}
     >
+      {!disabled && <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-linear-to-r from-transparent via-white/50 to-transparent" />}
       <OctagonX className="size-6" strokeWidth={2.5} />
       E-STOP
       {route === "ble" && (
@@ -87,7 +89,7 @@ function Stopped({ by, at, canRelease }: { by?: string; at?: number; canRelease:
       onContextMenu={(e) => e.preventDefault()}
       disabled={!canRelease}
       aria-label={canRelease ? "長按 2 秒解除緊急停止" : "已緊急停止，需由 Owner 解除"}
-      className="bg-estop-pressed relative flex h-14 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden text-white select-none disabled:cursor-default"
+      className="bg-estop-pressed ring-estop/60 relative flex h-14 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl text-white ring-2 select-none disabled:cursor-default"
     >
       {holding && (
         <span

@@ -145,6 +145,34 @@ export interface MapChunk {
   loaded: number;
   total: number;
   occupancy: OccupancyGrid;
+  /**
+   * Semantic floor layer (zones, walls, fixed furniture). Mock-only for now:
+   * the real navd publishes an octree; a zone map is a later product decision.
+   */
+  plan?: FloorPlan;
+}
+
+export type ZoneType = "office" | "corridor" | "lobby" | "restricted" | "public" | "utility";
+
+export interface Box2 {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  h: number;
+}
+
+export interface Zone {
+  id: string;
+  name: string;
+  type: ZoneType;
+  rect: Box2;
+}
+
+export interface FloorPlan {
+  zones: Zone[];
+  walls: Box2[];
+  furniture: Box2[];
 }
 
 /** 2.5D projection of the octree: 0 free, 1 occupied. Row-major, y then x. */
@@ -229,6 +257,19 @@ export interface PairedPhone {
 
 export type LicenseFeature = "map" | "mission" | "ai" | "talk";
 
+/** What a licence key unlocks on this dog. Activated over BLE, before Wi-Fi. */
+export interface LicenseInfo {
+  edition: "pro" | "basic" | "none";
+  /** Masked for display: SYNC-••••-••••-DEMO */
+  keyMasked: string | null;
+  features: { feature: LicenseFeature; granted: boolean }[];
+  expiresAt: number | null;
+}
+
+export type LicenseActivation =
+  | { ok: true; license: LicenseInfo }
+  | { ok: false; reason: "format" | "invalid" | "bound" | "expired" };
+
 export interface DeviceInfo {
   name: string;
   serial: string;
@@ -242,6 +283,8 @@ export interface DeviceInfo {
   safety: { speedLimit: number; outsideFence: "stop" | "return" | "alert"; estopLieSec: number };
   license: { feature: LicenseFeature; granted: boolean }[];
   licenseExpiresAt: number;
+  licenseEdition: LicenseInfo["edition"];
+  licenseKeyMasked: string | null;
   plugins: PluginManifest[];
   clips: { id: string; name: string; sec: number }[];
 }

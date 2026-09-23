@@ -1,14 +1,16 @@
 "use client";
 
-import { Bluetooth, Download, FlaskConical, Pencil, Power, RefreshCw, Smartphone, Upload, Wifi } from "lucide-react";
+import { Bluetooth, Download, FlaskConical, KeyRound, Pencil, Power, RefreshCw, Smartphone, Upload, Wifi } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { KeyInput } from "@/components/KeyInput";
 import { Card, Field, Modal, Pill, Row, SectionTitle, Select, Slider, inputClass, type Tone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { getDogLink } from "@/link";
 import { SCENARIOS, SCENARIO_IDS } from "@/link/mock/scenarios";
+import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_LABEL, isCompleteKey } from "@/lib/license";
 import { cn, formatClock } from "@/lib/utils";
 import { ROLE_LABEL, type GatewayHealthState, type Role, type WifiStatus } from "@/proto/types";
 import { set, useStore } from "@/store";
@@ -18,7 +20,6 @@ import { isLive } from "@/store/logic";
 import { useNow } from "../Banners";
 
 const HEALTH_TONE: Record<GatewayHealthState, Tone> = { up: "ok", degraded: "warn", down: "bad" };
-const FEATURE_LABEL = { map: "地圖", mission: "任務排程", ai: "AI 辨識", talk: "通話" } as const;
 
 /**
  * §10: the one tab with content even when the WS is down, because its core
@@ -68,7 +69,7 @@ function ThisDog({ owner, live }: { owner: boolean; live: boolean }) {
   const uptime = device ? Math.round((now - device.bootAt) / 60_000) : null;
   return (
     <section className="space-y-2">
-      <SectionTitle>這隻狗</SectionTitle>
+      <SectionTitle description="名稱、序號與版本">這隻狗</SectionTitle>
       <Card className="divide-y py-1">
         <Row label="名稱">
           {editing ? (
@@ -141,7 +142,7 @@ function Health({ owner }: { owner: boolean }) {
 
   return (
     <section className="space-y-2">
-      <SectionTitle>健康</SectionTitle>
+      <SectionTitle description="Gateway 與各服務">健康</SectionTitle>
       <Card className="divide-y py-1">
         <Row label="Gateway" sub={health.lastError}>
           <Pill tone={HEALTH_TONE[health.state]}>{health.state}</Pill>
@@ -192,7 +193,7 @@ function Phones({ owner }: { owner: boolean }) {
 
   return (
     <section className="space-y-2">
-      <SectionTitle>已配對手機 · {phones.length}</SectionTitle>
+      <SectionTitle description="信任單位是手機的公鑰，不是帳號">已配對手機 · {phones.length}</SectionTitle>
       <Card className="divide-y py-1">
         {phones.map((p) => (
           <div key={p.id} className="flex min-h-14 items-center gap-3 py-2">
@@ -272,7 +273,7 @@ function Network({ owner }: { owner: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <section className="space-y-2">
-      <SectionTitle>網路</SectionTitle>
+      <SectionTitle description="狗目前連的 Wi-Fi">網路</SectionTitle>
       <Card className="divide-y py-1">
         <Row label="Wi-Fi" sub={device?.network.ip ?? cred?.endpoint?.ip ?? "尚未設定"}>
           {device?.network.ssid ?? (cred?.endpoint ? "—" : "未設定")}
@@ -340,7 +341,7 @@ function Safety({ owner }: { owner: boolean }) {
   };
   return (
     <section className="space-y-2">
-      <SectionTitle>安全</SectionTitle>
+      <SectionTitle description="Operator 只能在這些限制內操作">安全</SectionTitle>
       <Card className="divide-y py-1">
         <div className="py-2">
           <div className="flex items-center justify-between text-[14px]">
@@ -388,27 +389,73 @@ function Safety({ owner }: { owner: boolean }) {
 function License({ owner }: { owner: boolean }) {
   const device = useStore((s) => s.device);
   const now = useNow(60_000);
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   if (!device) return null;
   const days = Math.ceil((device.licenseExpiresAt - now) / 86_400_000);
+  const none = device.licenseEdition === "none";
+
+  const activate = async () => {
+    setBusy(true);
+    const r = await rpc("license.activate", { key });
+    setBusy(false);
+    if (!r) return;
+    if (!r.ok) return setError(ACTIVATION_ERROR[r.reason]);
+    await refreshDevice();
+    setOpen(false);
+    setKey("");
+    toast.success(`License 已啟用 · ${EDITION_LABEL[r.license.edition]}`);
+  };
+
   return (
     <section className="space-y-2">
-      <SectionTitle>License</SectionTitle>
+      <SectionTitle description="決定這隻狗開啟哪些功能">License</SectionTitle>
       <Card className="divide-y py-1">
+        <Row label="版本" sub={device.licenseKeyMasked ?? "尚未輸入金鑰"}>
+          <Pill tone={none ? "warn" : "ok"}>{EDITION_LABEL[device.licenseEdition]}</Pill>
+        </Row>
         {device.license.map((l) => (
           <Row key={l.feature} label={FEATURE_LABEL[l.feature]}>
             <Pill tone={l.granted ? "ok" : "neutral"}>{l.granted ? "已授權" : "未授權"}</Pill>
           </Row>
         ))}
-        <Row label="到期日" sub={days <= 7 ? `${days} 天後到期` : undefined}>
-          <span className={cn(days <= 7 && "text-severity-warning font-semibold")}>{new Date(device.licenseExpiresAt).toLocaleDateString("zh-TW")}</span>
-        </Row>
+        {!none && (
+          <Row label="到期日" sub={days <= 7 ? `${days} 天後到期` : undefined}>
+            <span className={cn(days <= 7 && "text-severity-warning font-semibold")}>{new Date(device.licenseExpiresAt).toLocaleDateString("zh-TW")}</span>
+          </Row>
+        )}
       </Card>
       {owner && (
-        <Button variant="outline" className="h-11 w-full" disabled>
-          <Upload />
-          匯入 License 檔（v1 只留入口）
+        <Button variant={none ? "default" : "outline"} className="h-11 w-full" onClick={() => setOpen(true)}>
+          <KeyRound />
+          {none ? "輸入 License 金鑰" : "更換金鑰"}
         </Button>
       )}
+      <Modal open={open} onClose={() => setOpen(false)}>
+        <p className="text-lg font-semibold">{none ? "輸入 License 金鑰" : "更換 License 金鑰"}</p>
+        <p className="text-muted-foreground mt-1 mb-4 text-sm">4 組、每組 4 個英數字，可以整串貼上。</p>
+        <KeyInput
+          value={key}
+          onChange={(v) => {
+            setKey(v);
+            setError(null);
+          }}
+          invalid={!!error}
+          disabled={busy}
+          autoFocus
+        />
+        {error && <p className="text-status-error mt-2 text-[13px]">{error}</p>}
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-11" onClick={() => setOpen(false)}>
+            取消
+          </Button>
+          <Button className="h-11" disabled={!isCompleteKey(key)} loading={busy} onClick={() => void activate()}>
+            啟用
+          </Button>
+        </div>
+      </Modal>
     </section>
   );
 }
@@ -417,7 +464,7 @@ function Plugins({ owner }: { owner: boolean }) {
   const plugins = useStore((s) => s.device?.plugins);
   return (
     <section className="space-y-2">
-      <SectionTitle>Plugins</SectionTitle>
+      <SectionTitle description="已安裝的擴充功能">Plugins</SectionTitle>
       <Card className="divide-y py-1">
         {(plugins ?? []).map((p) => (
           <div key={p.id} className="flex min-h-14 items-center gap-3 py-2">
@@ -456,7 +503,7 @@ function Clips({ owner }: { owner: boolean }) {
   const clips = useStore((s) => s.device?.clips);
   return (
     <section className="space-y-2">
-      <SectionTitle>廣播音檔</SectionTitle>
+      <SectionTitle description="從狗喇叭播放的預錄音檔">廣播音檔</SectionTitle>
       <Card className="divide-y py-1">
         {(clips ?? []).map((c) => (
           <Row key={c.id} label={c.name}>
@@ -485,7 +532,7 @@ function Diagnostics() {
 
   return (
     <section className="space-y-2">
-      <SectionTitle>診斷</SectionTitle>
+      <SectionTitle description="系統事件與日誌匯出">診斷</SectionTitle>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" className="h-11" onClick={() => void load()}>
           最近 200 條事件
@@ -533,7 +580,7 @@ function Local() {
   const dev = taps >= 5;
   return (
     <section className="space-y-2">
-      <SectionTitle>本機</SectionTitle>
+      <SectionTitle description="這支手機上的配對資料">本機</SectionTitle>
       <Card className="divide-y py-1">
         <button className="w-full cursor-default text-left" onClick={() => setTaps((t) => t + 1)}>
           <Row label="App 版本">0.1.0-mock</Row>

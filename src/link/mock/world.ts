@@ -3,7 +3,8 @@ import { actionSeconds, nextTrigger, PATROL_SPEED } from "@/lib/schedule";
 
 import { Emitter } from "./emitter";
 import { seedDevice, seedHistory, seedMissions, seedPhones, uid, DEFAULT_FENCE } from "./fixtures";
-import { buildPointCloud, DOCK, GRID, insidePolygon, isFree } from "./floor";
+import { buildPointCloud, DOCK, GRID, insidePolygon, isFree, PLAN } from "./floor";
+import { licenseFor, mockActivate } from "@/lib/license";
 import { SCENARIOS, type ScenarioId } from "./scenarios";
 
 import type {
@@ -14,6 +15,8 @@ import type {
   Fence,
   Gait,
   GatewayHealth,
+  LicenseActivation,
+  LicenseInfo,
   MapChunk,
   Mission,
   PairedPhone,
@@ -85,7 +88,8 @@ export class MockWorld {
   missions: Mission[] = seedMissions();
   fences: Fence[] = [DEFAULT_FENCE];
   history: RunRecord[];
-  device: DeviceInfo;
+  private _device: DeviceInfo;
+  license: LicenseInfo;
   phones: PairedPhone[] = [];
   eventLog: DogEvent[] = [];
   private lastRunAt: Record<string, number> = {};
@@ -114,12 +118,51 @@ export class MockWorld {
     const now = Date.now();
     this.battery = this.scenario.battery;
     this.history = seedHistory(now);
-    this.device = seedDevice(now, this.scenario.missionLicense);
+    this._device = seedDevice(now, this.scenario.missionLicense);
+    this.license = loadLicense() ?? licenseFor("pro", "SYNC-PRO1-2026-DEMO", now);
     if (scenarioId === "low_battery") {
       this.mode = "CHARGING";
       this.charging = true;
     }
     this.health.emit({ state: "up" });
+  }
+
+  /** Device info with the licence folded in (and the `no_license` scenario on top). */
+  get device(): DeviceInfo {
+    const license = this.license.features.map((f) =>
+      f.feature === "mission" && !this.scenario.missionLicense ? { ...f, granted: false } : f
+    );
+    return {
+      ...this._device,
+      license,
+      licenseExpiresAt: this.license.expiresAt ?? 0,
+      licenseEdition: this.license.edition,
+      licenseKeyMasked: this.license.keyMasked,
+    };
+  }
+
+  patchDevice(patch: Partial<DeviceInfo>) {
+    this._device = { ...this._device, ...patch };
+  }
+
+  hasFeature(f: LicenseInfo["features"][number]["feature"]) {
+    return !!this.device.license.find((x) => x.feature === f)?.granted;
+  }
+
+  /** A factory-fresh dog has no licence until its first Owner binds one. */
+  resetAsNewDog() {
+    this.license = licenseFor("none", null, Date.now());
+    saveLicense(this.license);
+  }
+
+  activateLicense(key: string): LicenseActivation {
+    const r = mockActivate(key, Date.now());
+    if (r.ok) {
+      this.license = r.license;
+      saveLicense(r.license);
+      this.emitEvent("system", "info", `License 已啟用：${r.license.keyMasked}`);
+    }
+    return r;
   }
 
   start() {
@@ -165,7 +208,7 @@ export class MockWorld {
     // §6: first frame at 20% loaded, the rest streamed in.
     let loaded = Math.round(total * 0.2);
     const emit = () =>
-      this.map.emit({ positions: cloud.positions, colors: cloud.colors, loaded, total, occupancy: GRID });
+      this.map.emit({ positions: cloud.positions, colors: cloud.colors, loaded, total, occupancy: GRID, plan: PLAN });
     emit();
     this.mapTimer = setInterval(() => {
       loaded = Math.min(total, loaded + Math.round(total * 0.08));
@@ -549,7 +592,7 @@ export class MockWorld {
     if (now - this.lastScheduleCheck < 1000) return;
     const from = this.lastScheduleCheck;
     this.lastScheduleCheck = now;
-    if (!this.scenario.missionLicense || this.run) return;
+    if (!this.hasFeature("mission") || this.run) return;
     if (!["IDLE", "CHARGING"].includes(this.mode)) return;
     for (const m of this.missions) {
       if (!m.enabled || m.trigger.type === "event") continue;
@@ -630,4 +673,21 @@ function cloudFor(budget: number) {
     clouds.set(budget, c);
   }
   return c;
+}
+
+const LICENSE_KEY = "qc.mock.dog.license";
+
+function loadLicense(): LicenseInfo | null {
+  try {
+    const raw = localStorage.getItem(LICENSE_KEY);
+    return raw ? (JSON.parse(raw) as LicenseInfo) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLicense(l: LicenseInfo) {
+  try {
+    localStorage.setItem(LICENSE_KEY, JSON.stringify(l));
+  } catch {}
 }

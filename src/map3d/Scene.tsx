@@ -27,6 +27,9 @@ import type { Waypoint } from "@/proto/types";
  * Every conversion goes through these two so the sign lives in one place.
  */
 const toV = (x: number, y: number, z = 0) => new THREE.Vector3(x, z, -y);
+
+/** Floor-plate thickness: everything that stands on the floor sits on top of it. */
+const PLATE = 0.12;
 const fromV = (v: THREE.Vector3) => ({ x: v.x, y: -v.z });
 
 type OrbitControlsImpl = React.ComponentRef<typeof OrbitControls>;
@@ -40,9 +43,14 @@ export function Scene({ onLongPress }: { onLongPress: (x: number, y: number) => 
 
   return (
     <>
-      <color attach="background" args={[colors.bg]} />
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[10, 20, 5]} intensity={1.2} />
+      <color attach="background" args={[colors.ground]} />
+      {/* The dashboard's rig (map/lighting.ts): ambient carries the exposure,
+          one key light for form, a weak cool fill so shaded faces do not go
+          flat black. Less ambient in dark mode — its surfaces are already close
+          to the page. */}
+      <ambientLight intensity={colors.dark ? 2.9 : 2.6} />
+      <directionalLight position={[-8, 18, 10]} intensity={colors.dark ? 1.5 : 1.7} color={colors.dark ? "#dce4ff" : "#fffaf0"} />
+      <directionalLight position={[12, 9, -8]} intensity={colors.dark ? 0.5 : 0.7} color={colors.dark ? "#96a5d2" : "#e1e8ff"} />
 
       <Grid
         position={[0, -0.01, 0]}
@@ -51,14 +59,15 @@ export function Scene({ onLongPress }: { onLongPress: (x: number, y: number) => 
         cellThickness={0.6}
         sectionSize={5}
         sectionThickness={1}
-        cellColor={colors.dark ? "#262838" : "#cfd3e0"}
-        sectionColor={colors.dark ? "#353850" : "#b4bacd"}
+        cellColor={colors.dark ? "#1c1e29" : "#dde0ea"}
+        sectionColor={colors.dark ? "#262938" : "#cdd1de"}
         fadeDistance={70}
         infiniteGrid
       />
 
-      {layers.cloud && view !== "top" && <PointCloud dark={colors.dark} />}
-      {(layers.grid || view === "top") && <Occupancy colors={colors} />}
+      {layers.plan && <FloorPlanLayer colors={colors} labels={view !== "follow"} />}
+      {layers.cloud && <PointCloud dark={colors.dark} />}
+      {layers.grid && <Occupancy colors={colors} />}
       {layers.trail && <Trail pose={pose} color={colors.trail} />}
       {layers.fence && <Fences pose={pose} colors={colors} />}
       <Route colors={colors} controls={controls} />
@@ -143,6 +152,75 @@ function PointCloud({ dark }: { dark: boolean }) {
   return <points geometry={geom} material={material} frustumCulled={false} />;
 }
 
+// ── Floor plan (the dashboard's unit layer, in three.js) ────────────────────
+
+
+/**
+ * Same construction as the dashboard's `units.ts`: a thin plate per zone in
+ * the zone's `--map-unit-*` colour, and walls standing on it in the unit-line
+ * colour darkened to 62%. Plates, not blocks — extruded rooms read as roofs
+ * and hide every robot inside them.
+ */
+function FloorPlanLayer({ colors, labels }: { colors: MapColors; labels: boolean }) {
+  const plan = useStore((s) => s.plan);
+  const wallColor = useMemo(() => {
+    const c = new THREE.Color(colors.line);
+    return c.multiply(new THREE.Color(0.62, 0.62, 0.66));
+  }, [colors.line]);
+  const furnitureColor = useMemo(() => new THREE.Color(colors.line).multiplyScalar(colors.dark ? 0.45 : 0.8), [colors.line, colors.dark]);
+
+  if (!plan) return null;
+  const zoneColor = {
+    office: colors.unitOffice,
+    corridor: colors.unitCorridor,
+    lobby: colors.unitLobby,
+    restricted: colors.unitRestricted,
+    public: colors.unitPublic,
+    utility: colors.unitUtility,
+  } as const;
+
+  return (
+    <group>
+      {plan.zones.map((z) => {
+        const w = z.rect.x2 - z.rect.x1;
+        const d = z.rect.y2 - z.rect.y1;
+        const cx = (z.rect.x1 + z.rect.x2) / 2;
+        const cy = (z.rect.y1 + z.rect.y2) / 2;
+        return (
+          <group key={z.id}>
+            <mesh position={[cx, PLATE / 2, -cy]}>
+              <boxGeometry args={[w - 0.04, PLATE, d - 0.04]} />
+              <meshLambertMaterial color={zoneColor[z.type]} />
+            </mesh>
+            {labels && (
+              <Html position={[cx, PLATE + 0.5, -cy]} center zIndexRange={[4, 0]} style={{ pointerEvents: "none" }}>
+                <span
+                  className="text-[10px] font-medium whitespace-nowrap"
+                  style={{ color: colors.poi, textShadow: `0 0 3px ${colors.ground}, 0 0 3px ${colors.ground}` }}
+                >
+                  {z.name}
+                </span>
+              </Html>
+            )}
+          </group>
+        );
+      })}
+      {plan.walls.map((b, i) => (
+        <mesh key={`w${i}`} position={[(b.x1 + b.x2) / 2, PLATE + b.h / 2, -(b.y1 + b.y2) / 2]}>
+          <boxGeometry args={[b.x2 - b.x1, b.h, b.y2 - b.y1]} />
+          <meshLambertMaterial color={wallColor} />
+        </mesh>
+      ))}
+      {plan.furniture.map((b, i) => (
+        <mesh key={`f${i}`} position={[(b.x1 + b.x2) / 2, PLATE + b.h / 2, -(b.y1 + b.y2) / 2]}>
+          <boxGeometry args={[b.x2 - b.x1, b.h, b.y2 - b.y1]} />
+          <meshLambertMaterial color={furnitureColor} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 // ── 2.5D occupancy ───────────────────────────────────────────────────────────
 
 function Occupancy({ colors }: { colors: MapColors }) {
@@ -196,7 +274,7 @@ function Robot({ pose, colors }: { pose: React.RefObject<PoseRef>; colors: MapCo
       y: p.display.y + (p.target.y - p.display.y) * k,
       yaw: lerpAngle(p.display.yaw, p.target.yaw, k),
     };
-    group.current.position.set(p.display.x, 0, -p.display.y);
+    group.current.position.set(p.display.x, PLATE, -p.display.y);
     group.current.rotation.y = p.display.yaw;
     phase.current += dt * (4 + p.speed * 10);
     const swing = Math.min(0.5, p.speed * 0.8);
@@ -264,7 +342,7 @@ function Trail({ pose, color }: { pose: React.RefObject<PoseRef>; color: string 
     const attr = line.geometry.getAttribute("position") as THREE.BufferAttribute;
     const n = Math.min(trail.length, 400);
     const start = trail.length - n;
-    for (let i = 0; i < n; i++) attr.setXYZ(i, trail[start + i].x, 0.05, -trail[start + i].y);
+    for (let i = 0; i < n; i++) attr.setXYZ(i, trail[start + i].x, PLATE + 0.05, -trail[start + i].y);
     attr.needsUpdate = true;
     line.geometry.setDrawRange(0, n);
   });
@@ -280,7 +358,7 @@ function Fences({ pose, colors }: { pose: React.RefObject<PoseRef>; colors: MapC
     () =>
       fences.map((f) => {
         const line = new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints([...f.points, f.points[0]].map((p) => toV(p.x, p.y, 0.04))),
+          new THREE.BufferGeometry().setFromPoints([...f.points, f.points[0]].map((p) => toV(p.x, p.y, PLATE + 0.04))),
           new THREE.LineBasicMaterial({ color: colors.warning })
         );
         const fill = new THREE.Mesh(
@@ -288,7 +366,7 @@ function Fences({ pose, colors }: { pose: React.RefObject<PoseRef>; colors: MapC
           new THREE.MeshBasicMaterial({ color: colors.warning, transparent: true, opacity: 0.05, depthWrite: false })
         );
         fill.rotation.x = -Math.PI / 2;
-        fill.position.y = 0.015;
+        fill.position.y = PLATE + 0.015;
         return { fence: f, line, fill };
       }),
     [fences, colors.warning]
@@ -359,7 +437,7 @@ function Route({ colors, controls }: { colors: MapColors; controls: React.RefObj
 function RouteLine({ route, color, currentWp }: { route: Waypoint[]; color: string; currentWp: number }) {
   const lines = useMemo(() => {
     const all = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(route.map((w) => toV(w.x, w.y, 0.08))),
+      new THREE.BufferGeometry().setFromPoints(route.map((w) => toV(w.x, w.y, PLATE + 0.08))),
       new THREE.LineDashedMaterial({ color, dashSize: 0.4, gapSize: 0.25, transparent: true, opacity: currentWp > 0 ? 0.35 : 0.9 })
     );
     all.computeLineDistances();
@@ -367,7 +445,7 @@ function RouteLine({ route, color, currentWp }: { route: Waypoint[]; color: stri
     const remaining =
       currentWp > 0
         ? new THREE.Line(
-            new THREE.BufferGeometry().setFromPoints(route.slice(currentWp - 1).map((w) => toV(w.x, w.y, 0.1))),
+            new THREE.BufferGeometry().setFromPoints(route.slice(currentWp - 1).map((w) => toV(w.x, w.y, PLATE + 0.1))),
             new THREE.LineBasicMaterial({ color })
           )
         : null;
@@ -430,7 +508,7 @@ function WaypointMarker({
   };
 
   return (
-    <group position={toV(wp.x, wp.y)}>
+    <group position={toV(wp.x, wp.y, PLATE)}>
       <mesh position={[0, 0.25, 0]} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
         <cylinderGeometry args={[0.28, 0.28, 0.5, 20]} />
         <meshStandardMaterial color={color} transparent opacity={0.85} emissive={color} emissiveIntensity={0.3} />
@@ -490,7 +568,7 @@ function CameraFrustum({ pose, color }: { pose: React.RefObject<PoseRef>; color:
   useFrame(() => {
     if (!group.current) return;
     const p = pose.current.display;
-    group.current.position.set(p.x, 0.5, -p.y);
+    group.current.position.set(p.x, PLATE + 0.5, -p.y);
     group.current.rotation.y = p.yaw;
   });
   if (!active) return null;
@@ -516,7 +594,7 @@ function Measure({ pose, colors }: { pose: React.RefObject<PoseRef>; colors: Map
   useFrame(() => {
     if (!measure) return;
     const p = pose.current.display;
-    line.geometry.setFromPoints([toV(p.x, p.y, 0.12), toV(measure.x, measure.y, 0.12)]);
+    line.geometry.setFromPoints([toV(p.x, p.y, PLATE + 0.12), toV(measure.x, measure.y, PLATE + 0.12)]);
     line.computeLineDistances();
     if (label.current) label.current.textContent = `${Math.hypot(measure.x - p.x, measure.y - p.y).toFixed(1)} m`;
   });
@@ -525,7 +603,7 @@ function Measure({ pose, colors }: { pose: React.RefObject<PoseRef>; colors: Map
   return (
     <>
       <primitive object={line} />
-      <mesh position={toV(measure.x, measure.y, 0.05)} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={toV(measure.x, measure.y, PLATE + 0.05)} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.18, 24]} />
         <meshBasicMaterial color={colors.selected} />
       </mesh>
@@ -589,8 +667,9 @@ function CameraRig({ pose, controls }: { pose: React.RefObject<PoseRef>; control
       controls.current?.target.set(pose.current.display.x, 0, -pose.current.display.y);
     }
     if (view === "top") {
-      camera.position.set(0, 34, 6);
-      controls.current?.target.set(0, 0, 0);
+      // The dashboard's isometric framing: the whole floor, pitched ~50°, turned a little.
+      camera.position.set(11, 35, 29);
+      controls.current?.target.set(0, 0, -1);
     }
     controls.current?.update();
   }, [view, camera, controls, pose]);
@@ -598,9 +677,10 @@ function CameraRig({ pose, controls }: { pose: React.RefObject<PoseRef>; control
   useFrame((_, dt) => {
     if (view !== "follow") return;
     const p = pose.current.display;
-    // §6 跟隨: behind and above the dog, 3 m back.
-    desired.current.set(p.x - Math.cos(p.yaw) * 3, 2.4, -p.y + Math.sin(p.yaw) * 3);
-    target.current.set(p.x + Math.cos(p.yaw) * 2, 0.4, -p.y - Math.sin(p.yaw) * 2);
+    // §6 跟隨: behind and above the dog. Higher than the spec's 3 m-back/eye
+    // level so the camera clears 2.6 m walls instead of staring into one.
+    desired.current.set(p.x - Math.cos(p.yaw) * 2.6, 3.6, -p.y + Math.sin(p.yaw) * 2.6);
+    target.current.set(p.x + Math.cos(p.yaw) * 2.6, 0, -p.y - Math.sin(p.yaw) * 2.6);
     camera.position.lerp(desired.current, Math.min(1, dt * 4));
     camera.lookAt(target.current);
   });

@@ -1,14 +1,38 @@
 "use client";
 
-import { Bluetooth, Camera, Check, CircleAlert, Hand, KeyRound, Loader2, Mic, OctagonX, QrCode, RotateCcw, ShieldCheck, Signal, Wifi } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Bluetooth,
+  Camera,
+  Check,
+  CircleAlert,
+  Fingerprint,
+  Hand,
+  KeyRound,
+  Loader2,
+  Lock,
+  Mic,
+  OctagonX,
+  Radar,
+  RotateCcw,
+  ShieldCheck,
+  UserCheck,
+  Wifi,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { BrandGlyph } from "@/components/brand-mark";
+import { KeyInput } from "@/components/KeyInput";
 import { Field, Modal, inputClass } from "@/components/kit";
+import { Badge } from "@/components/ui/badge";
+import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_LABEL, formatKey, isCompleteKey } from "@/lib/license";
 import { Button } from "@/components/ui/button";
 import { getDogLink } from "@/link";
 import { cn, sleep } from "@/lib/utils";
-import { ROLE_LABEL, type DogAdvert, type Enrollment, type WifiStatus } from "@/proto/types";
+import { ROLE_LABEL, type DogAdvert, type Enrollment, type LicenseInfo, type WifiStatus } from "@/proto/types";
 import { useStore } from "@/store";
 import { beginOnboarding, finishOnboarding } from "@/store/controller";
 
@@ -16,19 +40,81 @@ import type { StepProps } from "./Onboarding";
 
 // ── Layout helpers ──────────────────────────────────────────────────────────
 
-function Screen({ title, lead, children, footer }: { title: string; lead?: React.ReactNode; children?: React.ReactNode; footer?: React.ReactNode }) {
+function Screen({
+  icon: Icon,
+  title,
+  lead,
+  children,
+  footer,
+}: {
+  icon?: LucideIcon;
+  title: string;
+  lead?: React.ReactNode;
+  children?: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
   return (
-    <div className="flex min-h-full flex-col px-5 pt-5 pb-5">
-      <h1 className="text-[26px] leading-tight font-bold tracking-tight">{title}</h1>
-      {lead && <p className="text-muted-foreground mt-2 text-[15px] leading-relaxed">{lead}</p>}
-      <div className="mt-6 flex-1 space-y-4">{children}</div>
+    <div className="flex min-h-full flex-col px-5 pt-6 pb-5">
+      {/* The login page's column: mark, title, one muted line — centred on one axis. */}
+      <div className="flex flex-col items-center text-center">
+        {Icon && (
+          <span className="bg-primary/10 text-primary-accent dark:bg-primary/20 mb-4 grid size-12 place-items-center rounded-2xl ring-1 ring-violet-400/15">
+            <Icon className="size-6" />
+          </span>
+        )}
+        <h1 className="text-[22px] leading-tight font-semibold tracking-tight">{title}</h1>
+        {lead && <p className="text-muted-foreground mt-2 max-w-[320px] text-[14px] leading-relaxed">{lead}</p>}
+      </div>
+      <div className="mt-7 flex-1 space-y-4">{children}</div>
       {footer && <div className="mt-6 space-y-2">{footer}</div>}
     </div>
   );
 }
 
 function Primary(props: React.ComponentProps<typeof Button>) {
-  return <Button {...props} className={cn("h-12 w-full text-[15px]", props.className)} />;
+  return <Button {...props} className={cn("h-12 w-full rounded-lg text-[15px]", props.className)} />;
+}
+
+/** The login page's account row: letter tile, two lines, a badge, an arrow. */
+function ChoiceRow({
+  tile,
+  title,
+  sub,
+  badge,
+  trailing,
+  onClick,
+  disabled,
+}: {
+  tile: React.ReactNode;
+  title: React.ReactNode;
+  sub: React.ReactNode;
+  badge?: React.ReactNode;
+  trailing?: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  const Tag = onClick ? "button" : "div";
+  return (
+    <Tag
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "border-border bg-card/60 group flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+        onClick && "hover:border-primary/50 hover:bg-primary/5 focus-visible:ring-primary/40 cursor-pointer focus-visible:ring-2 focus-visible:outline-none disabled:opacity-60"
+      )}
+    >
+      <span className="bg-primary/10 text-primary-accent ring-border/50 grid size-9 shrink-0 place-items-center rounded-lg text-xs font-semibold ring-2 [&_svg]:size-4">
+        {tile}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{title}</span>
+        <span className="text-muted-foreground block truncate text-xs">{sub}</span>
+      </span>
+      {badge}
+      {trailing ?? (onClick && <ArrowRight className="text-muted-foreground/40 group-hover:text-primary-accent size-4 shrink-0 transition-colors" />)}
+    </Tag>
+  );
 }
 
 function Note({ tone = "neutral", icon, children }: { tone?: "neutral" | "warn" | "bad"; icon?: React.ReactNode; children: React.ReactNode }) {
@@ -52,31 +138,35 @@ export function StepWelcome({ go }: StepProps) {
   const [asking, setAsking] = useState(false);
   const [denied, setDenied] = useState(false);
 
+  const later = <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">稍後</Badge>;
+
   return (
-    <div className="flex min-h-full flex-col">
-      {/* The dashboard's dark plate as a hero — the same brand surface. */}
-      <div className="bg-plate relative overflow-hidden px-5 pt-12 pb-8 text-white">
-        <div aria-hidden className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-violet-500/60 to-transparent" />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 90% at 20% -10%, rgba(124,111,208,0.35), transparent 65%)" }} />
-          <div className="plate-grid absolute inset-0" style={{ maskImage: "radial-gradient(ellipse 90% 100% at 30% 0%, #000 25%, transparent 80%)" }} />
-        </div>
-        <p className="relative text-[11px] tracking-[0.2em] text-violet-200/80 uppercase">SyncAI Quadruped Console</p>
-        <h1 className="relative mt-3 text-[30px] leading-tight font-bold tracking-tight">在現場，直接帶你的巡邏犬上工。</h1>
-        <p className="relative mt-3 text-[15px] leading-relaxed text-white/65">不用帳號。靠近狗、用藍牙配對，這支手機就是它的遙控器。</p>
+    <div className="flex min-h-full flex-col px-5 pt-16 pb-5">
+      <div className="flex flex-col items-center text-center">
+        <BrandGlyph className="size-11" />
+        <h1 className="mt-7 text-[24px] font-semibold tracking-tight">連接你的 SyncAI-Dog</h1>
+        <p className="text-muted-foreground mt-2 max-w-[300px] text-[14px] leading-relaxed">不用帳號。靠近狗、用藍牙配對，這支手機就是它的遙控器。</p>
       </div>
 
-      <div className="flex-1 space-y-4 px-5 pt-6">
+      <div className="mt-8 flex-1 space-y-2">
         {revoked && (
           <Note tone="bad" icon={<CircleAlert />}>
             這支手機已被 Owner 撤銷，本機憑證已清除。需要的話請重新配對，並請 Owner 核准。
           </Note>
         )}
-        <div className="space-y-2">
-          <Perm icon={<Bluetooth />} title="藍牙" body="配對與無網路時的緊急停止都靠它" state={denied ? "denied" : "required"} />
-          <Perm icon={<Mic />} title="麥克風" body="對現場說話 · 第一次開通話時才詢問" state="later" />
-          <Perm icon={<Camera />} title="相機" body="掃狗身上的 QR 快速找到它" state="later" />
-        </div>
+        <ChoiceRow
+          tile={<Bluetooth />}
+          title="藍牙"
+          sub="配對，以及斷網時的緊急停止"
+          badge={
+            <Badge variant="outline" className={cn("shrink-0 text-[10px]", denied && "text-status-error border-status-error/40")}>
+              {denied ? "已拒絕" : "必要"}
+            </Badge>
+          }
+          trailing={<span className="w-4" />}
+        />
+        <ChoiceRow tile={<Mic />} title="麥克風" sub="對現場說話 · 第一次開通話時才詢問" badge={later} trailing={<span className="w-4" />} />
+        <ChoiceRow tile={<Camera />} title="相機" sub="拍照存證 · 第一次使用時才詢問" badge={later} trailing={<span className="w-4" />} />
         {denied && (
           <Note tone="warn" icon={<CircleAlert />}>
             沒有藍牙就無法配對，也無法在斷網時送出緊急停止。請到「設定 → SyncAI → 藍牙」開啟後回來。
@@ -84,13 +174,17 @@ export function StepWelcome({ go }: StepProps) {
         )}
       </div>
 
-      <div className="space-y-2 px-5 pt-6 pb-5">
-        <Primary onClick={() => setAsking(true)}>{denied ? "我已開啟，再試一次" : "允許藍牙並開始"}</Primary>
+      <div className="mt-6 space-y-2">
+        <Primary onClick={() => setAsking(true)}>
+          {denied ? "我已開啟，再試一次" : "允許藍牙並開始"}
+          <ArrowRight />
+        </Primary>
         {denied && (
-          <Button variant="ghost" className="h-11 w-full" onClick={() => toast("Mock：這裡會開啟系統設定")}>
+          <Button variant="outline" className="h-10 w-full rounded-lg" onClick={() => toast("Mock：這裡會開啟系統設定")}>
             開啟系統設定
           </Button>
         )}
+        <p className="text-muted-foreground/60 pt-3 text-center text-xs">© 2026 SyncAI · Mock 版本</p>
       </div>
 
       {/* A stand-in for the OS permission sheet, so the deny path is reviewable. */}
@@ -126,27 +220,11 @@ export function StepWelcome({ go }: StepProps) {
   );
 }
 
-function Perm({ icon, title, body, state }: { icon: React.ReactNode; title: string; body: string; state: "required" | "later" | "denied" }) {
-  return (
-    <div className="bg-card flex items-center gap-3 rounded-xl border px-3.5 py-3">
-      <span className="bg-primary/10 text-primary-accent grid size-9 shrink-0 place-items-center rounded-lg [&_svg]:size-4">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-medium">{title}</p>
-        <p className="text-muted-foreground text-xs">{body}</p>
-      </div>
-      <span className={cn("text-[11px] font-medium", state === "denied" ? "text-status-error" : state === "required" ? "text-foreground" : "text-muted-foreground")}>
-        {state === "denied" ? "已拒絕" : state === "required" ? "必要" : "稍後"}
-      </span>
-    </div>
-  );
-}
-
 // ── 2 掃描 ───────────────────────────────────────────────────────────────────
 
 export function StepScan({ patch, go }: StepProps) {
   const [dogs, setDogs] = useState<DogAdvert[]>([]);
   const [elapsed, setElapsed] = useState(0);
-  const [qr, setQr] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -167,58 +245,40 @@ export function StepScan({ patch, go }: StepProps) {
     };
   }, []);
 
-  const shown = qr ? dogs.filter((d) => d.serial.endsWith(qr)) : dogs;
-
   return (
-    <Screen title="找到你的狗" lead="列出附近正在廣播的 SyncAI-Dog。認序號最後 4 碼，或掃狗身上的 QR。">
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground flex items-center gap-2 text-[13px]">
-          <Loader2 className="size-3.5 animate-spin" />
-          掃描中 · {elapsed} 秒
-        </p>
-        {qr ? (
-          <Button size="sm" variant="ghost" onClick={() => setQr(null)}>
-            清除 QR 過濾
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setQr("7F3A");
-              toast("Mock：已掃描狗身 QR · 7F3A");
-            }}
-          >
-            <QrCode />
-            掃 QR
-          </Button>
-        )}
-      </div>
+    <Screen icon={Radar} title="找到你的狗" lead="列出附近正在廣播的 SyncAI-Dog。對一下狗身上序號的最後 4 碼。">
+      <p className="text-muted-foreground flex items-center justify-center gap-2 text-[12px]">
+        <Loader2 className="size-3.5 animate-spin" />
+        掃描中 · {elapsed} 秒
+      </p>
 
       <div className="space-y-2">
-        {shown.map((d) => (
-          <button
+        {dogs.map((d) => (
+          <ChoiceRow
             key={d.id}
             onClick={() => {
               patch({ dog: d });
               go("connect");
             }}
-            className="bg-card hover:border-primary/50 flex w-full cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
-          >
-            <span className="bg-primary/10 text-primary-accent grid size-11 shrink-0 place-items-center rounded-xl font-mono text-[13px] font-bold">{d.serial.slice(-4)}</span>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">{d.name}</p>
-              <p className="text-muted-foreground text-xs">{d.hasOwner ? "已有 Owner · 需要核准" : "尚未配對 · 你會成為 Owner"}</p>
-            </div>
-            <Rssi rssi={d.rssi} />
-          </button>
+            tile={<span className="font-mono">{d.serial.slice(-4)}</span>}
+            title={d.name}
+            sub={d.hasOwner ? "已有 Owner · 加入需要核准" : "尚未配對 · 你會成為 Owner"}
+            badge={
+              <span className="flex shrink-0 items-center gap-2">
+                <Rssi rssi={d.rssi} />
+                <Badge variant="outline" className="text-[10px]">
+                  {d.hasOwner ? "已配對" : "新機"}
+                </Badge>
+              </span>
+            }
+          />
         ))}
-        {shown.length === 0 && elapsed < 30 && <div className="bg-muted/40 h-[72px] animate-pulse rounded-xl" />}
+        {dogs.length === 0 && elapsed < 30 && <div className="bg-muted/40 h-[58px] animate-pulse rounded-lg" />}
       </div>
 
-      {(elapsed >= 30 && shown.length === 0) || elapsed >= 8 ? (
-        <Note tone={shown.length === 0 ? "warn" : "neutral"} icon={<CircleAlert />}>
-          {shown.length === 0 ? "30 秒沒有找到狗。" : "沒看到你的狗？"}
+      {(elapsed >= 30 && dogs.length === 0) || elapsed >= 8 ? (
+        <Note tone={dogs.length === 0 ? "warn" : "neutral"} icon={<CircleAlert />}>
+          {dogs.length === 0 ? "30 秒沒有找到狗。" : "沒看到你的狗？"}
           <ul className="mt-1 list-disc pl-4">
             <li>確認狗已開機</li>
             <li>手機與狗距離 5 m 內</li>
@@ -233,14 +293,10 @@ export function StepScan({ patch, go }: StepProps) {
 function Rssi({ rssi }: { rssi: number }) {
   const bars = rssi > -60 ? 3 : rssi > -75 ? 2 : 1;
   return (
-    <span className="text-muted-foreground flex flex-col items-end gap-0.5 text-[10px] tabular-nums">
-      <span className="flex h-3 items-end gap-[2px]">
-        {[1, 2, 3].map((b) => (
-          <span key={b} className={cn("w-[3px] rounded-[1px]", b <= bars ? "bg-foreground" : "bg-muted")} style={{ height: b * 4 }} />
-        ))}
-      </span>
-      {rssi} dBm
-      <Signal className="sr-only" />
+    <span className="flex h-3 items-end gap-[2px]" aria-label={`訊號 ${rssi} dBm`}>
+      {[1, 2, 3].map((b) => (
+        <span key={b} className={cn("w-[3px] rounded-[1px]", b <= bars ? "bg-foreground/80" : "bg-muted")} style={{ height: b * 4 }} />
+      ))}
     </span>
   );
 }
@@ -281,7 +337,7 @@ export function StepConnect({ flow, patch, go }: StepProps) {
   }, []);
 
   return (
-    <Screen title="連線中" lead={`正在透過藍牙連到 ${flow.dog?.name}。`}>
+    <Screen icon={Bluetooth} title="連線中" lead={`正在透過藍牙連到 ${flow.dog?.name}。`}>
       <div className="bg-card flex flex-col items-center gap-4 rounded-2xl border py-10">
         <span className={cn("grid size-16 place-items-center rounded-full", ok ? "bg-status-ok/15 text-status-ok" : "bg-primary/10 text-primary-accent")}>
           {ok ? <Check className="size-7" /> : <Bluetooth className="size-7 animate-pulse" />}
@@ -329,7 +385,7 @@ export function StepCode({ flow, patch, go }: StepProps) {
   };
 
   return (
-    <Screen title="輸入確認碼" lead="看狗背面的燈號面板，會顯示 6 位數字。這一步確認你連到的是眼前這隻狗。">
+    <Screen icon={KeyRound} title="輸入確認碼" lead="看狗背面的燈號面板，會顯示 6 位數字。這一步確認你連到的是眼前這隻狗。">
       {/* The dog's back, simplified: a body outline with a lit 6-digit panel. */}
       <div className="bg-plate relative mx-auto flex h-36 w-full max-w-[300px] items-center justify-center overflow-hidden rounded-[2rem] border border-white/10">
         <div className="absolute inset-x-8 top-6 h-4 rounded-full bg-white/5" />
@@ -437,6 +493,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
 
   return (
     <Screen
+      icon={granted ? ShieldCheck : enrollment?.kind === "needs_approval" ? UserCheck : Fingerprint}
       title={granted ? "配對完成" : enrollment?.kind === "needs_approval" ? "需要 Owner 核准" : "註冊中"}
       lead={
         granted
@@ -447,7 +504,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
       }
       footer={
         granted ? (
-          <Primary onClick={() => go("wifi")}>繼續</Primary>
+          <Primary onClick={() => go("license")}>繼續</Primary>
         ) : enrollment?.kind === "needs_approval" ? (
           <>
             <Button variant="outline" className="h-12 w-full" onClick={() => void asViewer()}>
@@ -510,7 +567,185 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
   );
 }
 
-// ── 6 Wi-Fi ──────────────────────────────────────────────────────────────────
+// ── 6 License ────────────────────────────────────────────────────────────────
+
+/**
+ * The licence key decides which features this dog runs. It is bound over BLE
+ * before Wi-Fi, because the dog may have no network yet. Only the Owner binds
+ * one; a phone joining an already-licensed dog just sees what it has.
+ */
+export function StepLicense({ flow, go }: StepProps) {
+  const [license, setLicense] = useState<LicenseInfo | null>(null);
+  const [key, setKey] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [skipAsk, setSkipAsk] = useState(false);
+  const owner = flow.role === "owner";
+
+  useEffect(() => {
+    let alive = true;
+    void getDogLink()
+      .ble.readLicense()
+      .then((l) => alive && setLicense(l));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const activate = async () => {
+    setBusy(true);
+    setError(null);
+    const r = await getDogLink().ble.activateLicense(key);
+    setBusy(false);
+    if (r.ok) {
+      setLicense(r.license);
+      setChanging(false);
+      setKey("");
+      navigator.vibrate?.(20);
+    } else setError(ACTIVATION_ERROR[r.reason]);
+  };
+
+  if (!license)
+    return (
+      <Screen icon={KeyRound} title="讀取 License…">
+        <div className="text-muted-foreground flex justify-center">
+          <Loader2 className="size-5 animate-spin" />
+        </div>
+      </Screen>
+    );
+
+  const active = license.edition !== "none";
+  const entering = owner && (!active || changing);
+
+  return (
+    <Screen
+      icon={entering ? KeyRound : BadgeCheck}
+      title={entering ? "輸入 License 金鑰" : `License · ${EDITION_LABEL[license.edition]}`}
+      lead={
+        entering
+          ? "金鑰決定這隻狗能開啟哪些功能。印在隨機附的授權卡上，4 組、每組 4 個英數字。"
+          : owner
+            ? "這隻狗的 License 已啟用。"
+            : "這隻狗的 License 由 Owner 管理，以下是可用的功能。"
+      }
+      footer={
+        entering ? (
+          <>
+            <Primary disabled={!isCompleteKey(key)} loading={busy} onClick={() => void activate()}>
+              啟用
+            </Primary>
+            {changing ? (
+              <Button variant="ghost" className="h-11 w-full" onClick={() => setChanging(false)}>
+                取消
+              </Button>
+            ) : (
+              <Button variant="ghost" className="h-11 w-full" onClick={() => setSkipAsk(true)}>
+                稍後再輸入
+              </Button>
+            )}
+          </>
+        ) : (
+          <>
+            <Primary onClick={() => go("wifi")}>
+              繼續
+              <ArrowRight />
+            </Primary>
+            {owner && (
+              <Button variant="ghost" className="h-11 w-full" onClick={() => setChanging(true)}>
+                更換金鑰
+              </Button>
+            )}
+          </>
+        )
+      }
+    >
+      {entering && (
+        <div className="space-y-2">
+          <KeyInput
+            value={key}
+            onChange={(v) => {
+              setKey(v);
+              setError(null);
+            }}
+            invalid={!!error}
+            disabled={busy}
+            autoFocus
+          />
+          {error ? (
+            <p className="text-status-error text-[13px]">{error}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs">可以整串貼上，會自動分段。經藍牙送到狗上驗證。</p>
+          )}
+        </div>
+      )}
+
+      {!entering && <LicenseCard license={license} />}
+
+      {entering && (
+        <p className="text-muted-foreground text-center text-xs leading-relaxed">
+          Mock：<code className="font-mono">SYNC-…</code> 專業版 · <code className="font-mono">BASE-…</code> 基本版 · 含 <code className="font-mono">0000</code> 已綁定 ·{" "}
+          <code className="font-mono">EXPD-…</code> 過期
+          <br />
+          試試{" "}
+          <button className="text-primary-accent cursor-pointer font-mono underline-offset-2 hover:underline" onClick={() => setKey("SYNCPRO12026DEMO")}>
+            {formatKey("SYNCPRO12026DEMO")}
+          </button>
+        </p>
+      )}
+
+      <Modal open={skipAsk} onClose={() => setSkipAsk(false)}>
+        <p className="text-lg font-semibold">先不啟用 License？</p>
+        <p className="text-muted-foreground mt-1 text-sm">只有 3D 地圖、操控與 E-Stop 可用；任務排程、雙向通話、AI 辨識會鎖住。之後可以在裝置頁輸入金鑰。</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-11" onClick={() => setSkipAsk(false)}>
+            回去輸入
+          </Button>
+          <Button
+            className="h-11"
+            onClick={() => {
+              setSkipAsk(false);
+              go("wifi");
+            }}
+          >
+            略過
+          </Button>
+        </div>
+      </Modal>
+    </Screen>
+  );
+}
+
+export function LicenseCard({ license }: { license: LicenseInfo }) {
+  return (
+    <div className="bg-card/60 overflow-hidden rounded-xl border">
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <span className="font-mono text-[13px] tracking-wide">{license.keyMasked ?? "未輸入金鑰"}</span>
+        {license.expiresAt && <span className="text-muted-foreground text-xs">到期 {new Date(license.expiresAt).toLocaleDateString("zh-TW")}</span>}
+      </div>
+      <ul className="divide-y">
+        {license.features.map((f) => (
+          <li key={f.feature} className="flex h-11 items-center justify-between px-4 text-[14px]">
+            <span className={cn(!f.granted && "text-muted-foreground")}>{FEATURE_LABEL[f.feature]}</span>
+            {f.granted ? (
+              <span className="text-status-ok flex items-center gap-1 text-xs font-medium">
+                <Check className="size-3.5" />
+                已開啟
+              </span>
+            ) : (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <Lock className="size-3" />
+                未授權
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ── 7 Wi-Fi ──────────────────────────────────────────────────────────────────
 
 export function StepWifi({ flow, patch, go }: StepProps) {
   const [skipAsk, setSkipAsk] = useState(false);
@@ -518,6 +753,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
 
   return (
     <Screen
+      icon={Wifi}
       title="現場 Wi-Fi"
       lead="狗要連上現場的 Wi-Fi，手機才能看 3D 地圖、操控與通話。手機不會切換網路。"
       footer={
@@ -529,8 +765,8 @@ export function StepWifi({ flow, patch, go }: StepProps) {
               go("wait");
             }}
           >
-            <Wifi />
             讓狗連線
+            <ArrowRight />
           </Primary>
           <Button variant="ghost" className="h-11 w-full" onClick={() => setSkipAsk(true)}>
             略過，之後再設
@@ -577,7 +813,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
   );
 }
 
-// ── 7 等待 ───────────────────────────────────────────────────────────────────
+// ── 8 等待 ───────────────────────────────────────────────────────────────────
 
 const WIFI_TEXT: Record<WifiStatus, string> = {
   connecting: "狗正在連線 Wi-Fi…",
@@ -625,6 +861,7 @@ export function StepWait({ flow, patch, go }: StepProps) {
 
   return (
     <Screen
+      icon={Wifi}
       title="等狗上線"
       lead={`狗正在連 ${flow.ssid}，完成後會回報它的區網位址。`}
       footer={
@@ -655,7 +892,7 @@ export function StepWait({ flow, patch, go }: StepProps) {
   );
 }
 
-// ── 8 安全須知 ───────────────────────────────────────────────────────────────
+// ── 9 安全須知 ───────────────────────────────────────────────────────────────
 
 export function StepSafety({ flow }: StepProps) {
   const [ack, setAck] = useState([false, false, false]);
@@ -665,7 +902,10 @@ export function StepSafety({ flow }: StepProps) {
       title: "E-Stop 永遠在畫面中間",
       body: "地圖和下方面板之間那條紅色長鍵。按一下就停，不會再問。任何人都能按，只有 Owner 能解除。",
       visual: (
-        <div className="bg-estop estop-stripes flex h-9 items-center justify-center rounded-md text-[12px] font-black tracking-[0.2em] text-white">E-STOP</div>
+        <div className="from-estop to-estop-pressed flex h-10 items-center justify-center gap-1.5 rounded-lg bg-linear-to-b text-[12px] font-black tracking-[0.18em] text-white shadow-md ring-1 ring-white/15">
+          <OctagonX className="size-4" />
+          E-STOP
+        </div>
       ),
     },
     {
@@ -682,6 +922,7 @@ export function StepSafety({ flow }: StepProps) {
 
   return (
     <Screen
+      icon={ShieldCheck}
       title="開始之前"
       lead="三件事，每一件都請確認。"
       footer={

@@ -160,6 +160,8 @@ export function seedDevice(now: number, missionLicense: boolean): DeviceInfo {
       { feature: "talk", granted: true },
     ],
     licenseExpiresAt: now + 5 * 86_400_000,
+    licenseEdition: "pro",
+    licenseKeyMasked: null,
     plugins: [GAS_PLUGIN, THERMAL_PLUGIN],
     clips: [
       { id: "clip-restricted", name: "此區域禁止進入", sec: 4 },

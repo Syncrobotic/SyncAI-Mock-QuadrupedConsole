@@ -37,7 +37,7 @@ export function MissionTab() {
       <div className="space-y-4 p-4">
         <LockedPanel
           reason={access.reason}
-          detail={access.reason === "任務排程未授權" ? "這隻狗的 License 不含任務排程。Owner 可以在裝置頁匯入新的 License。" : undefined}
+          detail={access.reason === "任務排程未授權" ? "這隻狗的 License 不含任務排程。Owner 可以在裝置頁輸入新的 License 金鑰。" : undefined}
         />
         {missions.length > 0 && scopes.includes("view") && (
           <div className="space-y-2 opacity-70">
@@ -66,6 +66,7 @@ function MissionList() {
       {run && <RunCard />}
       <div className="space-y-2">
         <SectionTitle
+          description="存在狗上，依排程或事件觸發"
           action={
             <Button size="sm" variant="ghost" className="text-primary-accent h-8" onClick={() => openEditor()}>
               <Plus />

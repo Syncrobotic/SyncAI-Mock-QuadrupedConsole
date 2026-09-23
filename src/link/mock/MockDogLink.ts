@@ -79,6 +79,7 @@ function createBle(world: MockWorld): BleChannel {
         throw new Error("GATT 連線逾時");
       }
       flakyFailures = 0;
+      if (!DOGS.find((d) => d.id === dogId)?.hasOwner) world.resetAsNewDog();
       return { dogId, identity: dogIdentity(dogId), attemptsLeft: 3 };
     },
 
@@ -110,6 +111,16 @@ function createBle(world: MockWorld): BleChannel {
     async requestViewer() {
       await sleep(600);
       return { kind: "granted", role: "viewer", certificate: "cert-viewer" };
+    },
+
+    async readLicense() {
+      await sleep(350);
+      return structuredClone(world.license);
+    },
+
+    async activateLicense(key) {
+      await sleep(900);
+      return world.activateLicense(key);
     },
 
     async *provisionWifi(ssid): AsyncGenerator<WifiStatus> {
@@ -188,7 +199,7 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
     "mission.validate": (m) => ({ issues: validate(m) }),
     "mission.save": (m) => {
       need("mission.rw");
-      if (!world.scenario.missionLicense) throw new RpcError("forbidden", "任務排程未授權");
+      if (!world.hasFeature("mission")) throw new RpcError("forbidden", "任務排程未授權");
       const issues = validate(m);
       if (issues.some((i) => i.level === "error")) return { issues };
       const idx = world.missions.findIndex((x) => x.id === m.id);
@@ -210,7 +221,7 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
     },
     "mission.start": ({ id }) => {
       need("mission.rw");
-      if (!world.scenario.missionLicense) throw new RpcError("forbidden", "任務排程未授權");
+      if (!world.hasFeature("mission")) throw new RpcError("forbidden", "任務排程未授權");
       if (["ESTOP", "FAULT"].includes(world.mode)) throw new RpcError("invalid", "目前狀態不能啟動任務");
       world.startMission(id);
       world.emitMissionsChanged();
@@ -235,7 +246,7 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
     "device.info": () => structuredClone(world.device),
     "device.rename": ({ name }) => {
       need("admin");
-      world.device.name = name;
+      world.patchDevice({ name });
     },
     "device.phones": () => structuredClone(world.phones),
     "device.setRole": ({ phoneId, role }) => {
@@ -255,11 +266,15 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
     },
     "device.setSafety": (patch) => {
       need("admin");
-      world.device.safety = { ...world.device.safety, ...patch };
+      world.patchDevice({ safety: { ...world.device.safety, ...patch } });
     },
     "device.setPlugin": ({ id, enabled }) => {
       need("admin");
-      world.device.plugins = world.device.plugins.map((p) => (p.id === id ? { ...p, enabled } : p));
+      world.patchDevice({ plugins: world.device.plugins.map((p) => (p.id === id ? { ...p, enabled } : p)) });
+    },
+    "license.activate": ({ key }) => {
+      need("admin");
+      return world.activateLicense(key);
     },
     "media.broadcast": ({ clipId }) => {
       need("media.talk");

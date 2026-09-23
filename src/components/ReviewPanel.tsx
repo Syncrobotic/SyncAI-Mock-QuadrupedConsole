@@ -121,6 +121,12 @@ export function ReviewPanel() {
               <code className="font-mono text-white/80">none</code> → 找不到；
               <code className="font-mono text-white/80">slow</code> → 25 秒才連上
             </li>
+            <li>
+              License 金鑰：<code className="font-mono text-white/80">SYNC-…</code> 專業版、
+              <code className="font-mono text-white/80">BASE-…</code> 基本版（無任務排程）、含
+              <code className="font-mono text-white/80">0000</code> 已綁定、
+              <code className="font-mono text-white/80">EXPD-…</code> 過期
+            </li>
             <li>任務 tab 開編輯器時，在地圖上長按 0.5 秒放航點</li>
             <li>點地圖任一點顯示與狗的直線距離</li>
           </ul>

@@ -19,7 +19,13 @@ const KEYS = {
   line: "--map-unit-line",
   office: "--map-unit-office",
   ground: "--map-ground",
-  bg: "--map-bg",
+  poi: "--map-poi",
+  unitOffice: "--map-unit-office",
+  unitCorridor: "--map-unit-corridor",
+  unitLobby: "--map-unit-lobby",
+  unitRestricted: "--map-unit-restricted",
+  unitPublic: "--map-unit-public",
+  unitUtility: "--map-unit-utility",
 } as const;
 
 export type MapColors = Record<keyof typeof KEYS, string> & { dark: boolean };

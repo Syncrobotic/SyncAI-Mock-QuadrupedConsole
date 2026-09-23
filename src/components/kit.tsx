@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, m } from "framer-motion";
-import { Lock } from "lucide-react";
+import { Lock, type LucideIcon } from "lucide-react";
 import { Component, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -55,13 +55,92 @@ export function Modal({
   );
 }
 
-// ── Section title (resident-app style) ──────────────────────────────────────
+// ── Section header (dashboard `Section`: title + one muted line) ────────────
 
-export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function SectionTitle({ children, description, action }: { children: ReactNode; description?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <h3 className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">{children}</h3>
+    <div className="flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="text-[15px] leading-tight font-semibold">{children}</h3>
+        {description && <p className="text-muted-foreground mt-0.5 text-[12px]">{description}</p>}
+      </div>
       {action}
+    </div>
+  );
+}
+
+// ── Header triple (dashboard `PageHeader` / `MapHeader`: plate · title · subtitle) ──
+
+/** One tone for every plate, as in the dashboard: a place is not a state. */
+export function IconPlate({ icon: Icon, size = "md" }: { icon: LucideIcon; size?: "sm" | "md" }) {
+  return (
+    <span
+      className={cn(
+        "bg-primary/10 text-primary-accent dark:bg-primary/20 grid shrink-0 place-items-center",
+        size === "sm" ? "size-8 rounded-lg [&_svg]:size-4" : "size-10 rounded-xl [&_svg]:size-5"
+      )}
+    >
+      <Icon />
+    </span>
+  );
+}
+
+export function PanelHeader({ icon, title, subtitle, action }: { icon: LucideIcon; title: ReactNode; subtitle?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <IconPlate icon={icon} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[16px] leading-tight font-semibold">{title}</p>
+        {subtitle && <p className="text-muted-foreground mt-0.5 truncate text-[12px]">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+// ── Active plate (dashboard nav `ActivePlate`) ─────────────────────────────
+
+export function ActivePlate({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "absolute inset-0 rounded-xl bg-linear-to-r from-violet-600 to-violet-500 shadow-lg ring-1 shadow-violet-600/15 ring-white/15",
+        className
+      )}
+    />
+  );
+}
+
+// ── Readouts (dashboard command strip, pocket size) ─────────────────────────
+
+const READOUT_TONE = { neutral: "text-white", warn: "text-amber-300", bad: "text-red-400" } as const;
+
+/**
+ * The dark plate with numbers on it. Same rule as the dashboard's command
+ * strip: a reading is white until it is bad — colour is the signal, so it is
+ * not spent on "fine".
+ */
+export function Readouts({ items }: { items: { label: string; value: ReactNode; unit?: string; tone?: keyof typeof READOUT_TONE }[] }) {
+  return (
+    <div className="bg-plate relative overflow-hidden rounded-xl border border-white/8 text-white">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-violet-500/60 to-transparent" />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "radial-gradient(ellipse 60% 120% at 10% -30%, rgba(124,111,208,0.20), transparent 62%)" }}
+      />
+      <div className="relative grid auto-cols-fr grid-flow-col divide-x divide-white/6">
+        {items.map((it) => (
+          <div key={it.label} className="px-3 py-2.5">
+            <p className="text-[10px] tracking-wide text-white/45 uppercase">{it.label}</p>
+            <p className={cn("mt-1 text-[20px] leading-none font-bold tabular-nums", READOUT_TONE[it.tone ?? "neutral"])}>
+              {it.value}
+              {it.unit && <span className="ml-0.5 text-[11px] font-medium text-white/45">{it.unit}</span>}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
