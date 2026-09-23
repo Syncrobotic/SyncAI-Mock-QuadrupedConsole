@@ -12,6 +12,7 @@ import { tabAccess, type Access, type Tab } from "@/store/logic";
 import { Banners } from "./Banners";
 import { EStopBar } from "./EStopBar";
 import { FaultOverlay, Overlays } from "./Overlays";
+import { LicenseGate } from "./LicenseGate";
 import { DogHeader } from "./StatusBar";
 import { DeviceTab, DeviceSummary } from "./device/DeviceTab";
 import { MissionSummary, MissionTab } from "./mission/MissionTab";
@@ -54,6 +55,7 @@ export function useAccess(tab: Tab): Access {
 export function Console() {
   const tab = useStore((s) => s.tab);
   const snap = useStore((s) => s.snap);
+  const unlicensed = useStore((s) => s.device?.licenseEdition === "none");
   const root = useRef<HTMLDivElement>(null);
   const [rootH, setRootH] = useState(760);
 
@@ -75,6 +77,16 @@ export function Console() {
   // Sheet heights are fractions of the space under the status header, as in §5.
   const usable = rootH - 16;
   const sheetH = Math.round(usable * SNAP_PCT[snap]) - (snap === 2 ? 64 : 0);
+
+  if (unlicensed)
+    return (
+      <div ref={root} className="bg-surface-sunken relative flex h-full flex-col gap-2 p-2">
+        <div className="bg-surface relative min-h-0 flex-1 overflow-y-auto rounded-xl border">
+          <LicenseGate />
+        </div>
+        <EStopBar />
+      </div>
+    );
 
   return (
     <div ref={root} className="bg-surface-sunken relative flex h-full flex-col gap-2 p-2">

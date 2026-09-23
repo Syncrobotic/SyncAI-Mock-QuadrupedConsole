@@ -11,7 +11,7 @@ import { mockWorld } from "@/link";
 import { SCENARIOS, SCENARIO_IDS } from "@/link/mock/scenarios";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
-import { changeScenario, clearLocalPairing, refreshPhones } from "@/store/controller";
+import { changeScenario, clearLocalPairing, refreshDevice, refreshPhones } from "@/store/controller";
 import { CONN_LABEL, MODE_LABEL } from "@/store/logic";
 
 /**
@@ -91,6 +91,14 @@ export function ReviewPanel() {
               <Action onClick={act(() => world.otherPhoneTakesTeleop())}>他機搶操控</Action>
               <Action
                 onClick={act(() => {
+                  world.resetAsNewDog();
+                  void refreshDevice();
+                })}
+              >
+                清除 License
+              </Action>
+              <Action
+                onClick={act(() => {
                   world.simulateJoinRequest();
                   void refreshPhones();
                 })}
@@ -123,7 +131,8 @@ export function ReviewPanel() {
             </li>
             <li>
               License 金鑰：<code className="font-mono text-white/80">SYNC-…</code> 專業版、
-              <code className="font-mono text-white/80">BASE-…</code> 基本版（無任務排程）、含
+              <code className="font-mono text-white/80">BASE-…</code> 標準版（無 AI）、
+              <code className="font-mono text-white/80">CTRL-…</code> 操控版（只有操控＋地圖）、含
               <code className="font-mono text-white/80">0000</code> 已綁定、
               <code className="font-mono text-white/80">EXPD-…</code> 過期
             </li>

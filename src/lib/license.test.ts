@@ -23,7 +23,9 @@ describe("licence keys", () => {
     const pro = mockActivate("SYNC-PRO1-2026-DEMO", now);
     expect(pro.ok && pro.license.edition).toBe("pro");
     const basic = mockActivate("BASE-2026-0101-DEMO", now);
-    expect(basic.ok && basic.license.features.find((f) => f.feature === "mission")?.granted).toBe(false);
+    expect(basic.ok && basic.license.features.find((f) => f.feature === "ai")?.granted).toBe(false);
+    const ctrl = mockActivate("CTRL-2026-0101-DEMO", now);
+    expect(ctrl.ok && ctrl.license.features.filter((f) => f.granted).map((f) => f.feature)).toEqual(["teleop", "map"]);
     expect(mockActivate("SYNC-0000-2026-DEMO", now)).toEqual({ ok: false, reason: "bound" });
     expect(mockActivate("EXPD-2020-0101-DEMO", now)).toEqual({ ok: false, reason: "expired" });
     expect(mockActivate("ABCD-EFGH-IJKL-MNOP", now)).toEqual({ ok: false, reason: "invalid" });

@@ -33,22 +33,40 @@ export function maskKey(raw: string): string {
   return g.length === 4 ? `${g[0]}-••••-••••-${g[3]}` : "";
 }
 
+export const ALL_FEATURES: readonly LicenseFeature[] = ["teleop", "map", "mission", "talk", "ai"];
+
 export const FEATURE_LABEL: Record<LicenseFeature, string> = {
+  teleop: "手動操控",
   map: "3D 地圖",
   mission: "任務排程",
-  ai: "AI 辨識",
   talk: "雙向通話",
+  ai: "AI 辨識",
 };
 
+export const FEATURE_HINT: Record<LicenseFeature, string> = {
+  teleop: "搖桿、姿態與步態",
+  map: "點雲、平面圖、軌跡",
+  mission: "巡邏路線與排程",
+  talk: "影像與雙向語音",
+  ai: "人員偵測、異常事件",
+};
+
+/**
+ * What each edition turns on. The map comes with every edition — without it
+ * nothing else can be operated safely — so a licence is really choosing
+ * which *capabilities* sit on top: a control-only dog is a real product.
+ */
 const EDITIONS = {
-  pro: ["map", "mission", "ai", "talk"],
-  basic: ["map", "talk"],
-  none: ["map"],
+  pro: ["teleop", "map", "mission", "talk", "ai"],
+  basic: ["teleop", "map", "mission", "talk"],
+  control: ["teleop", "map"],
+  none: [],
 } as const satisfies Record<LicenseInfo["edition"], readonly LicenseFeature[]>;
 
 export const EDITION_LABEL: Record<LicenseInfo["edition"], string> = {
   pro: "專業版",
-  basic: "基本版",
+  basic: "標準版",
+  control: "操控版",
   none: "未啟用",
 };
 
@@ -57,7 +75,7 @@ export function licenseFor(edition: LicenseInfo["edition"], key: string | null, 
   return {
     edition,
     keyMasked: key ? maskKey(key) : null,
-    features: (["map", "mission", "ai", "talk"] as const).map((feature) => ({ feature, granted: granted.includes(feature) })),
+    features: ALL_FEATURES.map((feature) => ({ feature, granted: granted.includes(feature) })),
     expiresAt: edition === "none" ? null : now + (edition === "pro" ? 5 : 365) * 86_400_000,
   };
 }
@@ -65,7 +83,8 @@ export function licenseFor(edition: LicenseInfo["edition"], key: string | null, 
 /**
  * The mock licence server. Demo keys:
  *   SYNC-…            → 專業版 (everything)
- *   BASE-…            → 基本版 (map + talk; no mission scheduling, no AI)
+ *   BASE-…            → 標準版 (everything but AI)
+ *   CTRL-…            → 操控版 (teleop + map only)
  *   any group "0000"  → already bound to another dog
  *   EXPD-…            → expired
  *   anything else     → invalid
@@ -77,6 +96,7 @@ export function mockActivate(raw: string, now: number): LicenseActivation {
   if (key.startsWith("EXPD")) return { ok: false, reason: "expired" };
   if (key.startsWith("SYNC")) return { ok: true, license: licenseFor("pro", key, now) };
   if (key.startsWith("BASE")) return { ok: true, license: licenseFor("basic", key, now) };
+  if (key.startsWith("CTRL")) return { ok: true, license: licenseFor("control", key, now) };
   return { ok: false, reason: "invalid" };
 }
 

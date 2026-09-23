@@ -104,6 +104,14 @@ describe("tab access", () => {
     }
   });
 
+  it("a control-only licence locks mission and talk but not teleop", () => {
+    const license = { teleop: true, map: true, mission: false, talk: false, ai: false };
+    expect(tabAccess("teleop", ctx({ license })).locked).toBe(false);
+    expect(tabAccess("mission", ctx({ license }))).toEqual({ locked: true, reason: "任務排程未授權" });
+    expect(tabAccess("talk", ctx({ license }))).toEqual({ locked: true, reason: "通話功能未授權" });
+    expect(tabAccess("teleop", ctx({ license: { ...license, teleop: false } }))).toEqual({ locked: true, reason: "手動操控未授權" });
+  });
+
   it("an unlicensed feature is locked for the owner too, naming the licence", () => {
     expect(tabAccess("mission", ctx({ license: { mission: false } }))).toEqual({ locked: true, reason: "任務排程未授權" });
   });

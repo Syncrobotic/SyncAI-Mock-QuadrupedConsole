@@ -154,10 +154,11 @@ export function seedDevice(now: number, missionLicense: boolean): DeviceInfo {
     network: { ssid: "SyncAI-Office", ip: "192.168.50.23", signal: -61 },
     safety: { speedLimit: 1.2, outsideFence: "stop", estopLieSec: 3 },
     license: [
+      { feature: "teleop", granted: true },
       { feature: "map", granted: true },
       { feature: "mission", granted: missionLicense },
-      { feature: "ai", granted: false },
       { feature: "talk", granted: true },
+      { feature: "ai", granted: true },
     ],
     licenseExpiresAt: now + 5 * 86_400_000,
     licenseEdition: "pro",

@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { currentScenarioId, getDogLink, switchScenario } from "@/link";
+import { currentScenarioId, getDogLink, mockWorld, switchScenario } from "@/link";
 import { RpcError, type Credential, type RpcName, type RpcReq, type RpcRes } from "@/link/DogLink";
 
 import { get, set } from ".";
@@ -35,6 +35,10 @@ function go(to: ConnState, patch: Partial<ReturnType<typeof get>> = {}) {
 
 export function boot() {
   const link = getDogLink();
+  // Dev handles for the Playwright UI audit (.playwright-mcp/audit.js). Mock only.
+  const w = window as unknown as Record<string, unknown>;
+  w.__qcSet = set;
+  w.__qcFire = (what: "estop_remote" | "gateway_down" | "revoked" | "fault") => mockWorld()?.fire(what);
   set({ scenario: currentScenarioId() });
   wire();
   const cred = link.keystore.load();

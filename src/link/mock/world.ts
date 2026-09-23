@@ -606,6 +606,11 @@ export class MockWorld {
 
   private maybePerception(now: number) {
     if (now < this.nextPerceptionAt) return;
+    // Perception events ARE the AI feature: an unlicensed dog does not raise them.
+    if (!this.hasFeature("ai")) {
+      this.nextPerceptionAt = now + 30_000;
+      return;
+    }
     this.nextPerceptionAt = now + 30_000 + Math.random() * 60_000;
     const p = PERCEPTION[Math.floor(Math.random() * PERCEPTION.length)];
     this.emitEvent("perception", p.level, p.text);

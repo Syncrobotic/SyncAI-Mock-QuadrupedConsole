@@ -121,6 +121,7 @@ export function tabAccess(tab: Tab, ctx: AccessContext): Access {
   if (ctx.mode === "FAULT") return lock("FAULT 中，只保留裝置頁與 E-Stop");
 
   // License is shown to every role, before scope (§2: 不隱藏，註明原因).
+  if (tab === "teleop" && ctx.license.teleop === false) return lock("手動操控未授權");
   if (tab === "mission" && ctx.license.mission === false) return lock("任務排程未授權");
   if (tab === "talk" && ctx.license.talk === false) return lock("通話功能未授權");
 

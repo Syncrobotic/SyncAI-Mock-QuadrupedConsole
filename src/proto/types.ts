@@ -255,11 +255,12 @@ export interface PairedPhone {
   pending?: boolean;
 }
 
-export type LicenseFeature = "map" | "mission" | "ai" | "talk";
+export type LicenseFeature = "teleop" | "map" | "mission" | "talk" | "ai";
 
 /** What a licence key unlocks on this dog. Activated over BLE, before Wi-Fi. */
 export interface LicenseInfo {
-  edition: "pro" | "basic" | "none";
+  /** `none` = never activated. The Console refuses to run until it is not. */
+  edition: "pro" | "basic" | "control" | "none";
   /** Masked for display: SYNC-••••-••••-DEMO */
   keyMasked: string | null;
   features: { feature: LicenseFeature; granted: boolean }[];

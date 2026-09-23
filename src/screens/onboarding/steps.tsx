@@ -28,11 +28,11 @@ import { BrandGlyph } from "@/components/brand-mark";
 import { KeyInput } from "@/components/KeyInput";
 import { Field, Modal, inputClass } from "@/components/kit";
 import { Badge } from "@/components/ui/badge";
-import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_LABEL, formatKey, isCompleteKey } from "@/lib/license";
+import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_HINT, FEATURE_LABEL, formatKey, isCompleteKey } from "@/lib/license";
 import { Button } from "@/components/ui/button";
 import { getDogLink } from "@/link";
 import { cn, sleep } from "@/lib/utils";
-import { ROLE_LABEL, type DogAdvert, type Enrollment, type LicenseInfo, type WifiStatus } from "@/proto/types";
+import { ROLE_LABEL, type DogAdvert, type Enrollment, type LicenseActivation, type LicenseInfo, type WifiStatus } from "@/proto/types";
 import { useStore } from "@/store";
 import { beginOnboarding, finishOnboarding } from "@/store/controller";
 
@@ -576,11 +576,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
  */
 export function StepLicense({ flow, go }: StepProps) {
   const [license, setLicense] = useState<LicenseInfo | null>(null);
-  const [key, setKey] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [changing, setChanging] = useState(false);
-  const [skipAsk, setSkipAsk] = useState(false);
   const owner = flow.role === "owner";
 
   useEffect(() => {
@@ -593,19 +589,6 @@ export function StepLicense({ flow, go }: StepProps) {
     };
   }, []);
 
-  const activate = async () => {
-    setBusy(true);
-    setError(null);
-    const r = await getDogLink().ble.activateLicense(key);
-    setBusy(false);
-    if (r.ok) {
-      setLicense(r.license);
-      setChanging(false);
-      setKey("");
-      navigator.vibrate?.(20);
-    } else setError(ACTIVATION_ERROR[r.reason]);
-  };
-
   if (!license)
     return (
       <Screen icon={KeyRound} title="讀取 License…">
@@ -616,102 +599,132 @@ export function StepLicense({ flow, go }: StepProps) {
     );
 
   const active = license.edition !== "none";
-  const entering = owner && (!active || changing);
+
+  // A licence is required. A non-Owner cannot bind one, so an unlicensed dog
+  // is a dead end for them — say so and send them back, rather than letting
+  // them into a Console where every feature is locked.
+  if (!active && !owner)
+    return (
+      <Screen
+        icon={Lock}
+        title="這隻狗還沒啟用 License"
+        lead="License 決定狗能使用哪些功能，必須由 Owner 在自己的手機上輸入金鑰後，其他手機才能使用。"
+        footer={
+          <Primary variant="outline" onClick={() => go("scan")}>
+            回到掃描
+          </Primary>
+        }
+      />
+    );
+
+  if (!active || changing)
+    return (
+      <LicenseEntry
+        changing={changing}
+        onCancel={() => setChanging(false)}
+        onActivated={(l) => {
+          setLicense(l);
+          setChanging(false);
+        }}
+      />
+    );
 
   return (
     <Screen
-      icon={entering ? KeyRound : BadgeCheck}
-      title={entering ? "輸入 License 金鑰" : `License · ${EDITION_LABEL[license.edition]}`}
-      lead={
-        entering
-          ? "金鑰決定這隻狗能開啟哪些功能。印在隨機附的授權卡上，4 組、每組 4 個英數字。"
-          : owner
-            ? "這隻狗的 License 已啟用。"
-            : "這隻狗的 License 由 Owner 管理，以下是可用的功能。"
-      }
+      icon={BadgeCheck}
+      title={`License · ${EDITION_LABEL[license.edition]}`}
+      lead={owner ? "這隻狗會啟用下列功能。" : "這隻狗的 License 由 Owner 管理，以下是你能用的功能。"}
       footer={
-        entering ? (
-          <>
-            <Primary disabled={!isCompleteKey(key)} loading={busy} onClick={() => void activate()}>
-              啟用
-            </Primary>
-            {changing ? (
-              <Button variant="ghost" className="h-11 w-full" onClick={() => setChanging(false)}>
-                取消
-              </Button>
-            ) : (
-              <Button variant="ghost" className="h-11 w-full" onClick={() => setSkipAsk(true)}>
-                稍後再輸入
-              </Button>
-            )}
-          </>
-        ) : (
-          <>
-            <Primary onClick={() => go("wifi")}>
-              繼續
-              <ArrowRight />
-            </Primary>
-            {owner && (
-              <Button variant="ghost" className="h-11 w-full" onClick={() => setChanging(true)}>
-                更換金鑰
-              </Button>
-            )}
-          </>
-        )
+        <>
+          <Primary onClick={() => go("wifi")}>
+            繼續
+            <ArrowRight />
+          </Primary>
+          {owner && (
+            <Button variant="ghost" className="h-11 w-full" onClick={() => setChanging(true)}>
+              更換金鑰
+            </Button>
+          )}
+        </>
       }
     >
-      {entering && (
-        <div className="space-y-2">
-          <KeyInput
-            value={key}
-            onChange={(v) => {
-              setKey(v);
-              setError(null);
-            }}
-            invalid={!!error}
-            disabled={busy}
-            autoFocus
-          />
-          {error ? (
-            <p className="text-status-error text-[13px]">{error}</p>
-          ) : (
-            <p className="text-muted-foreground text-xs">可以整串貼上，會自動分段。經藍牙送到狗上驗證。</p>
+      <LicenseCard license={license} />
+    </Screen>
+  );
+}
+
+/** Key entry. Shared by onboarding and the Console's licence gate. */
+export function LicenseEntry({
+  changing,
+  onCancel,
+  onActivated,
+  activate = (key) => getDogLink().ble.activateLicense(key),
+}: {
+  changing?: boolean;
+  onCancel?: () => void;
+  onActivated: (l: LicenseInfo) => void;
+  activate?: (key: string) => Promise<LicenseActivation | null>;
+}) {
+  const [key, setKey] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    const r = await activate(key);
+    setBusy(false);
+    if (!r) return;
+    if (r.ok) {
+      navigator.vibrate?.(20);
+      onActivated(r.license);
+    } else setError(ACTIVATION_ERROR[r.reason]);
+  };
+
+  return (
+    <Screen
+      icon={KeyRound}
+      title={changing ? "更換 License 金鑰" : "輸入 License 金鑰"}
+      lead="金鑰決定這隻狗能開啟哪些功能，例如只開操控、不含 AI。必須啟用才能使用。金鑰印在隨機附的授權卡上。"
+      footer={
+        <>
+          <Primary disabled={!isCompleteKey(key)} loading={busy} onClick={() => void submit()}>
+            啟用
+          </Primary>
+          {changing && (
+            <Button variant="ghost" className="h-11 w-full" onClick={onCancel}>
+              取消
+            </Button>
           )}
-        </div>
-      )}
-
-      {!entering && <LicenseCard license={license} />}
-
-      {entering && (
-        <p className="text-muted-foreground text-center text-xs leading-relaxed">
-          Mock：<code className="font-mono">SYNC-…</code> 專業版 · <code className="font-mono">BASE-…</code> 基本版 · 含 <code className="font-mono">0000</code> 已綁定 ·{" "}
-          <code className="font-mono">EXPD-…</code> 過期
-          <br />
-          試試{" "}
-          <button className="text-primary-accent cursor-pointer font-mono underline-offset-2 hover:underline" onClick={() => setKey("SYNCPRO12026DEMO")}>
-            {formatKey("SYNCPRO12026DEMO")}
-          </button>
-        </p>
-      )}
-
-      <Modal open={skipAsk} onClose={() => setSkipAsk(false)}>
-        <p className="text-lg font-semibold">先不啟用 License？</p>
-        <p className="text-muted-foreground mt-1 text-sm">只有 3D 地圖、操控與 E-Stop 可用；任務排程、雙向通話、AI 辨識會鎖住。之後可以在裝置頁輸入金鑰。</p>
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-11" onClick={() => setSkipAsk(false)}>
-            回去輸入
-          </Button>
-          <Button
-            className="h-11"
-            onClick={() => {
-              setSkipAsk(false);
-              go("wifi");
-            }}
-          >
-            略過
-          </Button>
-        </div>
-      </Modal>
+        </>
+      }
+    >
+      <div className="space-y-2">
+        <KeyInput
+          value={key}
+          onChange={(v) => {
+            setKey(v);
+            setError(null);
+          }}
+          invalid={!!error}
+          disabled={busy}
+          autoFocus
+        />
+        {error ? (
+          <p className="text-status-error text-[13px]">{error}</p>
+        ) : (
+          <p className="text-muted-foreground text-xs">4 組、每組 4 個英數字，可以整串貼上。經藍牙送到狗上驗證。</p>
+        )}
+      </div>
+      <p className="text-muted-foreground text-center text-xs leading-relaxed">
+        Mock：<code className="font-mono">SYNC-…</code> 專業版 · <code className="font-mono">BASE-…</code> 標準版（無 AI）·{" "}
+        <code className="font-mono">CTRL-…</code> 操控版
+        <br />
+        含 <code className="font-mono">0000</code> 已綁定 · <code className="font-mono">EXPD-…</code> 過期 · 試試{" "}
+        <button className="text-primary-accent cursor-pointer font-mono underline-offset-2 hover:underline" onClick={() => setKey("CTRL01AB2026DEMO")}>
+          {formatKey("CTRL01AB2026DEMO")}
+        </button>
+      </p>
     </Screen>
   );
 }
@@ -725,8 +738,11 @@ export function LicenseCard({ license }: { license: LicenseInfo }) {
       </div>
       <ul className="divide-y">
         {license.features.map((f) => (
-          <li key={f.feature} className="flex h-11 items-center justify-between px-4 text-[14px]">
-            <span className={cn(!f.granted && "text-muted-foreground")}>{FEATURE_LABEL[f.feature]}</span>
+          <li key={f.feature} className="flex h-11 items-center justify-between gap-2 px-4 text-[14px]">
+            <span className={cn("min-w-0", !f.granted && "text-muted-foreground")}>
+              {FEATURE_LABEL[f.feature]}
+              <span className="text-muted-foreground ml-2 text-[11px]">{FEATURE_HINT[f.feature]}</span>
+            </span>
             {f.granted ? (
               <span className="text-status-ok flex items-center gap-1 text-xs font-medium">
                 <Check className="size-3.5" />
