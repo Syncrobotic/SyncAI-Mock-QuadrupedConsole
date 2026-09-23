@@ -52,7 +52,7 @@ export function LandscapeConsole() {
         {tab === "teleop" && <CallPip landscape />}
 
         <div className="pointer-events-none absolute inset-x-2 top-2 z-30 flex items-start gap-2">
-          <div className="flex w-[280px] shrink-0 flex-col gap-1.5">
+          <div className="flex w-[320px] shrink-0 flex-col gap-1.5">
             <DogHeader />
             <Banners />
           </div>

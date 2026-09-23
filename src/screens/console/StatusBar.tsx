@@ -51,50 +51,48 @@ export function DogHeader() {
 
   return (
     <div className="pointer-events-auto flex min-h-0 flex-col">
-      <div className="flex items-stretch gap-1.5">
-        <button
-          onClick={toggle}
-          aria-expanded={open}
-          className="bg-surface/85 hover:bg-surface flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-xl border px-2 py-1.5 text-left shadow-sm backdrop-blur transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
-        >
-          <IconPlate icon={Dog} size="sm" />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] leading-tight font-semibold">{name}</span>
-            <span className={cn("block truncate text-[11px] leading-tight", modeBad ? "text-status-error font-semibold" : mode === "PAUSED" ? "text-severity-warning" : "text-muted-foreground")}>
-              {subtitle}
-            </span>
+      {/* ONE card. It used to be two identical cards side by side — name, and
+          battery/RTT — which read as two tabs and did the same thing on tap.
+          Identity left, live readings right, a hairline between. */}
+      <button
+        onClick={toggle}
+        aria-expanded={open}
+        aria-label="狗的狀態與連線"
+        className="bg-surface/85 hover:bg-surface flex min-w-0 cursor-pointer items-center gap-2 rounded-xl border py-1.5 pr-2.5 pl-2 text-left shadow-sm backdrop-blur transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+      >
+        <IconPlate icon={Dog} size="sm" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] leading-tight font-semibold">{name}</span>
+          <span className={cn("block truncate text-[11px] leading-tight", modeBad ? "text-status-error font-semibold" : mode === "PAUSED" ? "text-severity-warning" : "text-muted-foreground")}>
+            {subtitle}
           </span>
-          <span className="relative shrink-0">
-            <ChevronDown className={cn("text-muted-foreground size-4 transition-transform", open && "rotate-180")} />
-            {notices > 0 && !open && <span aria-label={`${notices} 則提醒`} className="bg-severity-warning ring-surface absolute -top-1 -right-1 size-2 rounded-full ring-2" />}
-          </span>
-        </button>
+        </span>
 
-        <button
-          onClick={toggle}
-          className="bg-surface/85 hover:bg-surface flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 shadow-sm backdrop-blur transition-colors"
-          aria-label="電量與連線"
-        >
-          <span className={cn("flex items-center gap-1 text-[12px] font-semibold tabular-nums", batteryTone)}>
-            <BatteryIcon className="size-4" />
-            {battery !== null ? `${Math.round(battery)}%` : "—"}
-          </span>
-          <span className={cn("flex items-center gap-1.5 text-[12px] font-semibold tabular-nums", rttTone)}>
-            {live ? (
-              <span aria-hidden className="flex h-3 items-end gap-[2px]">
-                {[1, 2, 3].map((b) => (
-                  <span key={b} className={cn("w-[3px] rounded-[1px]", b <= bars ? barTone : "bg-muted-foreground/25")} style={{ height: b * 4 }} />
-                ))}
-              </span>
-            ) : conn === "BleOnly" ? (
-              <Bluetooth className="size-3.5" />
-            ) : (
-              <Radio className="size-3.5" />
-            )}
-            {live && rtt !== undefined ? rtt : "—"}
-          </span>
-        </button>
-      </div>
+        <span aria-hidden className="bg-border h-6 w-px shrink-0" />
+
+        <span className={cn("flex shrink-0 items-center gap-1 text-[12px] font-semibold tabular-nums", batteryTone)}>
+          <BatteryIcon className="size-4" />
+          {battery !== null ? `${Math.round(battery)}%` : "—"}
+        </span>
+        <span className={cn("flex shrink-0 items-center gap-1.5 text-[12px] font-semibold tabular-nums", rttTone)}>
+          {live ? (
+            <span aria-hidden className="flex h-3 items-end gap-[2px]">
+              {[1, 2, 3].map((b) => (
+                <span key={b} className={cn("w-[3px] rounded-[1px]", b <= bars ? barTone : "bg-muted-foreground/25")} style={{ height: b * 4 }} />
+              ))}
+            </span>
+          ) : conn === "BleOnly" ? (
+            <Bluetooth className="size-3.5" />
+          ) : (
+            <Radio className="size-3.5" />
+          )}
+          {live && rtt !== undefined ? rtt : "—"}
+        </span>
+        <span className="relative shrink-0">
+          <ChevronDown className={cn("text-muted-foreground size-4 transition-transform", open && "rotate-180")} />
+          {notices > 0 && !open && <span aria-label={`${notices} 則提醒`} className="bg-severity-warning ring-surface absolute -top-1 -right-1 size-2 rounded-full ring-2" />}
+        </span>
+      </button>
 
       <AnimatePresence>{open && <Details />}</AnimatePresence>
     </div>

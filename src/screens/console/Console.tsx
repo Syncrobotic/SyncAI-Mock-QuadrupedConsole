@@ -99,15 +99,24 @@ export function Console() {
   const GAP = 8;
   const ESTOP = 56;
   const COLLAPSED_HEADER = 64;
-  let sheetH = Math.round(usable * SNAP_PCT[snap]);
+  // Collapsed is "tab bar + one summary line", sized to that — not 20% of the
+  // screen, which left 40–70px of blank sheet the map could have had.
+  const COLLAPSED_SHEET = 96;
+  const teleopOpen = Math.round(Math.max(usable * 0.5, Math.min(usable * 0.62, 380)));
+  const heights: [number, number, number] = [
+    COLLAPSED_SHEET,
+    tab === "teleop" ? teleopOpen : Math.round(usable * SNAP_PCT[1]),
+    usable - ESTOP - COLLAPSED_HEADER - 2 * GAP,
+  ];
+  let sheetH = heights[snap];
   // Teleop's open height: on a short phone 50% cannot hold the sticks AND the
   // posture keys (measured: 266px for 360px of content on an SE), and
   // "recover" is the key you need right after an E-Stop. It takes up to 62%.
-  if (tab === "teleop" && snap > 0) sheetH = Math.round(Math.max(usable * 0.5, Math.min(usable * 0.62, 380)));
+
   // At 90% the map would be a 57–73px sliver entirely covered by its own
   // header. Collapse it to the header instead, and give the rest to the sheet.
   const collapsed = snap === 2 && tab !== "teleop";
-  if (collapsed) sheetH = usable - ESTOP - COLLAPSED_HEADER - 2 * GAP;
+  if (snap === 2 && !collapsed) sheetH = heights[1];
 
   // Safe areas: notch / Dynamic Island on top, home indicator at the bottom.
   const shell = "bg-surface-sunken relative flex h-full flex-col gap-2 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]";
@@ -151,14 +160,14 @@ export function Console() {
         <div ref={estop}>
           <EStopBar />
         </div>
-        <Sheet height={sheetH} usable={usable} />
+        <Sheet height={sheetH} heights={heights} />
         <Overlays />
       </div>
     </EStopZone.Provider>
   );
 }
 
-function Sheet({ height, usable }: { height: number; usable: number }) {
+function Sheet({ height, heights }: { height: number; heights: [number, number, number] }) {
   const tab = useStore((s) => s.tab);
   const snap = useStore((s) => s.snap);
   // Teleop can be dragged too (it used to be locked at 50% per §7 — reviewers
@@ -174,8 +183,8 @@ function Sheet({ height, usable }: { height: number; usable: number }) {
   };
   const onMove = (e: React.PointerEvent) => {
     if (!drag.current) return;
-    const top = maxSnap === 1 ? height : usable * 0.84;
-    setLive(Math.max(usable * 0.15, Math.min(Math.max(top, drag.current.h), drag.current.h + drag.current.y - e.clientY)));
+    const top = heights[maxSnap];
+    setLive(Math.max(heights[0], Math.min(Math.max(top, drag.current.h), drag.current.h + drag.current.y - e.clientY)));
   };
   const onUp = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -188,8 +197,7 @@ function Sheet({ height, usable }: { height: number; usable: number }) {
       set({ snap: snap >= maxSnap ? (maxSnap === 1 ? 0 : 1) : ((snap + 1) as SheetSnap) });
       return;
     }
-    const pct = h / usable;
-    const nearest = SNAP_PCT.reduce((best, p, i) => (Math.abs(p - pct) < Math.abs(SNAP_PCT[best] - pct) ? i : best), 0);
+    const nearest = heights.reduce((best, p, i) => (Math.abs(p - h) < Math.abs(heights[best] - h) ? i : best), 0);
     set({ snap: Math.min(nearest, maxSnap) as SheetSnap });
   };
 

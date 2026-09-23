@@ -14,7 +14,7 @@ async (page) => {
       const name = (el) => (el.getAttribute("aria-label") || el.innerText || el.tagName).trim().replace(/\s+/g, " ").slice(0, 28);
       // Floating things over the map panel
       const floats = [
-        ...document.querySelectorAll('[aria-expanded][class*="backdrop-blur"], [aria-label="電量與連線"], [role="status"], [aria-label="跟隨"], [aria-label^="回到通話"], [aria-label="圖層"]'),
+        ...document.querySelectorAll('[aria-expanded][class*="backdrop-blur"], [aria-label="狗的狀態與連線"], [role="status"], [aria-label="跟隨"], [aria-label^="回到通話"], [aria-label="圖層"]'),
       ].filter(vis);
       const overlaps = [];
       for (let i = 0; i < floats.length; i++)
@@ -102,11 +102,11 @@ async (page) => {
     // call running + teleop → PiP
     await page.getByRole("tab", { name: "操控" }).click();
     await page.waitForTimeout(800);
-    await page.getByLabel("電量與連線").click();
+    await page.getByLabel("狗的狀態與連線").click();
     await page.waitForTimeout(300);
     await measure(`${dev} 操控 + 通話PiP + 狀態展開`);
     await page.screenshot({ path: `.playwright-mcp/audit-${dev}-pip-status.png` });
-    await page.getByLabel("電量與連線").click();
+    await page.getByLabel("狗的狀態與連線").click();
 
     await go("weak_signal", vw, vh);
     await page.waitForTimeout(9000);
