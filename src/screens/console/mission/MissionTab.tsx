@@ -260,7 +260,7 @@ function RuleRow({ rule, readOnly }: { rule: Rule; readOnly?: boolean }) {
   const armed = rule.enabled && (rule.trigger.kind === "time" || inWindow(rule.trigger.activeWindow, now));
 
   return (
-    <div className={cn("bg-card flex items-center gap-2.5 rounded-xl border py-1.5 pr-2 pl-2.5", !rule.enabled && "opacity-65")}>
+    <div className={cn("flex items-center gap-2.5 rounded-xl border py-1.5 pr-2 pl-2.5", rule.enabled ? "bg-card" : "bg-muted/40 border-dashed")}>
       <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", armed ? "bg-primary/12 text-primary-accent" : "bg-muted text-muted-foreground")}>
         <RuleIcon rule={rule} className="size-4" />
       </span>
@@ -272,7 +272,7 @@ function RuleRow({ rule, readOnly }: { rule: Rule; readOnly?: boolean }) {
         <p className="text-muted-foreground truncate text-[11px]">
           {describeTrigger(rule.trigger, zoneName)} → {mission?.name ?? "—"}
         </p>
-        <p className="text-muted-foreground truncate text-[10px]">
+        <p className="text-muted-foreground truncate text-[11px]">
           {rule.mode !== "auto" && `${MODE_LABEL[rule.mode]} · `}
           {next ? `下次 ${clock(next)}（${formatRelative(next, now)}）` : rule.trigger.kind === "event" ? (armed ? "待命中" : "不在生效時段") : "沒有下一次"}
           {last && (
@@ -616,7 +616,7 @@ function Agenda() {
             const newDay = i === 0 || new Date(s.at).getDate() !== new Date(slots[i - 1].at).getDate();
             return (
               <li key={`${s.rule.id}-${s.at}`}>
-                {newDay && <p className="text-muted-foreground -ml-3 pt-1 pb-0.5 text-[10px] font-semibold">{new Date(s.at).toLocaleDateString("zh-TW", { month: "numeric", day: "numeric", weekday: "short" })}</p>}
+                {newDay && <p className="text-muted-foreground -ml-3 pt-1 pb-0.5 text-[11px] font-semibold">{new Date(s.at).toLocaleDateString("zh-TW", { month: "numeric", day: "numeric", weekday: "short" })}</p>}
                 <button
                   onClick={() => set({ detailRuleId: s.rule.id, snap: 2 })}
                   className={cn("bg-card hover:bg-accent/40 relative flex w-full cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1 text-left", s.conflict && "border-severity-warning/40")}
@@ -628,7 +628,7 @@ function Agenda() {
                       {s.rule.name}
                       <span className="text-muted-foreground"> · {s.mission?.name}</span>
                     </span>
-                    <span className={cn("block truncate text-[10px]", s.conflict ? "text-severity-warning" : "text-muted-foreground")}>
+                    <span className={cn("block truncate text-[11px]", s.conflict ? "text-severity-warning" : "text-muted-foreground")}>
                       {s.conflict ?? `約 ${formatDuration(s.durSec)}${s.rule.trigger.kind === "time" && s.rule.trigger.jitterMin ? ` · ±${s.rule.trigger.jitterMin} 分` : ""}`}
                     </span>
                   </span>
@@ -664,7 +664,7 @@ function Agenda() {
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "warn" }) {
   return (
     <div className="bg-card rounded-lg border px-2.5 py-1.5">
-      <p className="text-muted-foreground text-[10px]">{label}</p>
+      <p className="text-muted-foreground text-[11px]">{label}</p>
       <p className={cn("text-[15px] font-bold tabular-nums", tone === "warn" && "text-severity-warning")}>{value}</p>
     </div>
   );

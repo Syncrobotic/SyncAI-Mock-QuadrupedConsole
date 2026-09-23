@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, m } from "framer-motion";
-import { Lock, type LucideIcon } from "lucide-react";
+import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import { Component, createContext, useContext, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -152,7 +152,7 @@ export function Readouts({ items }: { items: { label: string; value: ReactNode; 
       <div className="relative grid auto-cols-fr grid-flow-col divide-x divide-white/6">
         {items.map((it) => (
           <div key={it.label} className="px-2.5 py-1.5">
-            <p className="text-[10px] tracking-wide text-white/45 uppercase">{it.label}</p>
+            <p className="text-[11px] tracking-wide text-white/45 uppercase">{it.label}</p>
             <p className={cn("mt-0.5 text-[17px] leading-none font-bold tabular-nums", READOUT_TONE[it.tone ?? "neutral"])}>
               {it.value}
               {it.unit && <span className="ml-0.5 text-[11px] font-medium text-white/45">{it.unit}</span>}
@@ -272,13 +272,13 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
     <label className="block space-y-1.5">
       <span className="text-[13px] font-medium">{label}</span>
       {children}
-      {error ? <span className="text-destructive block text-xs">{error}</span> : hint && <span className="text-muted-foreground block text-xs">{hint}</span>}
+      {error ? <span role="alert" className="text-destructive block text-xs">{error}</span> : hint && <span className="text-muted-foreground block text-xs">{hint}</span>}
     </label>
   );
 }
 
 export const inputClass =
-  "bg-background border-input h-10 w-full rounded-lg border px-3 text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 aria-invalid:border-destructive";
+  "bg-background border-input h-11 w-full rounded-lg border px-3 text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 aria-invalid:border-destructive";
 
 export function Select<T extends string>({
   value,
@@ -295,27 +295,41 @@ export function Select<T extends string>({
   label: string;
   className?: string;
 }) {
+  // The styled box keeps the dense 36px look; the native <select> sits invisibly on top and
+  // reaches 44px tall, so the tap target meets the minimum and the OS picker still opens.
+  const current = options.find((o) => o.value === value)?.label ?? value;
   return (
-    <select
-      aria-label={label}
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value as T)}
-      className={cn(inputClass, "h-9 cursor-pointer px-2 text-[13px]", className)}
+    <span
+      className={cn(
+        inputClass,
+        "has-[select:focus-visible]:ring-primary/40 relative inline-flex h-9 cursor-pointer items-center gap-1 px-2 text-[13px] has-[select:focus-visible]:ring-2",
+        disabled && "cursor-not-allowed opacity-50",
+        className
+      )}
     >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      <span className="min-w-0 flex-1 truncate">{current}</span>
+      <ChevronDown className="text-muted-foreground size-3.5 shrink-0" aria-hidden />
+      <select
+        aria-label={label}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="absolute inset-x-0 -inset-y-1.5 w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }
 
 /** A list row: label left, value/control right. 44pt minimum. */
 export function Row({ label, sub, children, className }: { label: ReactNode; sub?: ReactNode; children?: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex min-h-10 items-center justify-between gap-3 py-1", className)}>
+    <div className={cn("flex min-h-11 items-center justify-between gap-3 py-1", className)}>
       <div className="min-w-0">
         <p className="truncate text-[13px]">{label}</p>
         {sub && <p className="text-muted-foreground truncate text-[11px]">{sub}</p>}

@@ -93,12 +93,12 @@ export function EStopBar() {
       {phase === "sending" ? <Loader2 className="size-5 animate-spin" /> : <OctagonX className="size-6" strokeWidth={2.5} />}
       {label}
       {route === "ble" && (
-        <span className="absolute right-3 flex items-center gap-1 rounded-md bg-black/25 px-1.5 py-0.5 text-[10px] font-semibold tracking-normal normal-case">
+        <span className="absolute right-3 flex items-center gap-1 rounded-md bg-black/25 px-1.5 py-0.5 text-[11px] font-semibold tracking-normal normal-case">
           <Bluetooth className="size-3" />
           經藍牙
         </span>
       )}
-      {disabled && <span className="absolute right-3 text-[10px] font-semibold tracking-normal normal-case">連不到狗</span>}
+      {disabled && <span className="absolute right-3 text-[11px] font-semibold tracking-normal normal-case">連不到狗</span>}
     </button>
   );
 }

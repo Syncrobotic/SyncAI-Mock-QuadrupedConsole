@@ -177,11 +177,11 @@ function ConfirmRequest() {
           <div className="relative mt-3 grid aspect-video place-items-center overflow-hidden rounded-lg" style={{ background: "linear-gradient(135deg,#2a2350,#1b1d2a)" }}>
             <Camera className="size-7 text-white/35" />
             {req.detection && (
-              <span className="absolute top-1.5 left-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+              <span className="absolute top-1.5 left-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[11px] text-white">
                 {zones?.find((z) => z.id === req.detection!.zoneId)?.name} · 信心 {Math.round(req.detection.confidence * 100)}%
               </span>
             )}
-            {IS_MOCK && <span className="absolute right-1.5 bottom-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/70">MOCK · 偵測快照</span>}
+            {IS_MOCK && <span className="absolute right-1.5 bottom-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[11px] text-white/70">MOCK · 偵測快照</span>}
           </div>
           <p className="text-muted-foreground mt-2 text-[12px]">
             {left} 秒內沒人回應會{req.onTimeout === "run" ? "自動派狗前往" : "取消"}。

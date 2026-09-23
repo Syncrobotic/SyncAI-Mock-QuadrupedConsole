@@ -15,7 +15,7 @@ const eslintConfig = defineConfig([
     // Playwright artefacts and the audit snippet (a bare function expression
     // that Playwright MCP evaluates, not a module).
     ".playwright-mcp/**",
-    "scripts/ui-audit.js",
+    "scripts/ui-audit.js", "scripts/ux-audit.js",
   ]),
 ]);
 

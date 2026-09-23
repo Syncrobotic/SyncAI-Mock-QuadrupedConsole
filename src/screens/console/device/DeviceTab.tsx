@@ -83,7 +83,7 @@ function ThisDog({ owner, live }: { owner: boolean; live: boolean }) {
                 setEditing(false);
               }}
             >
-              <input autoFocus className={cn(inputClass, "h-9 w-36")} value={name} onChange={(e) => setName(e.target.value)} />
+              <input autoFocus className={cn(inputClass, "w-36")} value={name} onChange={(e) => setName(e.target.value)} />
               <Button size="sm" type="submit">
                 儲存
               </Button>
@@ -548,7 +548,7 @@ function License({ owner }: { owner: boolean }) {
           disabled={busy}
           autoFocus
         />
-        {error && <p className="text-status-error mt-2 text-[13px]">{error}</p>}
+        {error && <p role="alert" className="text-status-error mt-2 text-[13px]">{error}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2">
           <Button variant="outline"  onClick={() => setOpen(false)}>
             取消

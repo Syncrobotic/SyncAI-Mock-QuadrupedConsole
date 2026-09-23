@@ -82,7 +82,7 @@ function Screen({
  */
 function ActionBar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-background/85 shrink-0 space-y-1.5 border-t px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom),var(--kb,0px))] backdrop-blur">
+    <div data-actionbar className="bg-background/85 shrink-0 space-y-1.5 border-t px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom),var(--kb,0px))] backdrop-blur">
       {children}
     </div>
   );
@@ -155,7 +155,7 @@ export function StepWelcome({ go }: StepProps) {
   const [asking, setAsking] = useState(false);
   const [denied, setDenied] = useState(false);
 
-  const later = <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">稍後</Badge>;
+  const later = <Badge variant="outline" className="text-muted-foreground shrink-0 text-[11px]">稍後</Badge>;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -177,7 +177,7 @@ export function StepWelcome({ go }: StepProps) {
             title="藍牙"
             sub="配對，以及斷網時的緊急停止"
             badge={
-              <Badge variant="outline" className={cn("shrink-0 text-[10px]", denied && "text-status-error border-status-error/40")}>
+              <Badge variant="outline" className={cn("shrink-0 text-[11px]", denied && "text-status-error border-status-error/40")}>
                 {denied ? "已拒絕" : "必要"}
               </Badge>
             }
@@ -203,7 +203,7 @@ export function StepWelcome({ go }: StepProps) {
             開啟系統設定
           </Button>
         )}
-        <p className="text-muted-foreground/60 pt-1 text-center text-[11px]">© 2026 SyncAI · Mock 版本</p>
+        <p className="text-muted-foreground pt-1 text-center text-[11px]">© 2026 SyncAI · Mock 版本</p>
       </ActionBar>
 
       {/* A stand-in for the OS permission sheet, so the deny path is reviewable. */}
@@ -211,7 +211,7 @@ export function StepWelcome({ go }: StepProps) {
         <div className="px-5 pt-5 pb-4">
           <p className="text-[15px] font-semibold">「SyncAI」想要使用藍牙</p>
           <p className="text-muted-foreground mt-1 text-[13px]">用來配對與控制附近的 SyncAI-Dog。</p>
-          {IS_MOCK && <p className="text-muted-foreground/70 mt-2 text-[10px]">MOCK · 代替系統權限對話框</p>}
+          {IS_MOCK && <p className="text-muted-foreground/70 mt-2 text-[11px]">MOCK · 代替系統權限對話框</p>}
         </div>
         <div className="grid grid-cols-2 border-t text-[15px]">
           <button
@@ -285,7 +285,7 @@ export function StepScan({ patch, go }: StepProps) {
             badge={
               <span className="flex shrink-0 items-center gap-2">
                 <Rssi rssi={d.rssi} />
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-[11px]">
                   {d.hasOwner ? "已配對" : "新機"}
                 </Badge>
               </span>
@@ -647,7 +647,7 @@ export function LicenseEntry({
           autoFocus
         />
         {error ? (
-          <p className="text-status-error text-[13px]">{error}</p>
+          <p role="alert" className="text-status-error text-[13px]">{error}</p>
         ) : (
           <p className="text-muted-foreground text-xs">4 組、每組 4 個英數字，可以整串貼上。經藍牙送到狗上驗證。</p>
         )}

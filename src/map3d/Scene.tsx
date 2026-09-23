@@ -249,7 +249,7 @@ function ZoneLabels({ zones, colors, host }: { zones: FloorPlan["zones"]; colors
     spans.current = zones.map((z) => {
       const span = document.createElement("span");
       span.textContent = z.name;
-      span.className = "absolute top-0 left-0 text-[10px] font-medium whitespace-nowrap transition-opacity duration-150 will-change-transform";
+      span.className = "absolute top-0 left-0 text-[11px] font-medium whitespace-nowrap transition-opacity duration-150 will-change-transform";
       span.style.color = colors.poi;
       span.style.textShadow = `0 0 3px ${colors.ground}, 0 0 3px ${colors.ground}`;
       el.appendChild(span);
@@ -638,8 +638,8 @@ function WaypointMarker({
       </mesh>
       <Html position={[0, 0.8, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
         <span
-          className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-white tabular-nums shadow"
-          style={{ background: color }}
+          className="grid size-5 place-items-center rounded-full text-[11px] font-bold tabular-nums shadow"
+          style={{ background: color, color: inkOn(color) }}
         >
           {state === "done" ? "✓" : index + 1}
         </span>
@@ -816,4 +816,12 @@ function CameraRig({ pose, controls }: { pose: React.RefObject<PoseRef>; control
       makeDefault
     />
   );
+}
+
+/** Dark or white ink, whichever reads on a hex fill (the dark theme's map colours are light). */
+function inkOn(hex: string) {
+  const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
+  if (Number.isNaN(n)) return "#fff";
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#0b0b12" : "#fff";
 }

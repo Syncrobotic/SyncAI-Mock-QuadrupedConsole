@@ -102,7 +102,7 @@ export function Banners() {
       {top && <AlertRow alert={top} more={more} />}
       <div className="flex flex-wrap gap-1.5">
         {!top && more > 0 && (
-          <button onClick={() => set({ statusOpen: true })} className="pointer-events-auto relative cursor-pointer after:absolute after:-inset-2 after:content-['']">
+          <button onClick={() => set({ statusOpen: true })} className="pointer-events-auto relative cursor-pointer">
             <Chip>
               <span className="bg-severity-warning size-1.5 rounded-full" />
               {more} 則提醒

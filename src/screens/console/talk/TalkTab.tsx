@@ -85,16 +85,16 @@ function Call({ landscape, videoMain, onSwap }: { landscape: boolean; videoMain:
       )}
       {call.thermal && <ThermalLayer opacity={call.thermalOpacity} />}
       <div className="absolute top-2 left-2 flex gap-1">
-        {session && <span className="rounded bg-black/55 px-1.5 py-0.5 font-mono text-[10px] text-white">{session.resolution}</span>}
+        {session && <span className="rounded bg-black/55 px-1.5 py-0.5 font-mono text-[11px] text-white">{session.resolution}</span>}
         {session && (
-          <span className={cn("rounded px-1.5 py-0.5 font-mono text-[10px]", latency > 800 ? "bg-red-600 text-white" : "bg-black/55 text-white")}>
+          <span className={cn("rounded px-1.5 py-0.5 font-mono text-[11px]", latency > 800 ? "bg-red-600 text-white" : "bg-black/55 text-white")}>
             {latency > 800 ? "延遲高 · " : ""}
             {latency} ms
           </span>
         )}
-        {call.thermal && <span className="rounded bg-orange-600/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">熱像</span>}
+        {call.thermal && <span className="rounded bg-orange-600/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">熱像</span>}
       </div>
-      {IS_MOCK && <span className="absolute right-2 bottom-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/80">MOCK · 手機前鏡頭</span>}
+      {IS_MOCK && <span className="absolute right-2 bottom-2 rounded bg-black/55 px-1.5 py-0.5 text-[11px] text-white/80">MOCK · 手機前鏡頭</span>}
     </>
   );
 
@@ -117,7 +117,7 @@ function Call({ landscape, videoMain, onSwap }: { landscape: boolean; videoMain:
           onPointerLeave={() => call.ptt && setPtt(false)}
           onContextMenu={(e) => e.preventDefault()}
           className={cn(
-            "flex h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border text-[10px] font-medium select-none disabled:cursor-not-allowed disabled:opacity-40",
+            "flex h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border text-[11px] font-medium select-none disabled:cursor-not-allowed disabled:opacity-40",
             call.ptt ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-accent"
           )}
         >
@@ -212,7 +212,7 @@ function Ctl({ label, icon, onClick, active, disabled, danger }: { label: string
       disabled={disabled}
       aria-pressed={active}
       className={cn(
-        "flex h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 [&_svg]:size-4",
+        "flex h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 [&_svg]:size-4",
         danger ? "bg-status-error/10 text-status-error border-status-error/30 hover:bg-status-error/20" : active ? "bg-primary/15 text-primary-accent border-primary/40" : "bg-card hover:bg-accent"
       )}
     >

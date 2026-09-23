@@ -12,15 +12,15 @@ import type { Priority, Rule, RuleOutcome } from "@/proto/types";
  * P0 reads as emergency, P1 as warning, routine and maintenance stay quiet.
  */
 const P_TONE: Record<Priority, string> = {
-  0: "bg-severity-emergency/15 text-severity-emergency border-severity-emergency/40",
+  0: "bg-severity-emergency/15 text-red-700 dark:text-red-300 border-severity-emergency/40",
   1: "bg-severity-warning/15 text-severity-warning border-severity-warning/35",
   2: "bg-muted text-muted-foreground border-border",
-  3: "bg-muted text-muted-foreground/70 border-border",
+  3: "bg-muted text-muted-foreground border-border border-dashed",
 };
 
 export function PriorityPill({ p, long, className }: { p: Priority; long?: boolean; className?: string }) {
   return (
-    <span className={cn("inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px] font-bold tabular-nums", P_TONE[p], className)}>
+    <span className={cn("inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[11px] font-bold tabular-nums", P_TONE[p], className)}>
       {long ? PRIORITY[p].label : PRIORITY[p].short}
     </span>
   );

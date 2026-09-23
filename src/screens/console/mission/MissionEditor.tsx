@@ -250,7 +250,7 @@ function ActionList({ actions, onChange }: { actions: Action[]; onChange: (a: Ac
           {/* §11: plugin actions after the built-ins, grouped by plugin. */}
           {plugins.map((p) => (
             <div key={p.id}>
-              <p className="text-muted-foreground px-1 pt-1 text-[10px] font-semibold">
+              <p className="text-muted-foreground px-1 pt-1 text-[11px] font-semibold">
                 {p.name} · v{p.version}
               </p>
               {p.missionActions.map((a) => {
@@ -374,7 +374,7 @@ function PolicyEditor({ mission }: { mission: Mission }) {
         <span className="text-[14px]">遇到障礙</span>
         <div className="flex items-center gap-1.5">
           {p.onObstacle === "wait" && (
-            <input aria-label="等待秒數" className={cn(inputClass, "h-10 w-16 text-center")} type="number" value={p.waitSec} onChange={(e) => patch({ waitSec: Number(e.target.value) })} />
+            <input aria-label="等待秒數" className={cn(inputClass, "w-16 text-center")} type="number" value={p.waitSec} onChange={(e) => patch({ waitSec: Number(e.target.value) })} />
           )}
           <Select
             label="遇到障礙"

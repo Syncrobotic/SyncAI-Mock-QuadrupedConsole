@@ -166,9 +166,9 @@ export function ReviewPanel() {
 function Readout({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="rounded-lg bg-white/4 px-2.5 py-2">
-      <p className="text-[10px] tracking-wide text-white/45 uppercase">{label}</p>
+      <p className="text-[11px] tracking-wide text-white/45 uppercase">{label}</p>
       <p className="mt-0.5 truncate text-[13px] font-semibold">{value}</p>
-      <p className="truncate font-mono text-[10px] text-white/35">{sub}</p>
+      <p className="truncate font-mono text-[11px] text-white/35">{sub}</p>
     </div>
   );
 }
@@ -250,7 +250,7 @@ function DetectPanel() {
       <Action className="mt-1.5 w-full" onClick={() => void rpc("dev.detect", { type, zoneId: zone, confidence: conf, durationSec: dur })}>
         送出偵測
       </Action>
-      <p className="mt-1 text-[10px] leading-relaxed text-white/40">範例：「走廊人員查看」要南/北走廊、東側大廳，信心 ≥ 80%、持續 3 秒，會先詢問；「限制區入侵」選資料室或核心區會直接出動（P0）。</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-white/40">範例：「走廊人員查看」要南/北走廊、東側大廳，信心 ≥ 80%、持續 3 秒，會先詢問；「限制區入侵」選資料室或核心區會直接出動（P0）。</p>
     </Group>
   );
 }

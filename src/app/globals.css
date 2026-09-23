@@ -39,6 +39,21 @@
   label {
     touch-action: manipulation;
   }
+
+  /*
+   * 44×44 hit area without the 44px look (ui-ux-pro-max touch-target-size): controls stay
+   * visually dense, but an invisible ::after grows each one to at least 44 on both axes, centred.
+   * `relative` sits in the base layer so a control's own `absolute`/`fixed` utility still wins; a
+   * control's own `after:` utility also wins, so existing custom hit-slops are untouched.
+   */
+  :where(button, a[href], [role="button"], [role="tab"], [role="radio"], [role="switch"]):not([data-no-slop]) {
+    position: relative;
+  }
+  :where(button, a[href], [role="button"], [role="tab"], [role="radio"], [role="switch"]):not([data-no-slop])::after {
+    content: "";
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+  }
 }
 
 .scrollbar-none {

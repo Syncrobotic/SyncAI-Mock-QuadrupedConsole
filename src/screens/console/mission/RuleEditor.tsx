@@ -61,7 +61,7 @@ export function RuleEditor() {
             <PriorityPill p={r.priority} />
             <input
               aria-label="規則名稱"
-              className="min-w-0 flex-1 bg-transparent text-[14px] font-semibold outline-none"
+              className="focus-visible:ring-ring/50 -my-3 min-w-0 flex-1 rounded-sm bg-transparent py-3 text-[14px] font-semibold outline-none focus-visible:ring-2"
               value={r.name}
               onChange={(e) => patchRule({ name: e.target.value })}
             />
@@ -257,7 +257,7 @@ function TimeEditor({ t, ruleId }: { t: TimeTrigger; ruleId: string }) {
           )}
           <div className="flex items-center justify-between text-[13px]">
             時間（狗的時鐘）
-            <input className={cn(inputClass, "h-9 w-28")} type="time" value={s.time} onChange={(e) => setSchedule({ ...s, time: e.target.value })} />
+            <input className={cn(inputClass, "w-28")} type="time" value={s.time} onChange={(e) => setSchedule({ ...s, time: e.target.value })} />
           </div>
         </div>
       )}
@@ -328,9 +328,9 @@ function WindowRow({ window, onChange, label }: { window: { from: string; to: st
       </label>
       {window && (
         <div className="flex items-center gap-2">
-          <input aria-label="開始" className={cn(inputClass, "h-9")} type="time" value={window.from} onChange={(e) => onChange({ ...window, from: e.target.value })} />
+          <input aria-label="開始" className={inputClass} type="time" value={window.from} onChange={(e) => onChange({ ...window, from: e.target.value })} />
           <span className="text-muted-foreground">–</span>
-          <input aria-label="結束" className={cn(inputClass, "h-9")} type="time" value={window.to} onChange={(e) => onChange({ ...window, to: e.target.value })} />
+          <input aria-label="結束" className={inputClass} type="time" value={window.to} onChange={(e) => onChange({ ...window, to: e.target.value })} />
         </div>
       )}
     </div>
@@ -375,7 +375,7 @@ function EventEditor({ t }: { t: EventTrigger }) {
               {src !== "ai" && <Zap className="size-4" />}
               {SOURCE_LABEL[src]}
               {locked && (
-                <span className="text-muted-foreground flex items-center gap-0.5 text-[9px]">
+                <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
                   <Lock className="size-2.5" />
                   {src === "external" ? "第二期" : "未授權"}
                 </span>
@@ -395,7 +395,7 @@ function EventEditor({ t }: { t: EventTrigger }) {
             className={cn("cursor-pointer rounded-lg border px-2.5 py-1.5 text-left", t.type === k ? "border-primary bg-primary/10" : "bg-card hover:bg-accent")}
           >
             <span className="block text-[13px] font-medium">{EVENT_TYPES[k].label}</span>
-            <span className="text-muted-foreground block text-[10px] leading-tight">{EVENT_TYPES[k].hint}</span>
+            <span className="text-muted-foreground block text-[11px] leading-tight">{EVENT_TYPES[k].hint}</span>
           </button>
         ))}
       </div>
@@ -487,7 +487,7 @@ function PrioritySection({ r }: { r: Rule }) {
               )}
             >
               <span className="font-bold">{PRIORITY[p].short}</span>
-              <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
+              <span className="text-muted-foreground flex items-center gap-0.5 text-[11px]">
                 {!allowed && <Lock className="size-2.5" />}
                 {PRIORITY[p].label.split(" ")[1]}
               </span>

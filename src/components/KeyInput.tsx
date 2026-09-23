@@ -64,7 +64,7 @@ export function KeyInput({
               invalid ? "border-status-error/60" : "border-input"
             )}
           />
-          {i < KEY_GROUPS - 1 && <span className="text-muted-foreground/60 shrink-0">–</span>}
+          {i < KEY_GROUPS - 1 && <span aria-hidden className="text-muted-foreground/60 shrink-0">–</span>}
         </div>
       ))}
     </div>
