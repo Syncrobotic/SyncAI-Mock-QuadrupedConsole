@@ -231,9 +231,11 @@ function onEvent(e: DogEvent) {
     void refreshPhones();
     return;
   }
+  // Only what needs eyes now becomes a toast. Mission progress used to toast
+  // every start/finish and, on patrol, stacked over the map all night; it is
+  // in the run card and the status card's event list instead.
   if (e.level === "critical") toast.error(e.text);
   else if (e.level === "warning") toast.warning(e.text);
-  else if (e.kind === "mission") toast(e.text);
 }
 
 export async function refreshAll() {

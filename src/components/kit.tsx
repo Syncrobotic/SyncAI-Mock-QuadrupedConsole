@@ -2,7 +2,7 @@
 
 import { AnimatePresence, m } from "framer-motion";
 import { Lock, type LucideIcon } from "lucide-react";
-import { Component, type ReactNode } from "react";
+import { Component, createContext, useContext, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,16 @@ import { cn } from "@/lib/utils";
  */
 
 // ── Modal ────────────────────────────────────────────────────────────────────
+
+/**
+ * Where the E-Stop sits, in frame pixels. Provided by the Console.
+ *
+ * 🔴 §5: the E-Stop is never covered — not by a dialog either. The dim layer
+ * still covers the screen (so the dialog is modal), but the E-Stop is lifted
+ * above it (`z-[60]` in EStopBar) and the dialog is placed in whichever band,
+ * above or below the E-Stop, has more room.
+ */
+export const EStopZone = createContext<{ top: number; bottom: number; height: number } | null>(null);
 
 export function Modal({
   open,
@@ -26,21 +36,29 @@ export function Modal({
   className?: string;
   dismissable?: boolean;
 }) {
+  const zone = useContext(EStopZone);
+  const band: React.CSSProperties = !zone
+    ? { top: 0, bottom: 0 }
+    : zone.top >= zone.height - zone.bottom
+      ? { top: 0, height: zone.top }
+      : { top: zone.bottom, bottom: 0 };
+
   return (
     <AnimatePresence>
       {open && (
         <m.div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-3 sm:items-center"
+          className="fixed inset-0 z-50 bg-black/55"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           onClick={() => dismissable && onClose?.()}
         >
+          <div className="absolute inset-x-0 flex items-center justify-center p-3" style={band}>
           <m.div
             role="dialog"
             aria-modal
-            className={cn("bg-popover text-popover-foreground w-full max-w-sm rounded-2xl border p-5 shadow-2xl", className)}
+            className={cn("bg-popover text-popover-foreground max-h-full w-full max-w-sm overflow-y-auto rounded-2xl border p-5 shadow-2xl", className)}
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 16, opacity: 0 }}
@@ -49,6 +67,7 @@ export function Modal({
           >
             {children}
           </m.div>
+          </div>
         </m.div>
       )}
     </AnimatePresence>
@@ -282,7 +301,7 @@ export function Select<T extends string>({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as T)}
-      className={cn(inputClass, "h-10 cursor-pointer text-[14px]", className)}
+      className={cn(inputClass, "h-11 cursor-pointer text-[14px]", className)}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>

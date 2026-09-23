@@ -92,6 +92,8 @@ export interface State {
   };
   userSpeedCap: number;
   snapshotViewer: { wp: number; at: number } | null;
+  /** Px from the frame bottom to just above the E-Stop — where toasts go in the Console. */
+  toastBottom: number | null;
 }
 
 export const useStore = create<State>(() => ({
@@ -135,6 +137,7 @@ export const useStore = create<State>(() => ({
   call: { active: false, mic: false, ptt: false, speaker: true, thermal: false, thermalOpacity: 60, facing: "user" },
   userSpeedCap: 0.8,
   snapshotViewer: null,
+  toastBottom: null,
 }));
 
 export const set = useStore.setState;

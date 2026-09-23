@@ -10,6 +10,7 @@ import { describeTrigger, formatRelative, nextTrigger } from "@/lib/schedule";
 import { cn, formatClock, formatDuration } from "@/lib/utils";
 import { NO_SCOPES, set, useStore } from "@/store";
 import { rpc } from "@/store/controller";
+import { lockDetail } from "@/store/logic";
 
 import { useAccess } from "../Console";
 import { useNow } from "../Banners";
@@ -37,7 +38,7 @@ export function MissionTab() {
       <div className="space-y-4 p-4">
         <LockedPanel
           reason={access.reason}
-          detail={access.reason === "任務排程未授權" ? "這隻狗的 License 不含任務排程。Owner 可以在裝置頁輸入新的 License 金鑰。" : undefined}
+          detail={lockDetail(access.reason)}
         />
         {missions.length > 0 && scopes.includes("view") && (
           <div className="space-y-2 opacity-70">
@@ -68,7 +69,7 @@ function MissionList() {
         <SectionTitle
           description="存在狗上，依排程或事件觸發"
           action={
-            <Button size="sm" variant="ghost" className="text-primary-accent h-8" onClick={() => openEditor()}>
+            <Button size="sm" variant="ghost" className="text-primary-accent -mr-2 h-11" onClick={() => openEditor()}>
               <Plus />
               新任務
             </Button>
@@ -171,10 +172,10 @@ function MissionRow({ mission, readOnly }: { mission: Mission; readOnly?: boolea
       <button
         disabled={readOnly}
         onClick={() => set({ detailMissionId: mission.id, snap: 2 })}
-        className="min-w-0 flex-1 cursor-pointer text-left disabled:cursor-default"
+        className="min-h-11 min-w-0 flex-1 cursor-pointer text-left disabled:cursor-default"
       >
         <p className={cn("truncate text-[14px] font-medium", !mission.enabled && "text-muted-foreground")}>{mission.name}</p>
-        <p className="text-muted-foreground mt-0.5 truncate text-[12px]">
+        <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[12px]">
           {describeTrigger(mission.trigger)}
           {next !== null && ` · ${formatRelative(next, now)}`}
           {!mission.enabled && " · 已停用"}

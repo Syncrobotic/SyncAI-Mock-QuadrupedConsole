@@ -318,7 +318,7 @@ export function StepConnect({ flow, patch, go }: StepProps) {
           patch({ session });
           setOk(true);
           await sleep(900);
-          if (alive) go("code");
+          if (alive) go("enroll");
           return;
         } catch {
           await sleep(600);
@@ -356,91 +356,7 @@ export function StepConnect({ flow, patch, go }: StepProps) {
   );
 }
 
-// ── 4 確認碼 ─────────────────────────────────────────────────────────────────
-
-export function StepCode({ flow, patch, go }: StepProps) {
-  const [code, setCode] = useState("");
-  const [checking, setChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-
-  const submit = async (value: string) => {
-    if (!flow.session) return;
-    setChecking(true);
-    const r = await getDogLink().ble.confirm(flow.session, value);
-    setChecking(false);
-    if (r.ok) {
-      patch({ enrollment: r.enrollment });
-      go("enroll");
-      return;
-    }
-    if (r.attemptsLeft <= 0) {
-      toast.error("錯誤 3 次，狗端已中止這次配對");
-      go("scan");
-      return;
-    }
-    setError(`確認碼不對，還可以再試 ${r.attemptsLeft} 次`);
-    setCode("");
-    input.current?.focus();
-  };
-
-  return (
-    <Screen icon={KeyRound} title="輸入確認碼" lead="看狗背面的燈號面板，會顯示 6 位數字。這一步確認你連到的是眼前這隻狗。">
-      {/* The dog's back, simplified: a body outline with a lit 6-digit panel. */}
-      <div className="bg-plate relative mx-auto flex h-36 w-full max-w-[300px] items-center justify-center overflow-hidden rounded-[2rem] border border-white/10">
-        <div className="absolute inset-x-8 top-6 h-4 rounded-full bg-white/5" />
-        <div className="rounded-lg border border-cyan-300/30 bg-black/60 px-4 py-2 font-mono text-2xl tracking-[0.3em] text-cyan-200 shadow-[0_0_24px_rgba(103,232,249,0.25)]">
-          ••• •••
-        </div>
-        <span className="absolute bottom-3 text-[11px] text-white/40">狗背部 · 燈號面板</span>
-      </div>
-
-      <label className="relative block" onClick={() => input.current?.focus()}>
-        <span className="sr-only">6 位確認碼</span>
-        <input
-          ref={input}
-          autoFocus
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          value={code}
-          disabled={checking}
-          onChange={(e) => {
-            const v = e.target.value.replace(/\D/g, "").slice(0, 6);
-            setCode(v);
-            setError(null);
-            if (v.length === 6) void submit(v);
-          }}
-          className="absolute inset-0 opacity-0"
-        />
-        <div className="grid grid-cols-6 gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className={cn(
-                "grid h-14 place-items-center rounded-xl border-2 text-2xl font-bold tabular-nums",
-                error ? "border-status-error/60" : i === code.length ? "border-primary" : "border-border",
-                "bg-card"
-              )}
-            >
-              {code[i] ?? ""}
-            </div>
-          ))}
-        </div>
-      </label>
-      {checking && (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Loader2 className="size-4 animate-spin" />
-          驗證中…
-        </p>
-      )}
-      {error && <p className="text-status-error text-sm">{error}</p>}
-      <p className="text-muted-foreground text-xs">Mock：確認碼是 123456</p>
-    </Screen>
-  );
-}
-
-// ── 5 註冊 ───────────────────────────────────────────────────────────────────
+// ── 4 註冊 ───────────────────────────────────────────────────────────────────
 
 export function StepEnroll({ flow, patch, go }: StepProps) {
   const [lines, setLines] = useState<string[]>([]);
@@ -467,7 +383,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
       await sleep(600);
       add("送出公鑰與角色請求");
       await sleep(600);
-      const e: Enrollment = flow.enrollment ?? { kind: "rejected", reason: "no session" };
+      const e: Enrollment = flow.session ? await getDogLink().ble.enroll(flow.session) : { kind: "rejected", reason: "no session" };
       if (!alive) return;
       setEnrollment(e);
       if (e.kind === "granted") patch({ role: e.role });

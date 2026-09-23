@@ -65,8 +65,10 @@ export function Scene({ onLongPress }: { onLongPress: (x: number, y: number) => 
         infiniteGrid
       />
 
-      {layers.plan && <FloorPlanLayer colors={colors} labels={view !== "follow"} />}
-      {layers.cloud && <PointCloud dark={colors.dark} />}
+      {/* Follow view is for driving: walls go glassy so they stop filling the
+          frame, and the point cloud comes on — it is the perception layer. */}
+      {layers.plan && <FloorPlanLayer colors={colors} labels={view !== "follow"} ghost={view === "follow"} />}
+      {(layers.cloud || view === "follow") && <PointCloud dark={colors.dark} />}
       {layers.grid && <Occupancy colors={colors} />}
       {layers.trail && <Trail pose={pose} color={colors.trail} />}
       {layers.fence && <Fences pose={pose} colors={colors} />}
@@ -161,7 +163,7 @@ function PointCloud({ dark }: { dark: boolean }) {
  * colour darkened to 62%. Plates, not blocks — extruded rooms read as roofs
  * and hide every robot inside them.
  */
-function FloorPlanLayer({ colors, labels }: { colors: MapColors; labels: boolean }) {
+function FloorPlanLayer({ colors, labels, ghost }: { colors: MapColors; labels: boolean; ghost: boolean }) {
   const plan = useStore((s) => s.plan);
   const wallColor = useMemo(() => {
     const c = new THREE.Color(colors.line);
@@ -208,7 +210,7 @@ function FloorPlanLayer({ colors, labels }: { colors: MapColors; labels: boolean
       {plan.walls.map((b, i) => (
         <mesh key={`w${i}`} position={[(b.x1 + b.x2) / 2, PLATE + b.h / 2, -(b.y1 + b.y2) / 2]}>
           <boxGeometry args={[b.x2 - b.x1, b.h, b.y2 - b.y1]} />
-          <meshLambertMaterial color={wallColor} />
+          <meshLambertMaterial color={wallColor} transparent={ghost} opacity={ghost ? 0.22 : 1} depthWrite={!ghost} />
         </mesh>
       ))}
       {plan.furniture.map((b, i) => (

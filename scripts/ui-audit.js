@@ -14,7 +14,7 @@ async (page) => {
       const name = (el) => (el.getAttribute("aria-label") || el.innerText || el.tagName).trim().replace(/\s+/g, " ").slice(0, 28);
       // Floating things over the map panel
       const floats = [
-        ...document.querySelectorAll('[aria-expanded][class*="backdrop-blur"], [aria-label="電量與連線"], [role="status"], [aria-label="跟隨"], [aria-label="回到通話"], [aria-label="圖層"]'),
+        ...document.querySelectorAll('[aria-expanded][class*="backdrop-blur"], [aria-label="電量與連線"], [role="status"], [aria-label="跟隨"], [aria-label^="回到通話"], [aria-label="圖層"]'),
       ].filter(vis);
       const overlaps = [];
       for (let i = 0; i < floats.length; i++)
@@ -61,6 +61,23 @@ async (page) => {
   };
 
   const setSnap = (n) => page.evaluate((n) => window.__qcSet?.({ snap: n }), n);
+  // Start from a paired Owner phone on a pro-licensed dog, whatever the browser had.
+  await page.goto("http://localhost:3200/");
+  await page.evaluate(() => {
+    localStorage.setItem(
+      "qc.mock.keystore",
+      JSON.stringify({
+        dogId: "dog-a",
+        dogName: "SyncAI-Dog 7F3A",
+        serial: "SD2026-0917-7F3A",
+        role: "owner",
+        endpoint: { ip: "192.168.50.23", port: 8443, fingerprint: "SHA256:7f3a…c21e" },
+        pairedAt: Date.now(),
+      })
+    );
+    localStorage.removeItem("qc.mock.dog.license");
+  });
+
   const go = async (scenario, vw, vh) => {
     await page.setViewportSize({ width: vw, height: vh });
     await page.goto(`http://localhost:3200/?scenario=${scenario}`);
@@ -102,5 +119,22 @@ async (page) => {
     await measure(`${dev} BleOnly`);
     await page.screenshot({ path: `.playwright-mcp/audit-${dev}-ble.png` });
   }
+  // E-Stop must stay reachable with a dialog open (§5): open the abort dialog
+  // and ask the browser what is under the E-Stop's centre.
+  await go("default", 1100, 920);
+  await page.getByRole("tab", { name: "任務" }).click();
+  await page.waitForTimeout(800);
+  await page.getByText("夜間巡邏 · 走廊一圈").click();
+  await page.getByRole("button", { name: "刪除" }).click();
+  await page.waitForTimeout(400);
+  const estopHit = await page.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) => (x.getAttribute("aria-label") ?? "").startsWith("緊急停止"));
+    if (!b) return "no estop";
+    const r = b.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return b.contains(hit) ? "reachable" : `covered by ${hit?.tagName}.${hit?.className}`.slice(0, 80);
+  });
+  await page.screenshot({ path: ".playwright-mcp/audit-modal-estop.png" });
+  results.push({ label: "E-Stop with dialog open", estopHit });
   return results;
 }

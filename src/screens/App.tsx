@@ -14,6 +14,7 @@ import { Onboarding } from "./onboarding/Onboarding";
 export function App() {
   const conn = useStore((s) => s.conn);
   const epoch = useStore((s) => s.linkEpoch);
+  const toastBottom = useStore((s) => s.toastBottom);
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -31,9 +32,11 @@ export function App() {
       {/* Inside the frame: the frame is a containing block for `fixed`, so
           toasts land on the phone, not on the desktop around it. */}
       <Toaster
-        position="top-center"
+        // In the Console, toasts sit just above the E-Stop: the top of the map
+        // is the status header and banners, and a toast there hid both.
+        position={onboarding || toastBottom === null ? "top-center" : "bottom-center"}
         theme={(theme as "dark" | "light") ?? "dark"}
-        offset={56}
+        offset={onboarding || toastBottom === null ? 56 : { bottom: toastBottom }}
         visibleToasts={3}
         duration={3000}
         toastOptions={{ className: "!text-[13px]" }}

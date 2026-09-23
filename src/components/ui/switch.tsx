@@ -10,7 +10,9 @@ function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimi
     <SwitchPrimitive.Root
       data-slot="switch"
       className={cn(
-        "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm",
+        "peer relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm",
+        // 36×20 is the look; the finger gets 52×44.
+        "after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']",
         "transition-[background-color,box-shadow] duration-200 outline-none",
         "data-[state=unchecked]:bg-input dark:data-[state=unchecked]:bg-input/80",
         "data-[state=checked]:bg-primary",

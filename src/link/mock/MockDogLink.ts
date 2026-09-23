@@ -18,7 +18,7 @@ import {
   type RpcRes,
 } from "../DogLink";
 import type { ScenarioId } from "./scenarios";
-import type { Endpoint, Enrollment, PairSession, Role, Scope, WifiStatus } from "@/proto/types";
+import type { Endpoint, PairSession, Role, Scope, WifiStatus } from "@/proto/types";
 import { ROLE_SCOPES } from "@/proto/types";
 
 const ENDPOINT: Endpoint = { ip: "192.168.50.23", port: 8443, fingerprint: "SHA256:7f3a…c21e" };
@@ -83,17 +83,12 @@ function createBle(world: MockWorld): BleChannel {
       return { dogId, identity: dogIdentity(dogId), attemptsLeft: 3 };
     },
 
-    async confirm(session, code6) {
-      await sleep(700);
-      if (code6 !== "123456") {
-        session.attemptsLeft--;
-        return { ok: false, attemptsLeft: session.attemptsLeft };
-      }
+    async enroll(session) {
+      await sleep(900);
       const dog = DOGS.find((d) => d.id === session.dogId)!;
-      const enrollment: Enrollment = dog.hasOwner
+      return dog.hasOwner
         ? { kind: "needs_approval", ownerOnline: world.dev.ownerOnline }
         : { kind: "granted", role: "owner", certificate: "cert-owner" };
-      return { ok: true, enrollment };
     },
 
     awaitApproval(_dogId, signal) {

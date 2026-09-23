@@ -132,6 +132,17 @@ export function tabAccess(tab: Tab, ctx: AccessContext): Access {
   return OPEN;
 }
 
+/** One line under a locked tab's reason: what to do about it. */
+export function lockDetail(reason: string): string | undefined {
+  if (reason.includes("未授權")) return "這隻狗的 License 不含此功能。Owner 可以在裝置頁更換 License 金鑰。";
+  if (reason.includes("權限")) return "你的角色沒有這個功能。需要時請 Owner 在裝置頁調整角色。";
+  if (reason.includes("藍牙")) return "WS 斷線時只剩藍牙：可以用 E-Stop 與裝置頁。恢復連線後自動解鎖。";
+  if (reason.includes("找不到")) return "藍牙與區網都沒有回應。靠近狗、確認開機後重試。";
+  if (reason.includes("FAULT")) return "狗回報故障。請依裝置頁的建議處理。";
+  if (reason.includes("重啟")) return "Gateway 重啟完成後會自動解鎖。";
+  return undefined;
+}
+
 /**
  * Why the joysticks are disabled right now, or null if they are live.
  * The §13 table's "Degraded: 操控鎖" is implemented here, at the stick.

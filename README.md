@@ -11,7 +11,7 @@ pnpm build        # static export → out/ (for packaging with Tauri later)
 
 Switch scenarios with `?scenario=` (`default` `weak_signal` `low_battery` `estop_remote` `gateway_down` `revoked` `no_license` `viewer` `fault` `perf`), or from the review panel. On a phone, open the device tab and tap "App 版本" five times.
 
-Pairing code `123456`. Licence key (required, entered before Wi-Fi; decides which features the dog runs): `SYNC-…` pro (everything), `BASE-…` standard (no AI), `CTRL-…` control only (teleop + map); any `0000` group → already bound, `EXPD-…` → expired. Wi-Fi SSIDs containing `fail` / `none` / `slow` → wrong password / network not found / connects after 25 s.
+Licence key (required, entered before Wi-Fi; decides which features the dog runs): `SYNC-…` pro (everything), `BASE-…` standard (no AI), `CTRL-…` control only (teleop + map); any `0000` group → already bound, `EXPD-…` → expired. Wi-Fi SSIDs containing `fail` / `none` / `slow` → wrong password / network not found / connects after 25 s.
 
 ## Structure (follows spec §12)
 
@@ -32,7 +32,8 @@ Pairing code `123456`. Licence key (required, entered before Wi-Fi; decides whic
 - **Mission editor opens at 50%**: §8 puts it at 90%, but at 90% there's almost no map left to long-press for waypoints. Drag up to 90% to edit trigger/policy.
 - **Degraded doesn't lock the whole teleop tab**: the tab stays open and the joysticks are greyed out with "訊號不足" (signal too weak), so the operator can watch RTT recover (§7 and §13 interpreted together).
 - **Mic/camera permissions aren't requested at onboarding step 1**: §4 asks for them there, but §9 says "request the mic only on first entry to the call tab". Went with §9; step 1 only requests Bluetooth.
-- **Onboarding has a 9th step: the licence key (required)**: after enrolment, before Wi-Fi, bound over BLE. The licence decides which features the dog runs (teleop / map / missions / talk / AI); a dog without one runs only the E-Stop. QR scanning removed from the scan step.
+- **No LED pairing code** (§4 step 4): this dog pairs without one.
+- **Onboarding adds the licence key (required)**: after enrolment, before Wi-Fi, bound over BLE. The licence decides which features the dog runs (teleop / map / missions / talk / AI); a dog without one runs only the E-Stop. QR scanning removed from the scan step.
 - **The map defaults to the floor plan**: drawn like the dashboard (zone plates in `--map-unit-*`, walls). The point cloud is a layer, off by default (§6 says on).
 - **Point cloud is generated from a floor plan**: there is no recorded `.ply` yet (§15). The plan is shaped to support testing: loop corridor (drive the dog one lap), a sealed core (unreachable waypoints), north offices outside the fence (out-of-fence case).
 

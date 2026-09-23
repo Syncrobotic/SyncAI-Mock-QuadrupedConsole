@@ -96,7 +96,8 @@ export class RpcError extends Error {
 export interface BleChannel {
   scan(): AsyncIterable<DogAdvert>;
   pair(dogId: string): Promise<PairSession>;
-  confirm(session: PairSession, code6: string): Promise<{ ok: true; enrollment: Enrollment } | { ok: false; attemptsLeft: number }>;
+  /** Send this phone's public key and ask for a role. No pairing code: the dog is physically in reach over BLE. */
+  enroll(session: PairSession): Promise<Enrollment>;
   /** Resolves when the Owner phone answers (or the requester gives up). */
   awaitApproval(dogId: string, signal: AbortSignal): Promise<Enrollment>;
   requestViewer(dogId: string): Promise<Enrollment>;

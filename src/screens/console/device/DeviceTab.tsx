@@ -1,11 +1,11 @@
 "use client";
 
-import { Bluetooth, Download, FlaskConical, KeyRound, Pencil, Power, RefreshCw, Smartphone, Upload, Wifi } from "lucide-react";
+import { Bluetooth, ChevronRight, Download, FlaskConical, KeyRound, Pencil, Power, RefreshCw, Smartphone, Upload, Wifi } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { KeyInput } from "@/components/KeyInput";
-import { Card, Field, Modal, Pill, Row, SectionTitle, Select, Slider, inputClass, type Tone } from "@/components/kit";
+import { Card, Field, Modal, Pill, Row, SectionTitle, Segmented, Select, Slider, inputClass, type Tone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { getDogLink } from "@/link";
@@ -82,7 +82,7 @@ function ThisDog({ owner, live }: { owner: boolean; live: boolean }) {
                 setEditing(false);
               }}
             >
-              <input autoFocus className={cn(inputClass, "h-9 w-36")} value={name} onChange={(e) => setName(e.target.value)} />
+              <input autoFocus className={cn(inputClass, "h-11 w-36")} value={name} onChange={(e) => setName(e.target.value)} />
               <Button size="sm" type="submit">
                 儲存
               </Button>
@@ -109,8 +109,11 @@ function ThisDog({ owner, live }: { owner: boolean; live: boolean }) {
         <Row label="序號">
           <span className="font-mono text-[12px]">{device?.serial ?? cred?.serial ?? "—"}</span>
         </Row>
-        <Row label="版本" sub={device ? `小腦 ${device.versions.cerebellum} · Gateway ${device.versions.gateway}` : "藍牙 Identity 只帶韌體版本"}>
-          App {device?.versions.app ?? "0.1.0-mock"}
+        <Row label="小腦 / Gateway" sub={device ? undefined : "藍牙 Identity 只帶韌體版本"}>
+          <span className="font-mono text-[12px]">{device ? `${device.versions.cerebellum} · ${device.versions.gateway}` : "—"}</span>
+        </Row>
+        <Row label="App">
+          <span className="font-mono text-[12px]">{device?.versions.app ?? "0.1.0-mock"}</span>
         </Row>
         {uptime !== null && <Row label="運行時間">{`${Math.floor(uptime / 60)} 小時 ${uptime % 60} 分`}</Row>}
       </Card>
@@ -188,80 +191,104 @@ function Health({ owner }: { owner: boolean }) {
 
 function Phones({ owner }: { owner: boolean }) {
   const phones = useStore((s) => s.phones);
-  const [revoking, setRevoking] = useState<string | null>(null);
-  const target = phones.find((p) => p.id === revoking);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const target = phones.find((p) => p.id === selected);
 
+  const close = () => {
+    setSelected(null);
+    setConfirmRevoke(false);
+  };
+
+  // Rows are one tap target each; the role picker and revoke live in the
+  // sheet that opens. Inline controls squeezed the nickname to "夜班 · Pi…".
   return (
     <section className="space-y-2">
       <SectionTitle description="信任單位是手機的公鑰，不是帳號">已配對手機 · {phones.length}</SectionTitle>
-      <Card className="divide-y py-1">
-        {phones.map((p) => (
-          <div key={p.id} className="flex min-h-14 items-center gap-3 py-2">
-            <span className="bg-muted relative grid size-9 shrink-0 place-items-center rounded-full">
-              <Smartphone className="size-4" />
-              {p.online && <span className="bg-status-ok ring-card absolute right-0 bottom-0 size-2.5 rounded-full ring-2" />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px]">{p.nickname}</p>
-              <p className="text-muted-foreground text-xs">
-                {p.pending ? "等待核准" : p.online ? "在線" : `最後連線 ${formatClock(p.lastSeen)}`}
-              </p>
-            </div>
-            {p.pending && owner ? (
-              <div className="flex gap-1">
-                <Button size="sm" variant="outline" onClick={async () => { await rpc("device.approve", { phoneId: p.id, approve: false }); await refreshPhones(); }}>
+      <Card className="divide-y p-0">
+        {phones.map((p) => {
+          const actionable = owner && !p.mine && (p.pending || p.role !== "owner");
+          const Tag = actionable ? "button" : "div";
+          return (
+            <Tag
+              key={p.id}
+              onClick={actionable ? () => setSelected(p.id) : undefined}
+              className={cn("flex min-h-14 w-full items-center gap-3 px-3.5 py-2 text-left", actionable && "hover:bg-accent/50 cursor-pointer")}
+            >
+              <span className="bg-muted relative grid size-9 shrink-0 place-items-center rounded-full">
+                <Smartphone className="size-4" />
+                {p.online && <span className="bg-status-ok ring-card absolute right-0 bottom-0 size-2.5 rounded-full ring-2" />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14px]">{p.nickname}</p>
+                <p className="text-muted-foreground text-xs">{p.pending ? "等待核准" : p.online ? "在線" : `最後連線 ${formatClock(p.lastSeen)}`}</p>
+              </div>
+              <Pill tone={p.pending ? "warn" : p.mine ? "busy" : "neutral"}>
+                {p.pending ? "待核准" : ROLE_LABEL[p.role]}
+                {p.mine ? " · 本機" : ""}
+              </Pill>
+              {actionable && <ChevronRight className="text-muted-foreground size-4 shrink-0" />}
+            </Tag>
+          );
+        })}
+      </Card>
+
+      <Modal open={!!target} onClose={close}>
+        {target && !confirmRevoke && (
+          <>
+            <p className="text-lg font-semibold">{target.nickname}</p>
+            <p className="text-muted-foreground mt-0.5 mb-4 text-sm">{target.pending ? "請求加入為 Operator" : `目前角色：${ROLE_LABEL[target.role]}`}</p>
+            {target.pending ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={async () => { await rpc("device.approve", { phoneId: target.id, approve: false }); await refreshPhones(); close(); }}>
                   拒絕
                 </Button>
-                <Button size="sm" onClick={async () => { await rpc("device.approve", { phoneId: p.id, approve: true }); await refreshPhones(); }}>
+                <Button onClick={async () => { await rpc("device.approve", { phoneId: target.id, approve: true }); await refreshPhones(); close(); }}>
                   核准
                 </Button>
               </div>
-            ) : owner && !p.mine && p.role !== "owner" ? (
-              <div className="flex items-center gap-1">
-                <Select<Role>
-                  label="角色"
-                  className="h-9 w-28 text-[13px]"
-                  value={p.role}
+            ) : (
+              <div className="space-y-2">
+                <Segmented<Role>
+                  value={target.role}
                   options={[
                     { value: "operator", label: "Operator" },
                     { value: "viewer", label: "Viewer" },
                   ]}
                   onChange={async (role) => {
-                    await rpc("device.setRole", { phoneId: p.id, role });
+                    await rpc("device.setRole", { phoneId: target.id, role });
                     await refreshPhones();
                   }}
                 />
-                <Button size="sm" variant="ghost" className="text-status-error" onClick={() => setRevoking(p.id)}>
-                  撤銷
+                <Button variant="ghost" className="text-status-error w-full" onClick={() => setConfirmRevoke(true)}>
+                  撤銷這支手機
                 </Button>
               </div>
-            ) : (
-              <Pill tone={p.mine ? "busy" : "neutral"}>{ROLE_LABEL[p.role]}{p.mine ? " · 本機" : ""}</Pill>
             )}
-          </div>
-        ))}
-      </Card>
-      <Modal open={!!target} onClose={() => setRevoking(null)}>
-        <p className="text-lg font-semibold">撤銷「{target?.nickname}」？</p>
-        <p className="text-muted-foreground mt-1 text-sm">立即生效。對方的連線會被關閉並清除本機憑證，要再使用必須重新配對。</p>
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-11" onClick={() => setRevoking(null)}>
-            取消
-          </Button>
-          <Button
-            variant="destructive"
-            className="h-11"
-            onClick={async () => {
-              const id = revoking!;
-              setRevoking(null);
-              await rpc("device.revoke", { phoneId: id });
-              await refreshPhones();
-              toast.success("已撤銷");
-            }}
-          >
-            撤銷
-          </Button>
-        </div>
+          </>
+        )}
+        {target && confirmRevoke && (
+          <>
+            <p className="text-lg font-semibold">撤銷「{target.nickname}」？</p>
+            <p className="text-muted-foreground mt-1 text-sm">立即生效。對方的連線會被關閉並清除本機憑證，要再使用必須重新配對。</p>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setConfirmRevoke(false)}>
+                取消
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  await rpc("device.revoke", { phoneId: target.id });
+                  await refreshPhones();
+                  close();
+                  toast.success("已撤銷");
+                }}
+              >
+                撤銷
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
     </section>
   );
@@ -355,7 +382,7 @@ function Safety({ owner }: { owner: boolean }) {
           {owner ? (
             <Select
               label="圍欄外行為"
-              className="h-9 w-32 text-[13px]"
+              className="w-32 text-[13px]"
               value={safety.outsideFence}
               options={[
                 { value: "stop", label: "原地停止" },
@@ -372,7 +399,7 @@ function Safety({ owner }: { owner: boolean }) {
           {owner ? (
             <Select
               label="E-Stop 後自動趴下秒數"
-              className="h-9 w-24 text-[13px]"
+              className="w-24 text-[13px]"
               value={String(safety.estopLieSec)}
               options={["0", "3", "5", "10"].map((v) => ({ value: v, label: `${v} 秒` }))}
               onChange={(v) => void patch({ estopLieSec: Number(v) })}

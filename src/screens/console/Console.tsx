@@ -3,7 +3,7 @@
 import { Gamepad2, Lock, MapPinned, Phone, Settings2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { ActivePlate, TabBoundary } from "@/components/kit";
+import { ActivePlate, EStopZone, TabBoundary } from "@/components/kit";
 import { cn } from "@/lib/utils";
 import { MapView } from "@/map3d/MapView";
 import { NO_SCOPES, SNAP_PCT, set, useStore, type SheetSnap } from "@/store";
@@ -55,17 +55,35 @@ export function useAccess(tab: Tab): Access {
 export function Console() {
   const tab = useStore((s) => s.tab);
   const snap = useStore((s) => s.snap);
+  const statusOpen = useStore((s) => s.statusOpen);
   const unlicensed = useStore((s) => s.device?.licenseEdition === "none");
   const root = useRef<HTMLDivElement>(null);
-  const [rootH, setRootH] = useState(760);
+  const estop = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ h: 760, pad: 16 });
+  const [zone, setZone] = useState<{ top: number; bottom: number; height: number } | null>(null);
 
   useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setRootH(el.clientHeight));
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      setBox({ h: el.clientHeight, pad: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) });
+      const e = estop.current?.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      if (e) {
+        setZone({ top: e.top - r.top, bottom: e.bottom - r.top, height: r.height });
+        set({ toastBottom: Math.round(r.bottom - e.top + 8) });
+      }
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    if (estop.current?.previousElementSibling) ro.observe(estop.current.previousElementSibling);
+    measure();
+    return () => {
+      ro.disconnect();
+      set({ toastBottom: null });
+    };
+  }, [unlicensed]);
 
   // §7: the teleop tab is locked at 50% and enters follow view; §6: mission defaults to 2.5D top.
   useEffect(() => {
@@ -74,35 +92,64 @@ export function Console() {
     if (tab === "talk" || tab === "device") set({ view: "free" });
   }, [tab]);
 
-  // Sheet heights are fractions of the space under the status header, as in §5.
-  const usable = rootH - 16;
-  const sheetH = Math.round(usable * SNAP_PCT[snap]) - (snap === 2 ? 64 : 0);
+  const usable = box.h - box.pad;
+  const GAP = 8;
+  const ESTOP = 56;
+  const COLLAPSED_HEADER = 64;
+  let sheetH = Math.round(usable * SNAP_PCT[snap]);
+  // Teleop is locked at "50%" — but on a short phone 50% cannot hold sticks
+  // AND the posture keys (measured: 266px for 360px of content on an SE), and
+  // "recover" is the key you need right after an E-Stop. It takes up to 62%.
+  if (tab === "teleop") sheetH = Math.round(Math.max(usable * 0.5, Math.min(usable * 0.62, 400)));
+  // At 90% the map would be a 57–73px sliver entirely covered by its own
+  // header. Collapse it to the header instead, and give the rest to the sheet.
+  const collapsed = snap === 2 && tab !== "teleop";
+  if (collapsed) sheetH = usable - ESTOP - COLLAPSED_HEADER - 2 * GAP;
+
+  // Safe areas: notch / Dynamic Island on top, home indicator at the bottom.
+  const shell = "bg-surface-sunken relative flex h-full flex-col gap-2 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]";
 
   if (unlicensed)
     return (
-      <div ref={root} className="bg-surface-sunken relative flex h-full flex-col gap-2 p-2">
+      <div ref={root} className={shell}>
         <div className="bg-surface relative min-h-0 flex-1 overflow-y-auto rounded-xl border">
           <LicenseGate />
         </div>
-        <EStopBar />
+        <div ref={estop}>
+          <EStopBar />
+        </div>
       </div>
     );
 
   return (
-    <div ref={root} className="bg-surface-sunken relative flex h-full flex-col gap-2 p-2">
-      <div className="bg-map-ground relative min-h-0 flex-1 overflow-hidden rounded-xl border">
-        <MapView />
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-1.5 p-2">
-          <DogHeader />
-          <Banners />
+    <EStopZone.Provider value={zone}>
+      <div ref={root} className={shell}>
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-xl border",
+            collapsed ? "bg-surface h-16 shrink-0" : "bg-map-ground min-h-0 flex-1"
+          )}
+        >
+          <div className={cn("absolute inset-0", collapsed && "hidden")}>
+            <MapView />
+          </div>
+          {/* Full-height, click-through column: the status details can grow into
+              it and scroll, instead of being clipped by the panel (they were,
+              at 337px inside a 253–332px panel). */}
+          <div className={cn("pointer-events-none absolute inset-0 z-20 flex flex-col gap-1.5", collapsed ? "p-1.5" : "p-2")}>
+            <DogHeader />
+            {!statusOpen && !collapsed && <Banners />}
+          </div>
+          {!collapsed && !statusOpen && <CallPip />}
+          {!collapsed && <FaultOverlay />}
         </div>
-        <CallPip />
-        <FaultOverlay />
+        <div ref={estop}>
+          <EStopBar />
+        </div>
+        <Sheet height={sheetH} usable={usable} />
+        <Overlays />
       </div>
-      <EStopBar />
-      <Sheet height={sheetH} usable={usable} />
-      <Overlays />
-    </div>
+    </EStopZone.Provider>
   );
 }
 

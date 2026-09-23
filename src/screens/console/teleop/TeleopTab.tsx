@@ -9,7 +9,7 @@ import { getDogLink } from "@/link";
 import { formatClock } from "@/lib/utils";
 import { get, set, useStore } from "@/store";
 import { rpc } from "@/store/controller";
-import { effectiveSpeedCap, shapeAxis, stickLock } from "@/store/logic";
+import { effectiveSpeedCap, lockDetail, shapeAxis, stickLock } from "@/store/logic";
 
 import { Joystick } from "./Joystick";
 import { useAccess } from "../Console";
@@ -23,7 +23,7 @@ export function TeleopTab() {
   if (access.locked)
     return (
       <div className="p-4">
-        <LockedPanel reason={access.reason} detail="操控需要 teleop 權限與穩定的區網連線。E-Stop 永遠可用。" />
+        <LockedPanel reason={access.reason} detail={lockDetail(access.reason)} />
       </div>
     );
   return <Gate />;
@@ -253,7 +253,7 @@ function Controls() {
   const rttText = rtt === "good" ? "良好" : rtt === "fair" ? "偏慢 · 限速 0.5" : "訊號不足";
 
   return (
-    <div className="space-y-3 px-4 pt-1 pb-4">
+    <div className="space-y-2 px-3 pt-0.5 pb-2">
       {t?.mode === "ESTOP" && t.estop && (
         <div className="bg-status-error/10 border-status-error/30 text-status-error flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px]">
           <OctagonX className="size-4 shrink-0" />
@@ -280,6 +280,11 @@ function Controls() {
       />
       <span className="sr-only">連線品質：{rttText}</span>
 
+      {/* Posture before the sticks: "recover" is the key needed right after an
+          E-Stop, so it must never be the part that scrolls out of view. The
+          sticks go last — the bottom of the screen is where thumbs rest. */}
+      <PostureRow />
+
       <div className="flex items-center gap-3">
         <span className="text-muted-foreground shrink-0 text-[12px]">速度上限</span>
         <Slider label="速度上限" min={0.2} max={1.5} step={0.1} value={userCap} cap={globalCap} onChange={(v) => set({ userSpeedCap: v })} />
@@ -295,8 +300,6 @@ function Controls() {
           </div>
         )}
       </div>
-
-      <PostureRow />
     </div>
   );
 }

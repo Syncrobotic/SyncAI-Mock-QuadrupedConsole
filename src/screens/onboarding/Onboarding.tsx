@@ -5,9 +5,9 @@ import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { StepCode, StepConnect, StepEnroll, StepLicense, StepSafety, StepScan, StepWait, StepWelcome, StepWifi } from "./steps";
+import { StepConnect, StepEnroll, StepLicense, StepSafety, StepScan, StepWait, StepWelcome, StepWifi } from "./steps";
 
-import type { DogAdvert, Endpoint, Enrollment, PairSession, Role } from "@/proto/types";
+import type { DogAdvert, Endpoint, PairSession, Role } from "@/proto/types";
 
 /**
  * §4 first-connection onboarding: eight screens, each with an explicit
@@ -15,20 +15,20 @@ import type { DogAdvert, Endpoint, Enrollment, PairSession, Role } from "@/proto
  * a landscape call (§5).
  */
 
-export type Step = "welcome" | "scan" | "connect" | "code" | "enroll" | "license" | "wifi" | "wait" | "safety";
+export type Step = "welcome" | "scan" | "connect" | "enroll" | "license" | "wifi" | "wait" | "safety";
 
 /**
- * §4's eight screens plus one: the licence key, entered before Wi-Fi because
+ * §4's screens, minus the LED pairing code (not used on this dog) and plus
+ * the licence key, entered before Wi-Fi because
  * it decides what the dog is allowed to do, and it has to go over BLE — the
  * dog may not have a network yet.
  */
-export const STEPS: Step[] = ["welcome", "scan", "connect", "code", "enroll", "license", "wifi", "wait", "safety"];
+export const STEPS: Step[] = ["welcome", "scan", "connect", "enroll", "license", "wifi", "wait", "safety"];
 
 const TITLES: Record<Step, string> = {
   welcome: "歡迎",
   scan: "找狗",
   connect: "藍牙連線",
-  code: "確認碼",
   enroll: "註冊",
   license: "License",
   wifi: "現場 Wi-Fi",
@@ -39,7 +39,6 @@ const TITLES: Record<Step, string> = {
 export interface Flow {
   dog: DogAdvert | null;
   session: PairSession | null;
-  enrollment: Enrollment | null;
   role: Role | null;
   ssid: string;
   psk: string;
@@ -59,7 +58,6 @@ export function Onboarding() {
   const [flow, setFlow] = useState<Flow>({
     dog: null,
     session: null,
-    enrollment: null,
     role: null,
     ssid: "SyncAI-Office",
     psk: "",
@@ -72,7 +70,7 @@ export function Onboarding() {
   const index = STEPS.indexOf(step);
 
   // Back is offered only where going back is safe and meaningful.
-  const back: Partial<Record<Step, Step>> = { scan: "welcome", code: "scan", wifi: undefined };
+  const back: Partial<Record<Step, Step>> = { scan: "welcome" };
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
@@ -86,7 +84,7 @@ export function Onboarding() {
       </div>
 
       {step !== "welcome" && (
-        <header className="relative shrink-0 px-4 pt-3">
+        <header className="relative shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="flex h-10 items-center">
             {back[step] ? (
               <button onClick={() => setStep(back[step]!)} className="hover:bg-accent -ml-1.5 grid size-10 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
@@ -107,11 +105,10 @@ export function Onboarding() {
           </div>
         </header>
       )}
-      <div className="scrollbar-none relative min-h-0 flex-1 overflow-y-auto">
+      <div className="scrollbar-none relative min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
         {step === "welcome" && <StepWelcome {...props} />}
         {step === "scan" && <StepScan {...props} />}
         {step === "connect" && <StepConnect {...props} />}
-        {step === "code" && <StepCode {...props} />}
         {step === "enroll" && <StepEnroll {...props} />}
         {step === "license" && <StepLicense {...props} />}
         {step === "wifi" && <StepWifi {...props} />}

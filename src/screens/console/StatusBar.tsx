@@ -9,6 +9,8 @@ import { ROLE_LABEL } from "@/proto/types";
 import { useStore } from "@/store";
 import { CONN_LABEL, MODE_LABEL, rawRttLevel } from "@/store/logic";
 
+import { AlertRow, useAlerts } from "./Banners";
+
 /**
  * The status strip of §5, drawn as the dashboard's `/map` corner header: the
  * avatar / title / subtitle triple on a blurred surface card, floating on the
@@ -41,10 +43,14 @@ export function DogHeader() {
   const rttTone = !live ? "text-muted-foreground" : rttLevel === "poor" ? "text-status-error" : rttLevel === "fair" ? "text-severity-warning" : "text-foreground";
   const barTone = rttLevel === "poor" ? "bg-status-error" : rttLevel === "fair" ? "bg-severity-warning" : "bg-status-ok";
 
-  const toggle = () => useStore.setState({ statusOpen: !open });
+  const snap = useStore((s) => s.snap);
+  const notices = useAlerts().filter((a) => a.kind === "notice").length;
+  // With the sheet at 90% the map is collapsed to this header; details need
+  // room, so opening them brings the sheet down to 50% first.
+  const toggle = () => useStore.setState(snap === 2 && !open ? { statusOpen: true, snap: 1 } : { statusOpen: !open });
 
   return (
-    <div className="pointer-events-auto">
+    <div className="pointer-events-auto flex min-h-0 flex-col">
       <div className="flex items-stretch gap-1.5">
         <button
           onClick={toggle}
@@ -58,7 +64,10 @@ export function DogHeader() {
               {subtitle}
             </span>
           </span>
-          <ChevronDown className={cn("text-muted-foreground size-4 shrink-0 transition-transform", open && "rotate-180")} />
+          <span className="relative shrink-0">
+            <ChevronDown className={cn("text-muted-foreground size-4 transition-transform", open && "rotate-180")} />
+            {notices > 0 && !open && <span aria-label={`${notices} 則提醒`} className="bg-severity-warning ring-surface absolute -top-1 -right-1 size-2 rounded-full ring-2" />}
+          </span>
         </button>
 
         <button
@@ -100,6 +109,7 @@ function Details() {
   const device = useStore((s) => s.device);
   const events = useStore((s) => s.events);
   const lastError = useStore((s) => s.lastError);
+  const alerts = useAlerts();
   const channel = conn === "Online" || conn === "Degraded" ? "WS · TLS pinned" : conn === "BleOnly" ? "BLE" : "—";
 
   return (
@@ -108,8 +118,15 @@ function Details() {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.15 }}
-      className="bg-popover/95 mt-1.5 rounded-xl border p-3 shadow-xl backdrop-blur"
+      className="bg-popover/95 mt-1.5 min-h-0 overflow-y-auto overscroll-contain rounded-xl border p-3 shadow-xl backdrop-blur"
     >
+      {alerts.length > 0 && (
+        <div className="mb-3 space-y-1.5 border-b pb-3">
+          {alerts.map((a) => (
+            <AlertRow key={a.id} alert={a} flat />
+          ))}
+        </div>
+      )}
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
         <Item k="通道" v={channel} />
         <Item k="狀態" v={`${CONN_LABEL[conn]} · ${conn}`} />

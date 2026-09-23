@@ -42,7 +42,7 @@ export function EStopBar() {
       }}
       aria-label={route === "ble" ? "緊急停止（經由藍牙）" : "緊急停止"}
       className={cn(
-        "relative flex h-14 w-full shrink-0 cursor-pointer items-center justify-center gap-2.5 overflow-hidden rounded-xl text-[17px] font-black tracking-[0.18em] text-white uppercase select-none",
+        "relative z-[60] flex h-14 w-full shrink-0 cursor-pointer items-center justify-center gap-2.5 overflow-hidden rounded-xl text-[17px] font-black tracking-[0.18em] text-white uppercase select-none",
         "from-estop to-estop-pressed bg-linear-to-b shadow-lg ring-1 shadow-red-900/30 ring-white/15 transition-[filter,transform] duration-100 hover:brightness-110 active:scale-[0.99] active:brightness-90",
         "focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none",
         disabled && "bg-muted text-muted-foreground cursor-not-allowed bg-none shadow-none ring-0"
@@ -89,7 +89,7 @@ function Stopped({ by, at, canRelease }: { by?: string; at?: number; canRelease:
       onContextMenu={(e) => e.preventDefault()}
       disabled={!canRelease}
       aria-label={canRelease ? "長按 2 秒解除緊急停止" : "已緊急停止，需由 Owner 解除"}
-      className="bg-estop-pressed ring-estop/60 relative flex h-14 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl text-white ring-2 select-none disabled:cursor-default"
+      className="bg-estop-pressed ring-estop/60 relative z-[60] flex h-14 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl text-white ring-2 select-none disabled:cursor-default"
     >
       {holding && (
         <span

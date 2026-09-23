@@ -122,7 +122,7 @@ export function ReviewPanel() {
         <Group title="提示">
           <ul className="space-y-1 text-[11px] leading-relaxed text-white/55">
             <li>
-              確認碼：<code className="font-mono text-white/80">123456</code>，其他碼算錯
+              連線不需確認碼；新狗由第一支手機成為 Owner
             </li>
             <li>
               Wi-Fi 名稱含 <code className="font-mono text-white/80">fail</code> → 密碼錯；

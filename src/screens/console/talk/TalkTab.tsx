@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Loader2, Megaphone, Mic, MicOff, PhoneOff, SwitchCamera, Thermometer, Volume2, VolumeX } from "lucide-react";
+import { Camera, Ellipsis, Loader2, Megaphone, Mic, MicOff, PhoneOff, SwitchCamera, Thermometer, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -11,6 +11,7 @@ import { rpc } from "@/store/controller";
 
 import { useNow } from "../Banners";
 import { useAccess } from "../Console";
+import { lockDetail } from "@/store/logic";
 import { closeCall, flipCamera, openCall, setMic, setPtt, setSpeaker, useMediaSession } from "./session";
 import { ThermalLayer, Video } from "./Video";
 
@@ -21,7 +22,7 @@ export function TalkTab() {
   if (access.locked)
     return (
       <div className="p-4">
-        <LockedPanel reason={access.reason} detail="雙向通話需要 media.talk 權限。" />
+        <LockedPanel reason={access.reason} detail={lockDetail(access.reason)} />
       </div>
     );
   return <Call />;
@@ -34,6 +35,7 @@ function Call() {
   const clips = useStore((s) => s.device?.clips);
   const [micState, setMicState] = useState(micProbe);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [more, setMore] = useState(false);
   useNow(1000);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ function Call() {
   };
 
   return (
-    <div className="space-y-3 px-4 pt-1 pb-5">
+    <div className="space-y-2 px-3 pt-0.5 pb-4">
       <div data-call-video className={cn("relative overflow-hidden rounded-xl bg-black", snap === 2 ? "aspect-[3/4]" : "aspect-video")}>
         {session ? (
           <Video stream={session.stream} mirror={call.facing === "user"} />
@@ -93,7 +95,9 @@ function Call() {
         <span className="absolute right-2 bottom-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/80">Mock · 手機前鏡頭</span>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      {/* One row of what a guard uses mid-call; the rest behind "more". Two
+          full rows did not fit a 50% sheet on an SE (266px for 363px). */}
+      <div className="grid grid-cols-5 gap-1.5">
         <Ctl
           label={call.mic ? "麥克風開" : "麥克風"}
           active={call.mic}
@@ -108,20 +112,25 @@ function Call() {
           onPointerLeave={() => call.ptt && setPtt(false)}
           onContextMenu={(e) => e.preventDefault()}
           className={cn(
-            "flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-[11px] font-medium select-none disabled:cursor-not-allowed disabled:opacity-40",
+            "flex h-14 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-[11px] font-medium select-none disabled:cursor-not-allowed disabled:opacity-40",
             call.ptt ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-accent"
           )}
         >
           <Mic className="size-5" />
-          {call.ptt ? "說話中…" : "按住說話"}
+          {call.ptt ? "說話中" : "按住說"}
         </button>
         <Ctl label={call.speaker ? "喇叭" : "靜音"} active={call.speaker} onClick={() => setSpeaker(!call.speaker)} icon={call.speaker ? <Volume2 /> : <VolumeX />} />
-        <Ctl label="熱像" active={call.thermal} onClick={() => set((s) => ({ call: { ...s.call, thermal: !s.call.thermal } }))} icon={<Thermometer />} />
-        <Ctl label="切換鏡頭" onClick={() => void flipCamera()} icon={<SwitchCamera />} />
-        <Ctl label="快照" onClick={() => void snapshot()} icon={<Camera />} />
-        <Ctl label="廣播" onClick={() => setBroadcastOpen(true)} icon={<Megaphone />} />
+        <Ctl label="更多" active={more} onClick={() => setMore((m) => !m)} icon={<Ellipsis />} />
         <Ctl label="結束" onClick={closeCall} icon={<PhoneOff />} danger />
       </div>
+      {more && (
+        <div className="grid grid-cols-4 gap-1.5">
+          <Ctl label="熱像" active={call.thermal} onClick={() => set((s) => ({ call: { ...s.call, thermal: !s.call.thermal } }))} icon={<Thermometer />} />
+          <Ctl label="切換鏡頭" onClick={() => void flipCamera()} icon={<SwitchCamera />} />
+          <Ctl label="快照" onClick={() => void snapshot()} icon={<Camera />} />
+          <Ctl label="廣播" onClick={() => setBroadcastOpen(true)} icon={<Megaphone />} />
+        </div>
+      )}
 
       {micDisabled && (
         <p className="text-muted-foreground text-xs">
@@ -168,7 +177,7 @@ function Ctl({ label, icon, onClick, active, disabled, danger }: { label: string
       disabled={disabled}
       aria-pressed={active}
       className={cn(
-        "flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 [&_svg]:size-5",
+        "flex h-14 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 [&_svg]:size-5",
         danger ? "bg-status-error/10 text-status-error border-status-error/30 hover:bg-status-error/20" : active ? "bg-primary/15 text-primary-accent border-primary/40" : "bg-card hover:bg-accent"
       )}
     >

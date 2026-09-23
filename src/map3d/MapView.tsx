@@ -2,7 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Box, Crosshair, Layers, Rotate3d } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { onMapLongPress } from "@/screens/console/mission/editor";
@@ -18,10 +18,23 @@ import { Scene } from "./Scene";
 export function MapView() {
   const conn = useStore((s) => s.conn);
   const view = useStore((s) => s.view);
+  const statusOpen = useStore((s) => s.statusOpen);
   const stale = !isLive(conn);
+  const box = useRef<HTMLDivElement>(null);
+  const [short, setShort] = useState(false);
+
+  // On a short map (teleop on an SE: 179px) a vertical stack of three 44px
+  // buttons reaches up into the status header. Lay them out in a row instead.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setShort(el.clientHeight < 300));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <div className="absolute inset-0">
+    <div ref={box} className="absolute inset-0">
       {/* §13: BleOnly / Unreachable show the last cache, greyed. */}
       <div className={cn("absolute inset-0 transition-[filter,opacity] duration-300", stale && "opacity-60 grayscale")}>
         <Canvas
@@ -34,14 +47,32 @@ export function MapView() {
         </Canvas>
       </div>
 
-      <ViewButtons view={view} />
+      {!statusOpen && <ViewButtons view={view} horizontal={short} />}
     </div>
   );
 }
 
-function ViewButtons({ view }: { view: MapViewMode }) {
+function ViewButtons({ view, horizontal }: { view: MapViewMode; horizontal: boolean }) {
   const layers = useStore((s) => s.layers);
+  const tab = useStore((s) => s.tab);
   const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+
+  // Close on a tap anywhere else, and whenever the tab changes — it used to
+  // stay open across tabs, stacked over the status header.
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  const [openTab, setOpenTab] = useState(tab);
+  if (openTab !== tab) {
+    setOpenTab(tab);
+    setOpen(false);
+  }
 
   const btn = (active: boolean) =>
     cn(
@@ -50,9 +81,16 @@ function ViewButtons({ view }: { view: MapViewMode }) {
     );
 
   return (
-    <div className="absolute right-3 bottom-3 flex flex-col items-end gap-2">
+    <div ref={root} className="absolute right-2 bottom-2">
       {open && (
-        <div className="bg-surface/95 w-40 space-y-0.5 rounded-xl border p-1.5 shadow-lg backdrop-blur">
+        // Opens to the LEFT of the column, bottom-aligned, so it never reaches
+        // up into the header and banners.
+        <div
+          className={cn(
+            "bg-surface/95 absolute w-40 space-y-0.5 rounded-xl border p-1.5 shadow-lg backdrop-blur",
+            horizontal ? "right-0 bottom-[52px] max-h-[200px] overflow-y-auto" : "right-[52px] bottom-0"
+          )}
+        >
           {(
             [
               ["plan", "樓層平面"],
@@ -65,7 +103,7 @@ function ViewButtons({ view }: { view: MapViewMode }) {
             <button
               key={k}
               onClick={() => set((s) => ({ layers: { ...s.layers, [k]: !s.layers[k] } }))}
-              className="hover:bg-accent flex h-9 w-full cursor-pointer items-center justify-between rounded-md px-2 text-[13px]"
+              className="hover:bg-accent flex h-11 w-full cursor-pointer items-center justify-between rounded-md px-2 text-[13px]"
               aria-pressed={layers[k]}
             >
               {label}
@@ -74,7 +112,7 @@ function ViewButtons({ view }: { view: MapViewMode }) {
           ))}
         </div>
       )}
-      <div className="bg-surface/95 flex flex-col overflow-hidden rounded-xl border shadow-lg backdrop-blur">
+      <div className={cn("bg-surface/95 flex overflow-hidden rounded-xl border shadow-lg backdrop-blur", horizontal ? "flex-row" : "flex-col")}>
         <button className={btn(view === "follow")} onClick={() => set({ view: view === "follow" ? "free" : "follow" })} aria-label="跟隨" aria-pressed={view === "follow"}>
           <Crosshair className="size-[18px]" />
         </button>
