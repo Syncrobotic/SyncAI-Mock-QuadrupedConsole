@@ -11,6 +11,7 @@ import { get, set, useStore } from "@/store";
 import { rpc } from "@/store/controller";
 import { effectiveSpeedCap, lockDetail, shapeAxis, stickLock } from "@/store/logic";
 
+import { useCallSummary } from "../talk/CallLayer";
 import { Joystick } from "./Joystick";
 import { useAccess } from "../Console";
 
@@ -414,9 +415,11 @@ function PostureRow() {
 
 export function TeleopSummary() {
   const t = useStore((s) => s.telemetry);
+  const call = useCallSummary();
   return (
     <span className="tabular-nums">
       RTT {t?.rttMs ?? "—"} ms · {(t?.speed ?? 0).toFixed(1)} m/s · {t?.gait ?? "walk"}
+      {call}
     </span>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Gamepad2, Lock, MapPinned, Phone, Settings2 } from "lucide-react";
+import { Gamepad2, Lock, MapPinned, ScrollText, Settings2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ActivePlate, EStopZone, TabBoundary } from "@/components/kit";
@@ -8,7 +8,7 @@ import { useLandscape } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import { MapView } from "@/map3d/MapView";
 import { NO_SCOPES, SNAP_PCT, set, useStore, type SheetSnap } from "@/store";
-import { tabAccess, type Access, type Tab } from "@/store/logic";
+import { tabAccess, type Access, type Area, type Tab } from "@/store/logic";
 
 import { Banners } from "./Banners";
 import { EStopBar } from "./EStopBar";
@@ -17,19 +17,19 @@ import { LandscapeConsole } from "./LandscapeConsole";
 import { LicenseGate } from "./LicenseGate";
 import { DogHeader } from "./StatusBar";
 import { DeviceTab, DeviceSummary } from "./device/DeviceTab";
+import { EventsSummary, EventsTab, useUnreadEvents } from "./events/EventsTab";
 import { MissionSummary, MissionTab } from "./mission/MissionTab";
-import { CallPip } from "./talk/CallPip";
-import { TalkSummary, TalkTab } from "./talk/TalkTab";
+import { CallLayer } from "./talk/CallLayer";
 import { TeleopSummary, TeleopTab } from "./teleop/TeleopTab";
 
 const TABS: { id: Tab; label: string; icon: typeof Gamepad2 }[] = [
   { id: "teleop", label: "操控", icon: Gamepad2 },
   { id: "mission", label: "任務", icon: MapPinned },
-  { id: "talk", label: "通話", icon: Phone },
+  { id: "events", label: "事件", icon: ScrollText },
   { id: "device", label: "裝置", icon: Settings2 },
 ];
 
-export function useAccess(tab: Tab): Access {
+export function useAccess(tab: Area): Access {
   const conn = useStore((s) => s.conn);
   const scopes = useStore((s) => s.session?.scopes ?? NO_SCOPES);
   const license = useStore((s) => s.device?.license);
@@ -59,6 +59,7 @@ export function Console() {
   const snap = useStore((s) => s.snap);
   const statusOpen = useStore((s) => s.statusOpen);
   const unlicensed = useStore((s) => s.device?.licenseEdition === "none");
+  const videoMain = useStore((s) => s.call.active && s.call.videoMain && s.tab === "teleop");
   const landscape = useLandscape();
   const root = useRef<HTMLDivElement>(null);
   const estop = useRef<HTMLDivElement>(null);
@@ -91,8 +92,8 @@ export function Console() {
   // §7: the teleop tab is locked at 50% and enters follow view; §6: mission defaults to 2.5D top.
   useEffect(() => {
     if (tab === "teleop") set({ snap: 1, view: "follow" });
-    if (tab === "mission") set({ view: "top" });
-    if (tab === "talk" || tab === "device") set({ view: "free" });
+    if (tab === "mission" || tab === "events") set({ view: "top" });
+    if (tab === "device") set({ view: "free" });
   }, [tab]);
 
   const usable = box.h - box.pad;
@@ -117,6 +118,9 @@ export function Console() {
   // header. Collapse it to the header instead, and give the rest to the sheet.
   const collapsed = snap === 2 && tab !== "teleop";
   if (snap === 2 && !collapsed) sheetH = heights[1];
+  // In a call with the video as the main view, the map shrinks to a window at the right —
+  // smaller on a short panel so it stays clear of the status header.
+  const mapH = usable - ESTOP - sheetH - 2 * GAP;
 
   // Safe areas: notch / Dynamic Island on top, home indicator at the bottom.
   const shell = "bg-surface-sunken relative flex h-full flex-col gap-2 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]";
@@ -144,8 +148,22 @@ export function Console() {
             collapsed ? "bg-surface h-16 shrink-0" : "bg-map-ground min-h-0 flex-1"
           )}
         >
-          <div className={cn("absolute inset-0", collapsed && "hidden")}>
-            <MapView />
+          <div
+            className={cn(
+              collapsed && "hidden",
+              videoMain
+                ? cn("absolute right-2 bottom-[60px] z-20 aspect-video overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15", mapH < 260 ? "w-24" : "w-36")
+                : "absolute inset-0"
+            )}
+          >
+            <MapView bare={videoMain} />
+            {videoMain && (
+              <button
+                onClick={() => set((s) => ({ call: { ...s.call, videoMain: false } }))}
+                className="absolute inset-0 z-10 cursor-pointer"
+                aria-label="放大地圖"
+              />
+            )}
           </div>
           {/* Full-height, click-through column: the status details can grow into
               it and scroll, instead of being clipped by the panel (they were,
@@ -154,7 +172,7 @@ export function Console() {
             <DogHeader />
             {!statusOpen && !collapsed && <Banners />}
           </div>
-          {!collapsed && !statusOpen && <CallPip />}
+          {!collapsed && (videoMain || !statusOpen) && <CallLayer />}
           {!collapsed && <FaultOverlay />}
         </div>
         <div ref={estop}>
@@ -238,6 +256,8 @@ function TabBar() {
 /** The dashboard rail's selected row, turned sideways: violet plate, white label. */
 function TabButton({ id, label, icon: Icon, active }: { id: Tab; label: string; icon: typeof Gamepad2; active: boolean }) {
   const access = useAccess(id);
+  const unread = useUnreadEvents();
+  const dot = id === "events" && unread > 0 && !active;
   return (
     <button
       role="tab"
@@ -253,6 +273,7 @@ function TabButton({ id, label, icon: Icon, active }: { id: Tab; label: string; 
       <span className="relative flex items-center gap-1.5">
         {access.locked ? <Lock className="size-3.5 opacity-70" /> : <Icon className="size-3.5" />}
         {label}
+        {dot && <span className="bg-severity-emergency absolute -top-0.5 -right-2 size-1.5 rounded-full" aria-label={`${unread} 則新警示`} />}
       </span>
     </button>
   );
@@ -265,8 +286,8 @@ function TabContent() {
       return <TeleopTab />;
     case "mission":
       return <MissionTab />;
-    case "talk":
-      return <TalkTab />;
+    case "events":
+      return <EventsTab />;
     case "device":
       return <DeviceTab />;
   }
@@ -287,8 +308,8 @@ function Summary() {
         <TeleopSummary />
       ) : tab === "mission" ? (
         <MissionSummary />
-      ) : tab === "talk" ? (
-        <TalkSummary />
+      ) : tab === "events" ? (
+        <EventsSummary />
       ) : (
         <DeviceSummary />
       )}

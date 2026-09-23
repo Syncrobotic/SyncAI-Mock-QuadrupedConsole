@@ -1,6 +1,6 @@
 "use client";
 
-import { Bluetooth, ChevronRight, Download, Plus, FlaskConical, KeyRound, Pencil, Power, RefreshCw, Smartphone, Upload, Wifi } from "lucide-react";
+import { Bluetooth, ChevronRight, Download, Plus, FlaskConical, KeyRound, Pencil, Power, RefreshCw, ScrollText, Smartphone, Upload, Wifi } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -624,24 +624,16 @@ function Clips({ owner }: { owner: boolean }) {
 }
 
 function Diagnostics() {
-  const [events, setEvents] = useState<Awaited<ReturnType<typeof loadEvents>>>([]);
-  const [open, setOpen] = useState(false);
-
-  const load = async () => {
-    setEvents(await loadEvents());
-    setOpen(true);
-  };
-
   return (
     <section className="space-y-2">
       <SectionTitle description="系統事件與日誌匯出">診斷</SectionTitle>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline"  onClick={() => void load()}>
-          最近 200 條事件
+        <Button variant="outline" onClick={() => set({ tab: "events", snap: 2 })}>
+          <ScrollText />
+          查看事件紀錄
         </Button>
         <Button
           variant="outline"
-          
           onClick={async () => {
             const e = await loadEvents();
             const blob = new Blob([JSON.stringify(e, null, 2)], { type: "application/json" });
@@ -655,17 +647,6 @@ function Diagnostics() {
           匯出日誌
         </Button>
       </div>
-      {open && (
-        <Card className="max-h-72 space-y-1 overflow-y-auto">
-          {events.length === 0 && <p className="text-muted-foreground text-sm">沒有事件</p>}
-          {events.map((e) => (
-            <p key={e.id} className="flex gap-2 text-[12px]">
-              <span className="text-muted-foreground shrink-0 tabular-nums">{formatClock(e.at)}</span>
-              <span className={cn(e.level === "critical" ? "text-status-error" : e.level === "warning" ? "text-severity-warning" : "")}>{e.text}</span>
-            </p>
-          ))}
-        </Card>
-      )}
     </section>
   );
 }

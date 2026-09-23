@@ -670,10 +670,10 @@ function moveWaypoint(id: string, x: number, y: number, snap: boolean) {
   });
 }
 
-// ── Camera frustum (call tab) ───────────────────────────────────────────────
+// ── Camera frustum (during a call) ───────────────────────────────────────────────
 
 function CameraFrustum({ pose, color }: { pose: React.RefObject<PoseRef>; color: string }) {
-  const active = useStore((s) => s.call.active || s.tab === "talk");
+  const active = useStore((s) => s.call.active);
   const group = useRef<THREE.Group>(null);
   const geom = useMemo(() => {
     // A 70° × 40° pyramid, 3.5 m deep, from the head.

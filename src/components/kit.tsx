@@ -2,7 +2,7 @@
 
 import { AnimatePresence, m } from "framer-motion";
 import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
-import { Component, createContext, useContext, type ReactNode } from "react";
+import { Component, createContext, useContext, useEffect, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,13 @@ export function Modal({
   dismissable?: boolean;
 }) {
   const zone = useContext(EStopZone);
+  // Esc closes a dismissable dialog (keyboard / hardware-keyboard users).
+  useEffect(() => {
+    if (!open || !dismissable || !onClose) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, dismissable, onClose]);
   const band: React.CSSProperties = !zone
     ? { top: 0, bottom: 0 }
     : zone.top >= zone.height - zone.bottom

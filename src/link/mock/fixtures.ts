@@ -1,6 +1,6 @@
 import { DEFAULT_FENCE, GRID, snapToFree } from "./floor";
 
-import type { DeviceInfo, DogAdvert, Mission, PairedPhone, PluginManifest, Rule, RunRecord, Waypoint } from "@/proto/types";
+import type { Detection, DeviceInfo, DogAdvert, DogEvent, Mission, PairedPhone, PluginManifest, Rule, RunRecord, Waypoint } from "@/proto/types";
 
 export const DOGS: DogAdvert[] = [
   { id: "dog-a", serial: "SD2026-0917-7F3A", name: "SyncAI-Dog 7F3A", rssi: -58, hasOwner: false, pairingMode: true },
@@ -290,3 +290,29 @@ export function seedDevice(now: number, missionLicense: boolean): DeviceInfo {
 }
 
 export { DEFAULT_FENCE };
+
+/** The dog's own event log on first connect: a day of what the event tab should show. */
+export function seedEvents(now: number): DogEvent[] {
+  const min = 60_000;
+  const hr = 60 * min;
+  const det = (type: Detection["type"], zoneId: string, confidence: number, x: number, y: number, n: number): Detection => ({ type, zoneId, confidence, x, y, trackId: `trk-${n}` });
+  const rows: [number, DogEvent["kind"], DogEvent["level"], string, Detection?][] = [
+    [6 * min, "mission", "info", "「日間例行巡邏」完成 · 6/6 航點"],
+    [14 * min, "perception", "info", "偵測到人員 @ 北走廊（信心 72%）· 未達門檻，未觸發", det("person", "corr-n", 0.72, -3.2, 2.6, 118)],
+    [38 * min, "system", "warning", "電量 30%，已提前返回充電"],
+    [52 * min, "perception", "warning", "門未關 @ 資料室 · 已通知", det("door_open", "s3", 0.84, 6.8, -5.1, 117)],
+    [1 * hr + 10 * min, "fence", "warning", "接近地理圍欄邊界 · 已減速"],
+    [2 * hr + 5 * min, "teleop", "info", "夜班 · Pixel 8 取得操控權"],
+    [2 * hr + 7 * min, "estop", "critical", "緊急停止 · 由 夜班 · Pixel 8 觸發"],
+    [2 * hr + 9 * min, "estop", "info", "緊急停止已解除"],
+    [3 * hr, "mission", "info", "「機房巡檢」完成 · 熱像無異常"],
+    [9 * hr + 20 * min, "perception", "critical", "限制區入侵 @ 核心區（信心 91%）· 已出動", det("intrusion", "core", 0.91, 1.4, 0.2, 116)],
+    [9 * hr + 21 * min, "mission", "warning", "「限制區應變」打斷「夜間巡邏」· 完成後從航點 4 繼續"],
+    [9 * hr + 30 * min, "perception", "warning", "偵測到人員 @ 南走廊（信心 88%）· 夜班 · Pixel 8 確認出動", det("person", "corr-s", 0.88, -1.8, -2.9, 115)],
+    [11 * hr, "missions_changed", "info", "規則「閉館廣播」已停用"],
+    [15 * hr, "approval", "info", "iPhone 15（操作員）已加入"],
+    [20 * hr, "system", "info", "Gateway 更新到 gw-0.9.2"],
+    [23 * hr, "perception", "warning", "遺留物 @ 西側大廳（信心 80%）· 已通知", det("abandoned", "lobby-w", 0.8, -13.5, 0.9, 114)],
+  ];
+  return rows.map(([ago, kind, level, text, detection], i) => ({ id: `ev-seed-${i}`, at: now - ago, kind, level, text, detection }));
+}

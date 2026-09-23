@@ -93,8 +93,9 @@ describe("E-Stop route", () => {
 });
 
 describe("tab access", () => {
-  it("the device tab is never locked", () => {
+  it("the device and event tabs are never locked", () => {
     expect(tabAccess("device", ctx({ conn: "Unreachable", mode: "FAULT" })).locked).toBe(false);
+    expect(tabAccess("events", ctx({ conn: "BleOnly", scopes: ROLE_SCOPES.viewer })).locked).toBe(false);
   });
 
   it("viewer sees teleop, mission and talk locked with a reason", () => {

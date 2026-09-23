@@ -89,7 +89,9 @@ export function estopRoute(conn: ConnState): EstopRoute {
 
 // ── Tab access (§2, §5 鎖定態, §13 table) ────────────────────────────────────
 
-export type Tab = "teleop" | "mission" | "talk" | "device";
+export type Tab = "teleop" | "mission" | "events" | "device";
+/** What access is asked about: a tab, or the call — which lives inside the teleop tab. */
+export type Area = Tab | "talk";
 
 export interface AccessContext {
   conn: ConnState;
@@ -104,15 +106,15 @@ export type Access = { locked: false } | { locked: true; reason: string };
 const OPEN: Access = { locked: false };
 const lock = (reason: string): Access => ({ locked: true, reason });
 
-const TAB_SCOPE: Record<Exclude<Tab, "device">, Scope> = {
+const TAB_SCOPE: Record<Exclude<Area, "device" | "events">, Scope> = {
   teleop: "teleop",
   mission: "mission.rw",
   talk: "media.talk",
 };
 
-export function tabAccess(tab: Tab, ctx: AccessContext): Access {
-  // The device page is the one tab that always has content (§10).
-  if (tab === "device") return OPEN;
+export function tabAccess(tab: Area, ctx: AccessContext): Access {
+  // The device page always has content (§10); the event log shows what is cached even offline.
+  if (tab === "device" || tab === "events") return OPEN;
 
   if (ctx.restarting) return lock("Gateway 重啟中");
   if (ctx.conn === "BleOnly") return lock("未連上 Gateway，只剩藍牙");

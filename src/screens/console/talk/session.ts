@@ -8,8 +8,8 @@ import { get, set, useStore } from "@/store";
 import type { MediaSession } from "@/link/DogLink";
 
 /**
- * The one media session. It outlives the talk tab on purpose — §9: switching
- * tabs mid-call shrinks the video to picture-in-picture and keeps the audio.
+ * The one media session. It lives inside the teleop tab's map panel and outlives it on
+ * purpose — §9: switching tabs mid-call keeps the video as picture-in-picture and the audio.
  */
 
 let session: MediaSession | null = null;
@@ -46,7 +46,7 @@ export async function openCall() {
 export function closeCall() {
   session?.close();
   session = null;
-  set((s) => ({ call: { ...s.call, active: false, mic: false, ptt: false } }));
+  set((s) => ({ call: { ...s.call, active: false, mic: false, ptt: false, videoMain: false } }));
   notify();
 }
 

@@ -5,7 +5,7 @@ import { actionSeconds, PATROL_SPEED } from "@/lib/schedule";
 import { RuleEngine, type Activation, type Decision, type EngineCtx } from "./engine";
 
 import { Emitter } from "./emitter";
-import { seedDevice, seedHistory, seedMissions, seedPhones, seedRules, uid, DEFAULT_FENCE } from "./fixtures";
+import { seedDevice, seedEvents, seedHistory, seedMissions, seedPhones, seedRules, uid, DEFAULT_FENCE } from "./fixtures";
 import { buildPointCloud, DOCK, GRID, insidePolygon, isFree, PLAN, snapToFree } from "./floor";
 import { licenseFor, mockActivate } from "@/lib/license";
 import { SCENARIOS, type ScenarioId } from "./scenarios";
@@ -129,6 +129,7 @@ export class MockWorld {
     const now = Date.now();
     this.battery = this.scenario.battery;
     this.history = seedHistory(now);
+    this.eventLog = seedEvents(now);
     this._device = seedDevice(now, this.scenario.missionLicense);
     this.license = loadLicense() ?? fullLicense(now);
     if (scenarioId === "low_battery") {

@@ -63,7 +63,7 @@ export function ReviewPanel() {
         </div>
 
         <Group title="預覽">
-          <Toggle label="橫式（操控 / 通話）" on={landscape} onChange={() => useStore.setState({ forceLandscape: !landscape })} />
+          <Toggle label="橫式（操控）" on={landscape} onChange={() => useStore.setState({ forceLandscape: !landscape })} />
         </Group>
 
         <Group title="場景 ?scenario=">

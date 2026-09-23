@@ -12,9 +12,9 @@ import { Video } from "./Video";
 type Corner = "tl" | "tr" | "bl" | "br";
 
 /**
- * §9: a call left running while another tab is open shrinks to picture-in-
- * picture over the map; audio keeps going; a tap returns to the call. This is
- * the patrol mode — video beside the joysticks.
+ * §9: the call's picture-in-picture over the map — video beside the joysticks
+ * (the patrol mode), and what stays of a call on the other tabs, audio and all.
+ * A tap swaps it with the map.
  *
  * It can be dragged, and snaps to the nearest corner. The corners are inset
  * so it never lands on the status header (top) or the view buttons (right
@@ -22,7 +22,6 @@ type Corner = "tl" | "tr" | "bl" | "br";
  */
 export function CallPip({ landscape = false }: { landscape?: boolean }) {
   const active = useStore((s) => s.call.active);
-  const tab = useStore((s) => s.tab);
   const mic = useStore((s) => s.call.mic || s.call.ptt);
   const facing = useStore((s) => s.call.facing);
   const session = useMediaSession();
@@ -31,7 +30,7 @@ export function CallPip({ landscape = false }: { landscape?: boolean }) {
   const start = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const el = useRef<HTMLButtonElement>(null);
 
-  if (!active || tab === "talk" || !session) return null;
+  if (!active || !session) return null;
 
   const onDown = (e: React.PointerEvent) => {
     start.current = { x: e.clientX, y: e.clientY, moved: false };
@@ -49,7 +48,8 @@ export function CallPip({ landscape = false }: { landscape?: boolean }) {
     const s = start.current;
     start.current = null;
     if (!s?.moved || landscape) {
-      set({ tab: "talk" });
+      // A tap swaps: the video takes the panel, the map becomes the window.
+      set((st) => ({ tab: "teleop", call: { ...st.call, videoMain: true } }));
       return;
     }
     const b = el.current?.getBoundingClientRect();
@@ -84,7 +84,7 @@ export function CallPip({ landscape = false }: { landscape?: boolean }) {
         !landscape && corner === "br" && "right-[60px] bottom-2"
       )}
       style={drag ? { translate: `${drag.dx}px ${drag.dy}px` } : undefined}
-      aria-label="回到通話（可拖曳）"
+      aria-label="放大影像（可拖曳）"
     >
       <Video stream={session.stream} mirror={facing === "user"} />
       <span className="absolute bottom-1 left-1 grid size-5 place-items-center rounded-full bg-black/60 text-white">

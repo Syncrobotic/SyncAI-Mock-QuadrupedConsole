@@ -298,7 +298,7 @@ export async function restartGateway() {
 // ── Call ─────────────────────────────────────────────────────────────────────
 
 export function stopCall() {
-  set((s) => ({ call: { ...s.call, active: false, mic: false } }));
+  set((s) => ({ call: { ...s.call, active: false, mic: false, videoMain: false } }));
 }
 
 // ── Dev ──────────────────────────────────────────────────────────────────────
