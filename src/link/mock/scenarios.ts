@@ -90,7 +90,7 @@ export const SCENARIOS: Record<ScenarioId, Scenario> = {
     verifies: "鎖定態",
     missionLicense: false,
   },
-  viewer: { ...base, id: "viewer", label: "Viewer 角色", verifies: "scope 鎖定", forceRole: "viewer" },
+  viewer: { ...base, id: "viewer", label: "檢視者角色", verifies: "scope 鎖定", forceRole: "viewer" },
   fault: {
     ...base,
     id: "fault",

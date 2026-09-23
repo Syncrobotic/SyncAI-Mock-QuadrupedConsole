@@ -125,7 +125,7 @@ export function tabAccess(tab: Tab, ctx: AccessContext): Access {
   if (tab === "mission" && ctx.license.mission === false) return lock("任務排程未授權");
   if (tab === "talk" && ctx.license.talk === false) return lock("通話功能未授權");
 
-  if (!ctx.scopes.includes(TAB_SCOPE[tab])) return lock("需要 Operator 權限");
+  if (!ctx.scopes.includes(TAB_SCOPE[tab])) return lock("需要操作員權限");
 
   // Degraded does NOT lock the teleop tab: the stick is disabled inside it
   // (see `stickLock`) so the operator can watch the RTT come back (§7).
@@ -134,8 +134,8 @@ export function tabAccess(tab: Tab, ctx: AccessContext): Access {
 
 /** One line under a locked tab's reason: what to do about it. */
 export function lockDetail(reason: string): string | undefined {
-  if (reason.includes("未授權")) return "這隻狗的 License 不含此功能。Owner 可以在裝置頁更換 License 金鑰。";
-  if (reason.includes("權限")) return "你的角色沒有這個功能。需要時請 Owner 在裝置頁調整角色。";
+  if (reason.includes("未授權")) return "這隻狗的 License 不含此功能。擁有者可以在裝置頁更換 License 金鑰。";
+  if (reason.includes("權限")) return "你的角色沒有這個功能。需要時請擁有者在裝置頁調整角色。";
   if (reason.includes("藍牙")) return "WS 斷線時只剩藍牙：可以用 E-Stop 與裝置頁。恢復連線後自動解鎖。";
   if (reason.includes("找不到")) return "藍牙與區網都沒有回應。靠近狗、確認開機後重試。";
   if (reason.includes("FAULT")) return "狗回報故障。請依裝置頁的建議處理。";

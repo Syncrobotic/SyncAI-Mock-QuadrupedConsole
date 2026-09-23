@@ -100,7 +100,7 @@ describe("tab access", () => {
   it("viewer sees teleop, mission and talk locked with a reason", () => {
     for (const tab of ["teleop", "mission", "talk"] as const) {
       const a = tabAccess(tab, ctx({ scopes: ROLE_SCOPES.viewer }));
-      expect(a).toEqual({ locked: true, reason: "需要 Operator 權限" });
+      expect(a).toEqual({ locked: true, reason: "需要操作員權限" });
     }
   });
 

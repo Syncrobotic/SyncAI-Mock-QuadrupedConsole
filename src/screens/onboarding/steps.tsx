@@ -26,11 +26,13 @@ import { toast } from "sonner";
 
 import { BrandGlyph } from "@/components/brand-mark";
 import { KeyInput } from "@/components/KeyInput";
+import { MockHint } from "@/components/MockHint";
 import { Field, Modal, inputClass } from "@/components/kit";
 import { Badge } from "@/components/ui/badge";
 import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_HINT, FEATURE_LABEL, formatKey, isCompleteKey } from "@/lib/license";
 import { Button } from "@/components/ui/button";
 import { getDogLink } from "@/link";
+import { IS_MOCK } from "@/lib/env";
 import { cn, sleep } from "@/lib/utils";
 import { ROLE_LABEL, type DogAdvert, type Enrollment, type LicenseActivation, type LicenseInfo, type WifiStatus } from "@/proto/types";
 import { useStore } from "@/store";
@@ -151,7 +153,7 @@ export function StepWelcome({ go }: StepProps) {
       <div className="mt-8 flex-1 space-y-2">
         {revoked && (
           <Note tone="bad" icon={<CircleAlert />}>
-            這支手機已被 Owner 撤銷，本機憑證已清除。需要的話請重新配對，並請 Owner 核准。
+            這支手機已被擁有者撤銷，本機憑證已清除。需要的話請重新配對，並請擁有者核准。
           </Note>
         )}
         <ChoiceRow
@@ -180,7 +182,7 @@ export function StepWelcome({ go }: StepProps) {
           <ArrowRight />
         </Primary>
         {denied && (
-          <Button variant="outline" className="h-10 w-full rounded-lg" onClick={() => toast("Mock：這裡會開啟系統設定")}>
+          <Button variant="outline" className="h-10 w-full rounded-lg" onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>
             開啟系統設定
           </Button>
         )}
@@ -192,7 +194,7 @@ export function StepWelcome({ go }: StepProps) {
         <div className="px-5 pt-5 pb-4">
           <p className="text-[15px] font-semibold">「SyncAI」想要使用藍牙</p>
           <p className="text-muted-foreground mt-1 text-[13px]">用來配對與控制附近的 SyncAI-Dog。</p>
-          <p className="text-muted-foreground/70 mt-2 text-[10px]">Mock 系統權限對話框</p>
+          {IS_MOCK && <p className="text-muted-foreground/70 mt-2 text-[10px]">MOCK · 代替系統權限對話框</p>}
         </div>
         <div className="grid grid-cols-2 border-t text-[15px]">
           <button
@@ -262,7 +264,7 @@ export function StepScan({ patch, go }: StepProps) {
             }}
             tile={<span className="font-mono">{d.serial.slice(-4)}</span>}
             title={d.name}
-            sub={d.hasOwner ? "已有 Owner · 加入需要核准" : "尚未配對 · 你會成為 Owner"}
+            sub={d.hasOwner ? "已有擁有者 · 加入需要核准" : "尚未配對 · 你會成為擁有者"}
             badge={
               <span className="flex shrink-0 items-center gap-2">
                 <Rssi rssi={d.rssi} />
@@ -410,12 +412,12 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
   return (
     <Screen
       icon={granted ? ShieldCheck : enrollment?.kind === "needs_approval" ? UserCheck : Fingerprint}
-      title={granted ? "配對完成" : enrollment?.kind === "needs_approval" ? "需要 Owner 核准" : "註冊中"}
+      title={granted ? "配對完成" : enrollment?.kind === "needs_approval" ? "需要擁有者核准" : "註冊中"}
       lead={
         granted
           ? undefined
           : enrollment?.kind === "needs_approval"
-            ? "這隻狗已經有 Owner。Owner 的手機會跳出「有手機請求加入」，核准後你就能以 Operator 身分使用。"
+            ? "這隻狗已經有擁有者。擁有者的手機會跳出「有手機請求加入」，核准後你就能以操作員身分使用。"
             : "正在把這支手機登記到狗上。"
       }
       footer={
@@ -424,7 +426,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
         ) : enrollment?.kind === "needs_approval" ? (
           <>
             <Button variant="outline" className="h-12 w-full" onClick={() => void asViewer()}>
-              先以 Viewer 身分加入（唯讀）
+              先以檢視者身分加入（唯讀）
             </Button>
             <Button
               variant="ghost"
@@ -460,7 +462,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
             {granted.role === "owner"
               ? "第一支配對的手機。可以核准其他手機、解除 E-Stop、管理裝置。"
               : granted.role === "operator"
-                ? "可以操控、排任務、通話。裝置管理與解除 E-Stop 需要 Owner。"
+                ? "可以操控、排任務、通話。裝置管理與解除 E-Stop 需要擁有者。"
                 : "可以看地圖與影像，其他功能鎖定。"}
           </p>
         </div>
@@ -469,10 +471,10 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
       {enrollment?.kind === "needs_approval" && !granted && (
         <Note icon={<Loader2 className="animate-spin" />}>
           {enrollment.ownerOnline ? (
-            "等待 Owner 在手機上核准…"
+            "等待擁有者在手機上核准…"
           ) : (
             <>
-              Owner 的手機目前不在線。請聯絡 Owner 打開 App（裝置頁 → 已配對手機 → 核准），或先以 Viewer 身分加入。
+              擁有者的手機目前不在線。請聯絡擁有者打開 App（裝置頁 → 已配對手機 → 核准），或先以檢視者身分加入。
               <br />
               這個畫面會一直等，直到你取消。
             </>
@@ -524,7 +526,7 @@ export function StepLicense({ flow, go }: StepProps) {
       <Screen
         icon={Lock}
         title="這隻狗還沒啟用 License"
-        lead="License 決定狗能使用哪些功能，必須由 Owner 在自己的手機上輸入金鑰後，其他手機才能使用。"
+        lead="License 決定狗能使用哪些功能，必須由擁有者在自己的手機上輸入金鑰後，其他手機才能使用。"
         footer={
           <Primary variant="outline" onClick={() => go("scan")}>
             回到掃描
@@ -549,7 +551,7 @@ export function StepLicense({ flow, go }: StepProps) {
     <Screen
       icon={BadgeCheck}
       title={`License · ${EDITION_LABEL[license.edition]}`}
-      lead={owner ? "這隻狗會啟用下列功能。" : "這隻狗的 License 由 Owner 管理，以下是你能用的功能。"}
+      lead={owner ? "這隻狗會啟用下列功能。" : "這隻狗的 License 由擁有者管理，以下是你能用的功能。"}
       footer={
         <>
           <Primary onClick={() => go("wifi")}>
@@ -632,15 +634,13 @@ export function LicenseEntry({
           <p className="text-muted-foreground text-xs">4 組、每組 4 個英數字，可以整串貼上。經藍牙送到狗上驗證。</p>
         )}
       </div>
-      <p className="text-muted-foreground text-center text-xs leading-relaxed">
-        Mock：<code className="font-mono">SYNC-…</code> 專業版 · <code className="font-mono">BASE-…</code> 標準版（無 AI）·{" "}
-        <code className="font-mono">CTRL-…</code> 操控版
-        <br />
-        含 <code className="font-mono">0000</code> 已綁定 · <code className="font-mono">EXPD-…</code> 過期 · 試試{" "}
-        <button className="text-primary-accent cursor-pointer font-mono underline-offset-2 hover:underline" onClick={() => setKey("CTRL01AB2026DEMO")}>
+      <MockHint>
+        <code className="font-mono">SYNC-…</code> 專業版 · <code className="font-mono">BASE-…</code> 標準版（無 AI）· <code className="font-mono">CTRL-…</code> 操控版 · 含{" "}
+        <code className="font-mono">0000</code> 已綁定 · <code className="font-mono">EXPD-…</code> 過期。試試{" "}
+        <button className="cursor-pointer font-mono underline underline-offset-2" onClick={() => setKey("CTRL01AB2026DEMO")}>
           {formatKey("CTRL01AB2026DEMO")}
         </button>
-      </p>
+      </MockHint>
     </Screen>
   );
 }
@@ -720,7 +720,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
       <Note icon={<Bluetooth />}>
         <b className="text-foreground font-medium">略過的話：</b>只剩藍牙，Console 只有裝置頁與 E-Stop 能用。
       </Note>
-      <p className="text-muted-foreground text-xs">Mock：名稱含 fail → 密碼錯；none → 找不到；slow → 25 秒才連上</p>
+      <MockHint>網路名稱含 fail → 密碼錯；none → 找不到；slow → 25 秒才連上</MockHint>
 
       <Modal open={skipAsk} onClose={() => setSkipAsk(false)}>
         <p className="text-lg font-semibold">先不設 Wi-Fi？</p>
@@ -832,7 +832,7 @@ export function StepSafety({ flow }: StepProps) {
     {
       icon: <OctagonX />,
       title: "E-Stop 永遠在畫面中間",
-      body: "地圖和下方面板之間那條紅色長鍵。按一下就停，不會再問。任何人都能按，只有 Owner 能解除。",
+      body: "地圖和下方面板之間那條紅色長鍵。按一下就停，不會再問。任何人都能按，只有擁有者能解除。",
       visual: (
         <div className="from-estop to-estop-pressed flex h-10 items-center justify-center gap-1.5 rounded-lg bg-linear-to-b text-[12px] font-black tracking-[0.18em] text-white shadow-md ring-1 ring-white/15">
           <OctagonX className="size-4" />
@@ -847,7 +847,7 @@ export function StepSafety({ flow }: StepProps) {
     },
     {
       icon: <ShieldCheck />,
-      title: "Owner 手機遺失怎麼辦",
+      title: "擁有者手機遺失怎麼辦",
       body: "唯一的方法：在狗身上長按實體鍵 10 秒，燈號紅色快閃 3 秒後會清空所有配對，再重新走一次這個流程。",
     },
   ];

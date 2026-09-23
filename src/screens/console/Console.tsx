@@ -4,6 +4,7 @@ import { Gamepad2, Lock, MapPinned, Phone, Settings2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ActivePlate, EStopZone, TabBoundary } from "@/components/kit";
+import { useLandscape } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import { MapView } from "@/map3d/MapView";
 import { NO_SCOPES, SNAP_PCT, set, useStore, type SheetSnap } from "@/store";
@@ -12,6 +13,7 @@ import { tabAccess, type Access, type Tab } from "@/store/logic";
 import { Banners } from "./Banners";
 import { EStopBar } from "./EStopBar";
 import { FaultOverlay, Overlays } from "./Overlays";
+import { LandscapeConsole } from "./LandscapeConsole";
 import { LicenseGate } from "./LicenseGate";
 import { DogHeader } from "./StatusBar";
 import { DeviceTab, DeviceSummary } from "./device/DeviceTab";
@@ -57,6 +59,7 @@ export function Console() {
   const snap = useStore((s) => s.snap);
   const statusOpen = useStore((s) => s.statusOpen);
   const unlicensed = useStore((s) => s.device?.licenseEdition === "none");
+  const landscape = useLandscape();
   const root = useRef<HTMLDivElement>(null);
   const estop = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ h: 760, pad: 16 });
@@ -83,7 +86,7 @@ export function Console() {
       ro.disconnect();
       set({ toastBottom: null });
     };
-  }, [unlicensed]);
+  }, [unlicensed, landscape]);
 
   // §7: the teleop tab is locked at 50% and enters follow view; §6: mission defaults to 2.5D top.
   useEffect(() => {
@@ -108,6 +111,8 @@ export function Console() {
 
   // Safe areas: notch / Dynamic Island on top, home indicator at the bottom.
   const shell = "bg-surface-sunken relative flex h-full flex-col gap-2 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]";
+
+  if (landscape && !unlicensed) return <LandscapeConsole />;
 
   if (unlicensed)
     return (
@@ -199,7 +204,7 @@ function Sheet({ height, usable }: { height: number; usable: number }) {
         </div>
         <TabBar />
       </div>
-      <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain pt-2">
+      <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain pt-2 pb-[var(--kb,0px)]">
         <TabBoundary resetKey={tab}>{snap === 0 ? <Summary /> : <TabContent />}</TabBoundary>
       </div>
     </div>

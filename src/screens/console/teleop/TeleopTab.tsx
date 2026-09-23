@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { LockedPanel, Readouts, Select, Slider } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { getDogLink } from "@/link";
-import { formatClock } from "@/lib/utils";
+import { cn, formatClock } from "@/lib/utils";
 import { get, set, useStore } from "@/store";
 import { rpc } from "@/store/controller";
 import { effectiveSpeedCap, lockDetail, shapeAxis, stickLock } from "@/store/logic";
@@ -18,15 +18,30 @@ import type { Gait, Posture } from "@/proto/types";
 
 const PREEMPT_REASON = "被操控搶佔";
 
-export function TeleopTab() {
+/**
+ * Acquire and release go through one queue. Rotating the phone unmounts the
+ * portrait stick and mounts the landscape one in the same commit: the old one
+ * releases, the new one acquires — and with 50–150 ms of RPC jitter the
+ * release could land second and silently hand the stick back.
+ */
+let teleopChain: Promise<unknown> = Promise.resolve();
+function queued<T>(fn: () => Promise<T>): Promise<T> {
+  const next = teleopChain.then(fn, fn);
+  teleopChain = next.catch(() => {});
+  return next;
+}
+
+export function TeleopTab({ landscape = false }: { landscape?: boolean }) {
   const access = useAccess("teleop");
   if (access.locked)
     return (
-      <div className="p-4">
-        <LockedPanel reason={access.reason} detail={lockDetail(access.reason)} />
+      <div className={landscape ? "grid h-full place-items-center p-4" : "p-4"}>
+        <div className={landscape ? "w-full max-w-sm" : ""}>
+          <LockedPanel reason={access.reason} detail={lockDetail(access.reason)} />
+        </div>
       </div>
     );
-  return <Gate />;
+  return <Gate landscape={landscape} />;
 }
 
 /**
@@ -46,7 +61,7 @@ function initialPhase(): Phase {
   return "check";
 }
 
-function Gate() {
+function Gate({ landscape }: { landscape: boolean }) {
   const [phase, setPhase] = useState<Phase>(initialPhase);
   const holder = useStore((s) => s.telemetry?.teleopHolder ?? null);
   const run = useStore((s) => s.telemetry?.run ?? null);
@@ -54,7 +69,7 @@ function Gate() {
   const holding = useRef(false);
 
   const acquire = () =>
-    rpc("teleop.acquire", undefined).then((r) => {
+    queued(() => rpc("teleop.acquire", undefined)).then((r) => {
       if (r?.granted) {
         holding.current = true;
         setPhase("hold");
@@ -66,17 +81,17 @@ function Gate() {
   useEffect(() => {
     if (!asked) void acquire();
     return () => {
-      if (holding.current) void getDogLink().gateway.rpc("teleop.release", undefined).catch(() => {});
+      if (holding.current) void queued(() => getDogLink().gateway.rpc("teleop.release", undefined)).catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const mission = missions.find((m) => m.id === run?.missionId);
 
-  if (phase === "hold") return <Controls />;
+  if (phase === "hold") return <Controls landscape={landscape} />;
 
   return (
-    <div className="space-y-3 p-4">
+    <div className={cn("space-y-3 p-4", landscape && "bg-background/80 absolute top-1/2 left-1/2 w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border backdrop-blur")}>
       {phase === "check" && (
         <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
           <Loader2 className="size-4 animate-spin" />
@@ -114,7 +129,7 @@ function Gate() {
       {(phase === "other" || phase === "requesting") && (
         <Prompt
           icon={<Hand className="size-5" />}
-          title={`${holder?.phone ?? "另一支手機"}（${holder?.role ?? "Operator"}）正在操控`}
+          title={`${holder?.phone ?? "另一支手機"}（${holder?.role ?? "操作員"}）正在操控`}
           body="同一時間只能有一支手機操控。請求接手後，對方 5 秒內沒有拒絕就會轉移給你。"
           confirm={phase === "requesting" ? "等待對方回應…" : "請求接手"}
           busy={phase === "requesting"}
@@ -171,7 +186,7 @@ function Prompt({
 
 // ── The live stick ──────────────────────────────────────────────────────────
 
-function Controls() {
+function Controls({ landscape }: { landscape: boolean }) {
   const t = useStore((s) => s.telemetry);
   const conn = useStore((s) => s.conn);
   const rtt = useStore((s) => s.rtt.level);
@@ -252,6 +267,57 @@ function Controls() {
 
   const rttText = rtt === "good" ? "良好" : rtt === "fair" ? "偏慢 · 限速 0.5" : "訊號不足";
 
+  const readouts = (
+    <Readouts
+      items={[
+        { label: "延遲", value: t?.rttMs ?? "—", unit: "ms", tone: rtt === "poor" ? "bad" : rtt === "fair" ? "warn" : "neutral" },
+        { label: "速度", value: (t?.speed ?? 0).toFixed(1), unit: "m/s" },
+        { label: "上限", value: cap.toFixed(1), unit: "m/s", tone: rtt === "fair" ? "warn" : "neutral" },
+        { label: "電量", value: Math.round(t?.battery ?? 0), unit: "%", tone: (t?.battery ?? 100) < 20 ? "bad" : (t?.battery ?? 100) < 35 ? "warn" : "neutral" },
+      ]}
+    />
+  );
+  const lockBadge = lock && (
+    <div className="pointer-events-none absolute inset-0 grid place-items-center">
+      <span className="bg-popover/95 rounded-lg border px-3 py-1.5 text-[13px] font-semibold shadow-lg">{lock}</span>
+    </div>
+  );
+
+  // §5 landscape: the map is the whole screen; sticks sit under the thumbs at
+  // the two bottom corners, readouts and speed top-right, posture between the
+  // sticks. Everything floats; the map stays tappable between them.
+  if (landscape)
+    return (
+      <div className="pointer-events-none absolute inset-0">
+        <div className="pointer-events-auto absolute top-[68px] right-2 w-[300px] space-y-1.5">
+          {readouts}
+          <div className="bg-surface/85 flex items-center gap-2 rounded-xl border px-3 backdrop-blur">
+            <span className="text-muted-foreground shrink-0 text-[11px]">上限</span>
+            <Slider label="速度上限" min={0.2} max={1.5} step={0.1} value={userCap} cap={globalCap} onChange={(v) => set({ userSpeedCap: v })} />
+          </div>
+        </div>
+        <div className="pointer-events-auto absolute bottom-3 left-4">
+          <Joystick label="移動搖桿：前後左右" hint="前後 · 平移" onChange={onLeft} disabled={!!lock} />
+        </div>
+        <div className="pointer-events-auto absolute right-4 bottom-3">
+          <Joystick label="轉向搖桿：轉向與相機俯仰" hint="轉向 · 俯仰" onChange={onRight} disabled={!!lock} />
+        </div>
+        <div className="pointer-events-auto absolute bottom-3 left-1/2 w-[330px] -translate-x-1/2 space-y-1.5">
+          {pausedByUs && idle && (
+            <Button className="w-full" onClick={() => void rpc("mission.resume", undefined)}>
+              <PlayCircle />
+              10 秒沒有操控 · 恢復巡邏
+            </Button>
+          )}
+          <div className="bg-surface/85 rounded-xl border p-1.5 backdrop-blur">
+            <PostureRow />
+          </div>
+        </div>
+        {lockBadge}
+        <span className="sr-only">連線品質：{rttText}</span>
+      </div>
+    );
+
   return (
     <div className="space-y-2 px-3 pt-0.5 pb-2">
       {t?.mode === "ESTOP" && t.estop && (
@@ -270,14 +336,7 @@ function Controls() {
         </div>
       )}
 
-      <Readouts
-        items={[
-          { label: "延遲", value: t?.rttMs ?? "—", unit: "ms", tone: rtt === "poor" ? "bad" : rtt === "fair" ? "warn" : "neutral" },
-          { label: "速度", value: (t?.speed ?? 0).toFixed(1), unit: "m/s" },
-          { label: "上限", value: cap.toFixed(1), unit: "m/s", tone: rtt === "fair" ? "warn" : "neutral" },
-          { label: "電量", value: Math.round(t?.battery ?? 0), unit: "%", tone: (t?.battery ?? 100) < 20 ? "bad" : (t?.battery ?? 100) < 35 ? "warn" : "neutral" },
-        ]}
-      />
+      {readouts}
       <span className="sr-only">連線品質：{rttText}</span>
 
       {/* Posture before the sticks: "recover" is the key needed right after an
@@ -294,11 +353,7 @@ function Controls() {
       <div className="relative flex items-start justify-around">
         <Joystick label="移動搖桿：前後左右" hint="前後 · 平移" onChange={onLeft} disabled={!!lock} />
         <Joystick label="轉向搖桿：轉向與相機俯仰" hint="轉向 · 俯仰" onChange={onRight} disabled={!!lock} />
-        {lock && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <span className="bg-popover/95 rounded-lg border px-3 py-1.5 text-[13px] font-semibold shadow-lg">{lock}</span>
-          </div>
-        )}
+        {lockBadge}
       </div>
     </div>
   );

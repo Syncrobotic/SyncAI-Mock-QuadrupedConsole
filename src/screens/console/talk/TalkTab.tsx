@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { LockedPanel, Modal, Slider } from "@/components/kit";
+import { IS_MOCK } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { set, useStore } from "@/store";
 import { rpc } from "@/store/controller";
@@ -17,18 +18,20 @@ import { ThermalLayer, Video } from "./Video";
 
 let micProbe: "unknown" | "granted" | "denied" = "unknown";
 
-export function TalkTab() {
+export function TalkTab({ landscape = false, videoMain = true, onSwap }: { landscape?: boolean; videoMain?: boolean; onSwap?: () => void }) {
   const access = useAccess("talk");
   if (access.locked)
     return (
-      <div className="p-4">
-        <LockedPanel reason={access.reason} detail={lockDetail(access.reason)} />
+      <div className={landscape ? "grid h-full place-items-center p-4" : "p-4"}>
+        <div className={landscape ? "w-full max-w-sm" : ""}>
+          <LockedPanel reason={access.reason} detail={lockDetail(access.reason)} />
+        </div>
       </div>
     );
-  return <Call />;
+  return <Call landscape={landscape} videoMain={videoMain} onSwap={onSwap} />;
 }
 
-function Call() {
+function Call({ landscape, videoMain, onSwap }: { landscape: boolean; videoMain: boolean; onSwap?: () => void }) {
   const session = useMediaSession();
   const call = useStore((s) => s.call);
   const snap = useStore((s) => s.snap);
@@ -71,32 +74,34 @@ function Call() {
     if (r) toast.success("快照已存到手機與狗端 artifacts");
   };
 
-  return (
-    <div className="space-y-2 px-3 pt-0.5 pb-4">
-      <div data-call-video className={cn("relative overflow-hidden rounded-xl bg-black", snap === 2 ? "aspect-[3/4]" : "aspect-video")}>
-        {session ? (
-          <Video stream={session.stream} mirror={call.facing === "user"} />
-        ) : (
-          <div className="grid h-full place-items-center text-white/60">
-            <Loader2 className="size-6 animate-spin" />
-          </div>
-        )}
-        {call.thermal && <ThermalLayer opacity={call.thermalOpacity} />}
-        <div className="absolute top-2 left-2 flex gap-1">
-          {session && <span className="rounded bg-black/55 px-1.5 py-0.5 font-mono text-[10px] text-white">{session.resolution}</span>}
-          {session && (
-            <span className={cn("rounded px-1.5 py-0.5 font-mono text-[10px]", latency > 800 ? "bg-red-600 text-white" : "bg-black/55 text-white")}>
-              {latency > 800 ? "延遲高 · " : ""}
-              {latency} ms
-            </span>
-          )}
-          {call.thermal && <span className="rounded bg-orange-600/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">熱像</span>}
+  const videoInner = (
+    <>
+      {session ? (
+        <Video stream={session.stream} mirror={call.facing === "user"} />
+      ) : (
+        <div className="grid h-full place-items-center text-white/60">
+          <Loader2 className="size-6 animate-spin" />
         </div>
-        <span className="absolute right-2 bottom-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/80">Mock · 手機前鏡頭</span>
+      )}
+      {call.thermal && <ThermalLayer opacity={call.thermalOpacity} />}
+      <div className="absolute top-2 left-2 flex gap-1">
+        {session && <span className="rounded bg-black/55 px-1.5 py-0.5 font-mono text-[10px] text-white">{session.resolution}</span>}
+        {session && (
+          <span className={cn("rounded px-1.5 py-0.5 font-mono text-[10px]", latency > 800 ? "bg-red-600 text-white" : "bg-black/55 text-white")}>
+            {latency > 800 ? "延遲高 · " : ""}
+            {latency} ms
+          </span>
+        )}
+        {call.thermal && <span className="rounded bg-orange-600/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">熱像</span>}
       </div>
+      {IS_MOCK && <span className="absolute right-2 bottom-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/80">MOCK · 手機前鏡頭</span>}
+    </>
+  );
 
-      {/* One row of what a guard uses mid-call; the rest behind "more". Two
-          full rows did not fit a 50% sheet on an SE (266px for 363px). */}
+  // One row of what a guard uses mid-call; the rest behind "more". Two full
+  // rows did not fit a 50% sheet on an SE (266px for 363px).
+  const controls = (
+    <>
       <div className="grid grid-cols-5 gap-1.5">
         <Ctl
           label={call.mic ? "麥克風開" : "麥克風"}
@@ -131,13 +136,6 @@ function Call() {
           <Ctl label="廣播" onClick={() => setBroadcastOpen(true)} icon={<Megaphone />} />
         </div>
       )}
-
-      {micDisabled && (
-        <p className="text-muted-foreground text-xs">
-          麥克風權限被拒，影像仍可看。要對現場說話，請到系統設定開啟麥克風權限。
-        </p>
-      )}
-
       {call.thermal && (
         <div className="flex items-center gap-3">
           <span className="text-muted-foreground shrink-0 text-[12px]">熱像透明度</span>
@@ -145,27 +143,64 @@ function Call() {
           <span className="w-10 text-right text-[12px] tabular-nums">{call.thermalOpacity}%</span>
         </div>
       )}
+    </>
+  );
 
-      <Modal open={broadcastOpen} onClose={() => setBroadcastOpen(false)}>
-        <p className="mb-3 text-lg font-semibold">從狗的喇叭播放</p>
-        <div className="space-y-1.5">
-          {(clips ?? []).map((c) => (
-            <button
-              key={c.id}
-              onClick={async () => {
-                setBroadcastOpen(false);
-                const ok = await rpc("media.broadcast", { clipId: c.id });
-                if (ok !== null) toast(`正在播放「${c.name}」`);
-              }}
-              className="hover:bg-accent flex h-12 w-full cursor-pointer items-center justify-between rounded-lg border px-3 text-left text-[14px]"
-            >
-              {c.name}
-              <span className="text-muted-foreground text-xs tabular-nums">{c.sec}s</span>
-            </button>
-          ))}
+  const broadcast = (
+    <Modal open={broadcastOpen} onClose={() => setBroadcastOpen(false)}>
+      <p className="mb-3 text-lg font-semibold">從狗的喇叭播放</p>
+      <div className="space-y-1.5">
+        {(clips ?? []).map((c) => (
+          <button
+            key={c.id}
+            onClick={async () => {
+              setBroadcastOpen(false);
+              const ok = await rpc("media.broadcast", { clipId: c.id });
+              if (ok !== null) toast(`正在播放「${c.name}」`);
+            }}
+            className="hover:bg-accent flex h-12 w-full cursor-pointer items-center justify-between rounded-lg border px-3 text-left text-[14px]"
+          >
+            {c.name}
+            <span className="text-muted-foreground text-xs tabular-nums">{c.sec}s</span>
+          </button>
+        ))}
+      </div>
+      <p className="text-muted-foreground mt-3 text-xs">擁有者可以在裝置頁上傳新的音檔。</p>
+    </Modal>
+  );
+
+  // §9 landscape: the video is the whole screen, controls float at the bottom,
+  // and the map shrinks to a corner window — tap either small window to swap.
+  if (landscape)
+    return (
+      <>
+        <div
+          data-call-video
+          onClick={videoMain ? undefined : onSwap}
+          className={cn(
+            "overflow-hidden bg-black",
+            videoMain ? "absolute inset-0" : "absolute right-3 bottom-3 z-20 aspect-video w-52 cursor-pointer rounded-xl border shadow-2xl ring-1 ring-white/15"
+          )}
+        >
+          {videoInner}
         </div>
-        <p className="text-muted-foreground mt-3 text-xs">Owner 可以在裝置頁上傳新的音檔。</p>
-      </Modal>
+        <div className="bg-surface/85 absolute bottom-3 left-3 z-10 w-[400px] space-y-1.5 rounded-2xl border p-1.5 backdrop-blur">{controls}</div>
+        {broadcast}
+      </>
+    );
+
+  return (
+    <div className="space-y-2 px-3 pt-0.5 pb-4">
+      <div data-call-video className={cn("relative overflow-hidden rounded-xl bg-black", snap === 2 ? "aspect-[3/4]" : "aspect-video")}>
+        {videoInner}
+      </div>
+      {controls}
+      {micDisabled && (
+        <p className="text-muted-foreground text-xs">
+          麥克風權限被拒，影像仍可看。要對現場說話，請到系統設定開啟麥克風權限。
+        </p>
+      )}
+      {broadcast}
     </div>
   );
 }

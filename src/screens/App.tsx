@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { useTheme } from "next-themes";
 
 import { PhoneFrame } from "@/components/PhoneFrame";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { useStore } from "@/store";
 import { boot, onVisibility } from "@/store/controller";
 
@@ -16,6 +17,8 @@ export function App() {
   const epoch = useStore((s) => s.linkEpoch);
   const toastBottom = useStore((s) => s.toastBottom);
   const { theme } = useTheme();
+
+  useKeyboardInset();
 
   useEffect(() => {
     boot();

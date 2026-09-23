@@ -26,6 +26,7 @@ export function ReviewPanel() {
   const role = useStore((s) => s.session?.role ?? s.credential?.role);
   const [, force] = useState(0);
   const scenario = useStore((s) => s.scenario);
+  const landscape = useStore((s) => s.forceLandscape);
   const world = mockWorld();
   const { theme, setTheme } = useTheme();
 
@@ -57,6 +58,10 @@ export function ReviewPanel() {
           <Readout label="狗" value={mode ? MODE_LABEL[mode] : "—"} sub={mode ?? "no telemetry"} />
           <Readout label="角色" value={role ?? "—"} sub="scopes" />
         </div>
+
+        <Group title="預覽">
+          <Toggle label="橫式（操控 / 通話）" on={landscape} onChange={() => useStore.setState({ forceLandscape: !landscape })} />
+        </Group>
 
         <Group title="場景 ?scenario=">
           <div className="space-y-1">
@@ -111,7 +116,7 @@ export function ReviewPanel() {
 
         {world && (
           <Group title="配對模擬">
-            <Toggle label="Owner 手機在線（第二隻狗核准）" on={world.dev.ownerOnline} onChange={act(() => (world.dev.ownerOnline = !world.dev.ownerOnline))} />
+            <Toggle label="擁有者手機在線（第二隻狗核准）" on={world.dev.ownerOnline} onChange={act(() => (world.dev.ownerOnline = !world.dev.ownerOnline))} />
             <Toggle label="BLE 不穩（前兩次連線失敗）" on={world.dev.bleFlaky} onChange={act(() => (world.dev.bleFlaky = !world.dev.bleFlaky))} />
             <Action onClick={act(() => clearLocalPairing())} className="mt-2 w-full">
               清除本機配對 → 重走 Onboarding
@@ -122,7 +127,7 @@ export function ReviewPanel() {
         <Group title="提示">
           <ul className="space-y-1 text-[11px] leading-relaxed text-white/55">
             <li>
-              連線不需確認碼；新狗由第一支手機成為 Owner
+              連線不需確認碼；新狗由第一支手機成為擁有者
             </li>
             <li>
               Wi-Fi 名稱含 <code className="font-mono text-white/80">fail</code> → 密碼錯；

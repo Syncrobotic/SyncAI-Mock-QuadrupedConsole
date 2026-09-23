@@ -105,7 +105,7 @@ export function Onboarding() {
           </div>
         </header>
       )}
-      <div className="scrollbar-none relative min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+      <div className="scrollbar-none relative min-h-0 flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),var(--kb,0px))]">
         {step === "welcome" && <StepWelcome {...props} />}
         {step === "scan" && <StepScan {...props} />}
         {step === "connect" && <StepConnect {...props} />}

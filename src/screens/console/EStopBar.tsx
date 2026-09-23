@@ -1,6 +1,6 @@
 "use client";
 
-import { Bluetooth, OctagonX, ShieldCheck } from "lucide-react";
+import { Bluetooth, Loader2, OctagonX, ShieldCheck } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,41 +16,82 @@ const HOLD_MS = 2000;
  * a guard's speed matters more than an accidental stop. Rendered OUTSIDE the
  * tab error boundary (§14) so a crashing tab cannot take it down.
  */
+type Phase = "idle" | "sending" | "ble_ack" | "unconfirmed";
+
 export function EStopBar() {
   const conn = useStore((s) => s.conn);
   const mode = useStore((s) => s.telemetry?.mode);
   const estopInfo = useStore((s) => s.telemetry?.estop ?? null);
   const isOwner = useStore((s) => !!s.session?.scopes.includes("admin"));
   const route = estopRoute(conn);
-  const [sending, setSending] = useState(false);
+  const [phase, setPhase] = useState<Phase>("idle");
+
+  // Leaving BLE-only (WS back) clears the BLE acknowledgement: from then on
+  // the dog's own ESTOP mode is the source of truth.
+  const [lastRoute, setLastRoute] = useState(route);
+  if (lastRoute !== route) {
+    setLastRoute(route);
+    if (phase === "ble_ack" && route === "ws") setPhase("idle");
+  }
 
   if (mode === "ESTOP" && route === "ws") return <Stopped by={estopInfo?.by} at={estopInfo?.at} canRelease={isOwner} />;
 
   const disabled = route === "disabled";
 
+  /**
+   * Feedback in steps, because "I pressed it" is not "it stopped":
+   *   sending     — the press registered, the frame is on its way
+   *   (ESTOP)     — over WS, the dog's telemetry says ESTOP → the bar flips
+   *   unconfirmed — no ESTOP within 1.5 s → say so, and keep the key live
+   *   ble_ack     — over BLE there is no telemetry; a write-with-response
+   *                 from bootstrapd is the acknowledgement we can get
+   */
+  const press = async () => {
+    setPhase("sending");
+    try {
+      await estop();
+    } catch {
+      setPhase("unconfirmed");
+      return;
+    }
+    if (route === "ble") {
+      setPhase("ble_ack");
+      toast.warning("E-Stop 已經由藍牙送達");
+      return;
+    }
+    const until = Date.now() + 1500;
+    while (Date.now() < until) {
+      if (useStore.getState().telemetry?.mode === "ESTOP") {
+        setPhase("idle");
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    setPhase("unconfirmed");
+  };
+
+  const label =
+    phase === "sending" ? "送出中…" : phase === "unconfirmed" ? "未確認 · 再按一次" : phase === "ble_ack" ? "已經由藍牙送達" : "E-STOP";
+
   return (
     <button
-      disabled={disabled || sending}
-      onClick={async () => {
-        setSending(true);
-        try {
-          await estop();
-          if (route === "ble") toast.warning("E-Stop 已經由藍牙送出");
-        } finally {
-          setSending(false);
-        }
-      }}
+      disabled={disabled || phase === "sending"}
+      onClick={() => void press()}
       aria-label={route === "ble" ? "緊急停止（經由藍牙）" : "緊急停止"}
+      aria-live="assertive"
       className={cn(
-        "relative z-[60] flex h-14 w-full shrink-0 cursor-pointer items-center justify-center gap-2.5 overflow-hidden rounded-xl text-[17px] font-black tracking-[0.18em] text-white uppercase select-none",
+        "relative z-[60] flex h-14 w-full shrink-0 cursor-pointer items-center justify-center gap-2.5 overflow-hidden rounded-xl text-white select-none",
+        phase === "idle" ? "text-[17px] font-black tracking-[0.18em] uppercase" : "text-[16px] font-bold tracking-normal",
         "from-estop to-estop-pressed bg-linear-to-b shadow-lg ring-1 shadow-red-900/30 ring-white/15 transition-[filter,transform] duration-100 hover:brightness-110 active:scale-[0.99] active:brightness-90",
         "focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none",
+        phase === "unconfirmed" && "animate-pulse ring-4 ring-white/70",
+        phase === "ble_ack" && "bg-estop-pressed bg-none",
         disabled && "bg-muted text-muted-foreground cursor-not-allowed bg-none shadow-none ring-0"
       )}
     >
-      {!disabled && <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-linear-to-r from-transparent via-white/50 to-transparent" />}
-      <OctagonX className="size-6" strokeWidth={2.5} />
-      E-STOP
+      {!disabled && phase === "idle" && <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-linear-to-r from-transparent via-white/50 to-transparent" />}
+      {phase === "sending" ? <Loader2 className="size-5 animate-spin" /> : <OctagonX className="size-6" strokeWidth={2.5} />}
+      {label}
       {route === "ble" && (
         <span className="absolute right-3 flex items-center gap-1 rounded-md bg-black/25 px-1.5 py-0.5 text-[10px] font-semibold tracking-normal normal-case">
           <Bluetooth className="size-3" />
@@ -88,7 +129,7 @@ function Stopped({ by, at, canRelease }: { by?: string; at?: number; canRelease:
       onPointerCancel={cancel}
       onContextMenu={(e) => e.preventDefault()}
       disabled={!canRelease}
-      aria-label={canRelease ? "長按 2 秒解除緊急停止" : "已緊急停止，需由 Owner 解除"}
+      aria-label={canRelease ? "長按 2 秒解除緊急停止" : "已緊急停止，需由擁有者解除"}
       className="bg-estop-pressed ring-estop/60 relative z-[60] flex h-14 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl text-white ring-2 select-none disabled:cursor-default"
     >
       {holding && (
@@ -101,7 +142,7 @@ function Stopped({ by, at, canRelease }: { by?: string; at?: number; canRelease:
       <span className="relative flex flex-col items-center leading-tight">
         <span className="flex items-center gap-1.5 text-[15px] font-bold">
           <OctagonX className="size-4" />
-          已緊急停止 · 由 Owner 解除
+          已緊急停止 · 由擁有者解除
         </span>
         <span className="text-[11px] text-white/75">
           {canRelease ? (

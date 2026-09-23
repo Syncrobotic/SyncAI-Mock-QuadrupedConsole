@@ -36,7 +36,7 @@ export function MissionEditor() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="bg-surface sticky top-0 z-10 flex items-center gap-2 border-b px-4 py-2">
+      <div className="bg-surface sticky top-0 z-10 flex items-center gap-2 border-b px-2 py-1">
         <Button size="icon" variant="ghost" onClick={closeEditor} aria-label="取消編輯">
           <X />
         </Button>
@@ -54,9 +54,11 @@ export function MissionEditor() {
         </Button>
       </div>
 
-      <div className="flex-1 space-y-6 px-4 pt-4 pb-8">
+      {/* Route first: at 50% the waypoints are what you are placing on the map
+          above, so they get the space; basics follow. */}
+      <div className="flex flex-1 flex-col gap-5 px-3 pt-3 pb-8">
         {/* 1 基本 */}
-        <section className="space-y-3">
+        <section className="order-2 space-y-3">
           <SectionTitle>1 · 基本</SectionTitle>
           <Field label="名稱">
             <input className={inputClass} value={d.name} onChange={(e) => patchDraft({ name: e.target.value })} />
@@ -68,7 +70,7 @@ export function MissionEditor() {
         </section>
 
         {/* 2 路線 */}
-        <section className="space-y-2">
+        <section className="order-1 space-y-2">
           <SectionTitle>2 · 路線 · {d.route.length} 個航點</SectionTitle>
           <p className="text-muted-foreground text-xs">
             約 {est.meters.toFixed(0)} m · {formatDuration(est.sec)} · 耗電約 {est.batteryPct.toFixed(0)}%
@@ -84,19 +86,19 @@ export function MissionEditor() {
         </section>
 
         {/* 3 觸發 */}
-        <section className="space-y-3">
+        <section className="order-3 space-y-3">
           <SectionTitle>3 · 觸發</SectionTitle>
           <TriggerEditor trigger={d.trigger} onChange={(trigger) => patchDraft({ trigger })} />
         </section>
 
         {/* 4 策略 */}
-        <section className="space-y-1">
+        <section className="order-4 space-y-1">
           <SectionTitle>4 · 策略</SectionTitle>
           <PolicyEditor mission={d} />
         </section>
 
         {/* 5 驗證 */}
-        <section className="space-y-2">
+        <section className="order-5 space-y-2">
           <SectionTitle>5 · 儲存前驗證</SectionTitle>
           {editor.issues.length === 0 && d.route.length > 0 && <p className="text-status-ok text-[13px]">航點可達、無時間重疊、電量足夠</p>}
           {[...errors, ...warnings].map((issue, i) => (
@@ -146,7 +148,7 @@ function WaypointItem({ wp, index, last }: { wp: Waypoint; index: number; last: 
         if (el && selected) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }}
     >
-      <div className="flex items-center gap-2 py-1.5 pr-1.5 pl-3">
+      <div className="flex items-center gap-1 py-0.5 pr-1 pl-2.5">
         <button
           onClick={() => set((s) => (s.editor ? { editor: { ...s.editor, selectedWp: selected ? null : wp.id } } : {}))}
           className="flex min-h-10 min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left"
@@ -154,15 +156,16 @@ function WaypointItem({ wp, index, last }: { wp: Waypoint; index: number; last: 
           <span className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white", error ? "bg-status-error" : "bg-[var(--map-path-planned)]")}>
             {index + 1}
           </span>
-          <span className="min-w-0">
-            <span className="block text-[13px] font-medium tabular-nums">
+          {/* One line per waypoint: coordinates, then what happens there. */}
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="shrink-0 text-[13px] font-medium tabular-nums">
               ({wp.x.toFixed(1)}, {wp.y.toFixed(1)})
             </span>
-            <span className="text-muted-foreground block truncate text-[11px]">{wp.actions.length ? wp.actions.map(actionLabel(plugins)).join(" → ") : "無動作"}</span>
+            <span className="text-muted-foreground truncate text-[11px]">{wp.actions.length ? wp.actions.map(actionLabel(plugins)).join(" → ") : "無動作"}</span>
           </span>
           <ChevronDown className={cn("text-muted-foreground ml-auto size-4 shrink-0 transition-transform", selected && "rotate-180")} />
         </button>
-        <Button size="icon-sm" variant="ghost" disabled={index === 0} onClick={() => moveWaypointOrder(wp.id, -1)} aria-label="上移">
+        <Button size="icon-sm" variant="ghost" className="shrink-0" disabled={index === 0} onClick={() => moveWaypointOrder(wp.id, -1)} aria-label="上移">
           <ArrowUp />
         </Button>
         <Button size="icon-sm" variant="ghost" disabled={last} onClick={() => moveWaypointOrder(wp.id, 1)} aria-label="下移">

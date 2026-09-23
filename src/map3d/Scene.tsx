@@ -20,7 +20,7 @@ import { useStore, set, get } from "@/store";
 import { useMapColors, type MapColors } from "./colors";
 import { lerpAngle, usePoseRef, type PoseRef } from "./pose";
 
-import type { Waypoint } from "@/proto/types";
+import type { FloorPlan, Waypoint } from "@/proto/types";
 
 /**
  * Map frame → three.js: x → X, y → −Z, z → Y (three is y-up).
@@ -34,7 +34,7 @@ const fromV = (v: THREE.Vector3) => ({ x: v.x, y: -v.z });
 
 type OrbitControlsImpl = React.ComponentRef<typeof OrbitControls>;
 
-export function Scene({ onLongPress }: { onLongPress: (x: number, y: number) => void }) {
+export function Scene({ onLongPress, labelHost }: { onLongPress: (x: number, y: number) => void; labelHost?: React.RefObject<HTMLDivElement | null> }) {
   const colors = useMapColors();
   const pose = usePoseRef();
   const view = useStore((s) => s.view);
@@ -67,7 +67,7 @@ export function Scene({ onLongPress }: { onLongPress: (x: number, y: number) => 
 
       {/* Follow view is for driving: walls go glassy so they stop filling the
           frame, and the point cloud comes on — it is the perception layer. */}
-      {layers.plan && <FloorPlanLayer colors={colors} labels={view !== "follow"} ghost={view === "follow"} />}
+      {layers.plan && <FloorPlanLayer colors={colors} labels={view !== "follow"} ghost={view === "follow"} labelHost={labelHost} />}
       {(layers.cloud || view === "follow") && <PointCloud dark={colors.dark} />}
       {layers.grid && <Occupancy colors={colors} />}
       {layers.trail && <Trail pose={pose} color={colors.trail} />}
@@ -163,7 +163,17 @@ function PointCloud({ dark }: { dark: boolean }) {
  * colour darkened to 62%. Plates, not blocks — extruded rooms read as roofs
  * and hide every robot inside them.
  */
-function FloorPlanLayer({ colors, labels, ghost }: { colors: MapColors; labels: boolean; ghost: boolean }) {
+function FloorPlanLayer({
+  colors,
+  labels,
+  ghost,
+  labelHost,
+}: {
+  colors: MapColors;
+  labels: boolean;
+  ghost: boolean;
+  labelHost?: React.RefObject<HTMLDivElement | null>;
+}) {
   const plan = useStore((s) => s.plan);
   const wallColor = useMemo(() => {
     const c = new THREE.Color(colors.line);
@@ -194,19 +204,11 @@ function FloorPlanLayer({ colors, labels, ghost }: { colors: MapColors; labels: 
               <boxGeometry args={[w - 0.04, PLATE, d - 0.04]} />
               <meshLambertMaterial color={zoneColor[z.type]} />
             </mesh>
-            {labels && (
-              <Html position={[cx, PLATE + 0.5, -cy]} center zIndexRange={[4, 0]} style={{ pointerEvents: "none" }}>
-                <span
-                  className="text-[10px] font-medium whitespace-nowrap"
-                  style={{ color: colors.poi, textShadow: `0 0 3px ${colors.ground}, 0 0 3px ${colors.ground}` }}
-                >
-                  {z.name}
-                </span>
-              </Html>
-            )}
+
           </group>
         );
       })}
+      {labels && labelHost && <ZoneLabels zones={plan.zones} colors={colors} host={labelHost} />}
       {plan.walls.map((b, i) => (
         <mesh key={`w${i}`} position={[(b.x1 + b.x2) / 2, PLATE + b.h / 2, -(b.y1 + b.y2) / 2]}>
           <boxGeometry args={[b.x2 - b.x1, b.h, b.y2 - b.y1]} />
@@ -221,6 +223,54 @@ function FloorPlanLayer({ colors, labels, ghost }: { colors: MapColors; labels: 
       ))}
     </group>
   );
+}
+
+/**
+ * Zone names, kept out of the chrome: each frame a label is hidden if its
+ * anchor projects under the status header (top 76px), into the view-button
+ * column (right 60px) or off the edge — they were drawn half-cut at the map's
+ * border and across the buttons.
+ *
+ * Plain DOM in a host layer MapView owns, positioned from `useFrame` — not
+ * drei `<Html>`, which mounts one React root per label (17 of them) and warns
+ * about synchronous unmounts whenever the canvas goes away.
+ */
+function ZoneLabels({ zones, colors, host }: { zones: FloorPlan["zones"]; colors: MapColors; host: React.RefObject<HTMLDivElement | null> }) {
+  const spans = useRef<HTMLSpanElement[]>([]);
+  const v = useMemo(() => new THREE.Vector3(), []);
+  const { camera, size } = useThree();
+  const anchors = useMemo(() => zones.map((z) => new THREE.Vector3((z.rect.x1 + z.rect.x2) / 2, PLATE + 0.5, -(z.rect.y1 + z.rect.y2) / 2)), [zones]);
+
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    spans.current = zones.map((z) => {
+      const span = document.createElement("span");
+      span.textContent = z.name;
+      span.className = "absolute top-0 left-0 text-[10px] font-medium whitespace-nowrap transition-opacity duration-150 will-change-transform";
+      span.style.color = colors.poi;
+      span.style.textShadow = `0 0 3px ${colors.ground}, 0 0 3px ${colors.ground}`;
+      el.appendChild(span);
+      return span;
+    });
+    return () => spans.current.forEach((sp) => sp.remove());
+  }, [zones, colors.poi, colors.ground, host]);
+
+  useFrame(() => {
+    anchors.forEach((p, i) => {
+      const el = spans.current[i];
+      if (!el) return;
+      v.copy(p).project(camera);
+      const x = ((v.x + 1) / 2) * size.width;
+      const y = ((1 - v.y) / 2) * size.height;
+      const half = el.offsetWidth / 2;
+      const ok = v.z < 1 && x - half > 6 && x + half < size.width - 60 && y > 76 && y < size.height - 10;
+      el.style.transform = `translate(${Math.round(x - half)}px, ${Math.round(y - 7)}px)`;
+      el.style.opacity = ok ? "1" : "0";
+    });
+  });
+
+  return null;
 }
 
 // ── 2.5D occupancy ───────────────────────────────────────────────────────────

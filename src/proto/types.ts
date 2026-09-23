@@ -18,9 +18,9 @@ export const ROLE_SCOPES: Record<Role, readonly Scope[]> = {
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
-  owner: "Owner",
-  operator: "Operator",
-  viewer: "Viewer",
+  owner: "擁有者",
+  operator: "操作員",
+  viewer: "檢視者",
 };
 
 // ── BLE / bootstrapd ─────────────────────────────────────────────────────────

@@ -92,7 +92,7 @@ function Approval() {
           拒絕
         </Button>
         <Button className="h-11" onClick={() => void answer(true)}>
-          核准為 Operator
+          核准為操作員
         </Button>
       </div>
     </Modal>

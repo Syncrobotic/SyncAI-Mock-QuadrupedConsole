@@ -54,7 +54,7 @@ export function Modal({
           transition={{ duration: 0.15 }}
           onClick={() => dismissable && onClose?.()}
         >
-          <div className="absolute inset-x-0 flex items-center justify-center p-3" style={band}>
+          <div className="absolute inset-x-0 flex items-center justify-center p-3 pb-[max(0.75rem,var(--kb,0px))]" style={band}>
           <m.div
             role="dialog"
             aria-modal

@@ -239,7 +239,7 @@ export class MockWorld {
     this.estop = null;
     this.estopLyingAt = null;
     this.setMode(this.teleopHolder ? "TELEOP" : this.run ? "PAUSED" : "IDLE");
-    this.emitEvent("estop", "info", "E-Stop 已由 Owner 解除");
+    this.emitEvent("estop", "info", "E-Stop 已由擁有者解除");
   }
 
   acquireTeleop(): { granted: boolean; holder?: string } {
@@ -371,7 +371,7 @@ export class MockWorld {
   fire(what: "estop_remote" | "gateway_down" | "revoked" | "fault") {
     switch (what) {
       case "estop_remote":
-        this.triggerEstop("夜班 · Pixel 8（Operator）");
+        this.triggerEstop("夜班 · Pixel 8（操作員）");
         break;
       case "gateway_down":
         this.gatewayState = "down";
@@ -382,7 +382,7 @@ export class MockWorld {
         }
         break;
       case "revoked":
-        this.emitEvent("revoked", "critical", "本機已被 Owner 撤銷");
+        this.emitEvent("revoked", "critical", "本機已被擁有者撤銷");
         this.close();
         this.closed.emit({ reason: "revoked" });
         break;
@@ -402,7 +402,7 @@ export class MockWorld {
 
   async restartGateway() {
     this.gatewayState = "down";
-    this.health.emit({ state: "down", lastError: "RESTART_GATEWAY（Owner 簽名指令）" });
+    this.health.emit({ state: "down", lastError: "RESTART_GATEWAY（擁有者簽名指令）" });
     if (this.wsOpen) {
       this.close();
       this.closed.emit({ reason: "gateway_down" });
@@ -425,7 +425,7 @@ export class MockWorld {
       pending: true,
     };
     this.phones.push(phone);
-    this.emitEvent("approval", "warning", `序號 4E19 的手機請求加入為 Operator`, phone.id);
+    this.emitEvent("approval", "warning", `序號 4E19 的手機請求加入為操作員`, phone.id);
   }
 
   // ── Tick ─────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { getDogLink } from "@/link";
 import { SCENARIOS, SCENARIO_IDS } from "@/link/mock/scenarios";
 import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_LABEL, isCompleteKey } from "@/lib/license";
+import { IS_MOCK } from "@/lib/env";
 import { cn, formatClock } from "@/lib/utils";
 import { ROLE_LABEL, type GatewayHealthState, type Role, type WifiStatus } from "@/proto/types";
 import { set, useStore } from "@/store";
@@ -182,7 +183,7 @@ function Health({ owner }: { owner: boolean }) {
                   : "長按 2 秒重啟 Gateway"}
             </span>
           </button>
-          <p className="text-muted-foreground text-xs">重啟指令一律經藍牙送出並由本機 Owner 金鑰簽名，連線正常時也一樣。</p>
+          <p className="text-muted-foreground text-xs">重啟指令一律經藍牙送出並由本機擁有者金鑰簽名，連線正常時也一樣。</p>
         </>
       )}
     </section>
@@ -237,7 +238,7 @@ function Phones({ owner }: { owner: boolean }) {
         {target && !confirmRevoke && (
           <>
             <p className="text-lg font-semibold">{target.nickname}</p>
-            <p className="text-muted-foreground mt-0.5 mb-4 text-sm">{target.pending ? "請求加入為 Operator" : `目前角色：${ROLE_LABEL[target.role]}`}</p>
+            <p className="text-muted-foreground mt-0.5 mb-4 text-sm">{target.pending ? "請求加入為操作員" : `目前角色：${ROLE_LABEL[target.role]}`}</p>
             {target.pending ? (
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={async () => { await rpc("device.approve", { phoneId: target.id, approve: false }); await refreshPhones(); close(); }}>
@@ -252,8 +253,8 @@ function Phones({ owner }: { owner: boolean }) {
                 <Segmented<Role>
                   value={target.role}
                   options={[
-                    { value: "operator", label: "Operator" },
-                    { value: "viewer", label: "Viewer" },
+                    { value: "operator", label: "操作員" },
+                    { value: "viewer", label: "檢視者" },
                   ]}
                   onChange={async (role) => {
                     await rpc("device.setRole", { phoneId: target.id, role });
@@ -368,7 +369,7 @@ function Safety({ owner }: { owner: boolean }) {
   };
   return (
     <section className="space-y-2">
-      <SectionTitle description="Operator 只能在這些限制內操作">安全</SectionTitle>
+      <SectionTitle description="操作員只能在這些限制內操作">安全</SectionTitle>
       <Card className="divide-y py-1">
         <div className="py-2">
           <div className="flex items-center justify-between text-[14px]">
@@ -376,7 +377,7 @@ function Safety({ owner }: { owner: boolean }) {
             <span className="font-semibold tabular-nums">{safety.speedLimit.toFixed(1)} m/s</span>
           </div>
           {owner && <Slider label="全域速度上限" min={0.2} max={1.5} step={0.1} value={safety.speedLimit} onChange={(v) => void patch({ speedLimit: v })} />}
-          <p className="text-muted-foreground text-xs">Operator 只能在這個上限內調整操控速度。</p>
+          <p className="text-muted-foreground text-xs">操作員只能在這個上限內調整操控速度。</p>
         </div>
         <Row label="圍欄外行為">
           {owner ? (
@@ -604,7 +605,7 @@ function Local() {
   const [confirm, setConfirm] = useState(false);
   const [taps, setTaps] = useState(0);
   const scenario = useStore((s) => s.scenario);
-  const dev = taps >= 5;
+  const dev = IS_MOCK && taps >= 5;
   return (
     <section className="space-y-2">
       <SectionTitle description="這支手機上的配對資料">本機</SectionTitle>
@@ -630,7 +631,7 @@ function Local() {
       )}
       <Modal open={confirm} onClose={() => setConfirm(false)}>
         <p className="text-lg font-semibold">清除本機配對資料？</p>
-        <p className="text-muted-foreground mt-1 text-sm">這支手機會忘記這隻狗並退回 Onboarding。狗上的配對紀錄要由 Owner 撤銷。</p>
+        <p className="text-muted-foreground mt-1 text-sm">這支手機會忘記這隻狗並退回 Onboarding。狗上的配對紀錄要由擁有者撤銷。</p>
         <div className="mt-5 grid grid-cols-2 gap-2">
           <Button variant="outline" className="h-11" onClick={() => setConfirm(false)}>
             取消

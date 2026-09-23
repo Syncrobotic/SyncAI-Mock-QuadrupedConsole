@@ -94,6 +94,8 @@ export interface State {
   snapshotViewer: { wp: number; at: number } | null;
   /** Px from the frame bottom to just above the E-Stop — where toasts go in the Console. */
   toastBottom: number | null;
+  /** Review panel: render the frame sideways to preview §5 landscape. */
+  forceLandscape: boolean;
 }
 
 export const useStore = create<State>(() => ({
@@ -138,6 +140,7 @@ export const useStore = create<State>(() => ({
   userSpeedCap: 0.8,
   snapshotViewer: null,
   toastBottom: null,
+  forceLandscape: false,
 }));
 
 export const set = useStore.setState;

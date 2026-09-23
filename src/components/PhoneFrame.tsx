@@ -1,5 +1,9 @@
 "use client";
 
+import { IS_MOCK } from "@/lib/env";
+import { cn } from "@/lib/utils";
+import { useStore } from "@/store";
+
 import { ReviewPanel } from "./ReviewPanel";
 
 /**
@@ -12,12 +16,18 @@ import { ReviewPanel } from "./ReviewPanel";
  * in the app is clipped to the phone instead of the browser window.
  */
 export function PhoneFrame({ children }: { children: React.ReactNode }) {
+  const landscape = useStore((s) => s.forceLandscape);
   return (
-    <div className="bg-surface-sunken flex min-h-dvh items-center justify-center gap-10 sm:p-6">
-      <div className="bg-background relative flex h-dvh w-full transform-gpu flex-col overflow-hidden sm:h-[844px] sm:max-h-[calc(100dvh-3rem)] sm:w-[390px] sm:rounded-[2.75rem] sm:border-[10px] sm:border-neutral-800 sm:shadow-2xl">
+    <div className={cn("bg-surface-sunken flex min-h-dvh items-center justify-center gap-10 sm:p-6", landscape && "flex-col gap-6")}>
+      <div
+        className={cn(
+          "bg-background relative flex h-dvh w-full transform-gpu flex-col overflow-hidden sm:rounded-[2.75rem] sm:border-[10px] sm:border-neutral-800 sm:shadow-2xl",
+          landscape ? "sm:h-[390px] sm:w-[844px]" : "sm:h-[844px] sm:max-h-[calc(100dvh-3rem)] sm:w-[390px]"
+        )}
+      >
         {children}
       </div>
-      <ReviewPanel />
+      {IS_MOCK && <ReviewPanel />}
     </div>
   );
 }

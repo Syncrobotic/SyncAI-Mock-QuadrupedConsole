@@ -15,12 +15,13 @@ import { Scene } from "./Scene";
  * The main viewport (§5): the 3D map fills everything above the E-Stop.
  * Floating view buttons sit right, per the §5 wireframe.
  */
-export function MapView() {
+export function MapView({ bare = false }: { bare?: boolean }) {
   const conn = useStore((s) => s.conn);
   const view = useStore((s) => s.view);
   const statusOpen = useStore((s) => s.statusOpen);
   const stale = !isLive(conn);
   const box = useRef<HTMLDivElement>(null);
+  const labels = useRef<HTMLDivElement>(null);
   const [short, setShort] = useState(false);
 
   // On a short map (teleop on an SE: 179px) a vertical stack of three 44px
@@ -43,11 +44,12 @@ export function MapView() {
           gl={{ antialias: true, powerPreference: "high-performance" }}
           onPointerMissed={() => set({ measure: null })}
         >
-          <Scene onLongPress={onMapLongPress} />
+          <Scene onLongPress={onMapLongPress} labelHost={labels} />
         </Canvas>
+        <div ref={labels} aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" />
       </div>
 
-      {!statusOpen && <ViewButtons view={view} horizontal={short} />}
+      {!statusOpen && !bare && <ViewButtons view={view} horizontal={short} />}
     </div>
   );
 }

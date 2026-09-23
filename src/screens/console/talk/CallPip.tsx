@@ -20,7 +20,7 @@ type Corner = "tl" | "tr" | "bl" | "br";
  * so it never lands on the status header (top) or the view buttons (right
  * column) — on an SE it used to sit on "follow".
  */
-export function CallPip() {
+export function CallPip({ landscape = false }: { landscape?: boolean }) {
   const active = useStore((s) => s.call.active);
   const tab = useStore((s) => s.tab);
   const mic = useStore((s) => s.call.mic || s.call.ptt);
@@ -48,7 +48,7 @@ export function CallPip() {
   const onUp = () => {
     const s = start.current;
     start.current = null;
-    if (!s?.moved) {
+    if (!s?.moved || landscape) {
       set({ tab: "talk" });
       return;
     }
@@ -75,10 +75,13 @@ export function CallPip() {
       className={cn(
         "absolute z-10 aspect-video w-32 cursor-pointer touch-none overflow-hidden rounded-xl border bg-black shadow-2xl ring-1 ring-white/15",
         !drag && "transition-[top,left,right,bottom] duration-200 ease-out",
-        corner === "tl" && "top-[72px] left-2",
-        corner === "tr" && "top-[72px] right-2",
-        corner === "bl" && "bottom-2 left-2",
-        corner === "br" && "right-[60px] bottom-2"
+        // Landscape: the bottom corners are the joysticks and the top-right is
+        // the readouts, so it lives top-left under the header, and stays there.
+        landscape && "top-[104px] left-3",
+        !landscape && corner === "tl" && "top-[72px] left-2",
+        !landscape && corner === "tr" && "top-[72px] right-2",
+        !landscape && corner === "bl" && "bottom-2 left-2",
+        !landscape && corner === "br" && "right-[60px] bottom-2"
       )}
       style={drag ? { translate: `${drag.dx}px ${drag.dy}px` } : undefined}
       aria-label="回到通話（可拖曳）"
