@@ -196,11 +196,11 @@ async (page) => {
   try {
   await page.goto("http://localhost:3200/?scenario=default");
   await wait(3000);
-  for (const tab of ["操控", "任務", "通話", "裝置"]) {
+  for (const tab of ["操控", "任務", "事件", "裝置"]) {
     const t = page.getByRole("tab", { name: tab });
     if (!(await t.count())) continue;
     await t.click();
-    await wait(tab === "通話" ? 4000 : 900);
+    await wait(900);
     await page.evaluate(() => window.__qcSet?.({ snap: 1 }));
     await wait(450);
     await audit(`console ${tab}`);
