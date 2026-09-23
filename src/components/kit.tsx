@@ -58,7 +58,7 @@ export function Modal({
           <m.div
             role="dialog"
             aria-modal
-            className={cn("bg-popover text-popover-foreground max-h-full w-full max-w-sm overflow-y-auto rounded-2xl border p-5 shadow-2xl", className)}
+            className={cn("bg-popover text-popover-foreground max-h-full w-full max-w-sm overflow-y-auto rounded-2xl border p-4 text-[13px] shadow-2xl", className)}
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 16, opacity: 0 }}
@@ -80,8 +80,8 @@ export function SectionTitle({ children, description, action }: { children: Reac
   return (
     <div className="flex items-end justify-between gap-3">
       <div className="min-w-0">
-        <h3 className="text-[15px] leading-tight font-semibold">{children}</h3>
-        {description && <p className="text-muted-foreground mt-0.5 text-[12px]">{description}</p>}
+        <h3 className="text-[14px] leading-tight font-semibold">{children}</h3>
+        {description && <p className="text-muted-foreground mt-0.5 text-[11px]">{description}</p>}
       </div>
       {action}
     </div>
@@ -96,7 +96,7 @@ export function IconPlate({ icon: Icon, size = "md" }: { icon: LucideIcon; size?
     <span
       className={cn(
         "bg-primary/10 text-primary-accent dark:bg-primary/20 grid shrink-0 place-items-center",
-        size === "sm" ? "size-8 rounded-lg [&_svg]:size-4" : "size-10 rounded-xl [&_svg]:size-5"
+        size === "sm" ? "size-7 rounded-lg [&_svg]:size-3.5" : "size-9 rounded-xl [&_svg]:size-4.5"
       )}
     >
       <Icon />
@@ -151,9 +151,9 @@ export function Readouts({ items }: { items: { label: string; value: ReactNode; 
       />
       <div className="relative grid auto-cols-fr grid-flow-col divide-x divide-white/6">
         {items.map((it) => (
-          <div key={it.label} className="px-3 py-2.5">
+          <div key={it.label} className="px-2.5 py-1.5">
             <p className="text-[10px] tracking-wide text-white/45 uppercase">{it.label}</p>
-            <p className={cn("mt-1 text-[20px] leading-none font-bold tabular-nums", READOUT_TONE[it.tone ?? "neutral"])}>
+            <p className={cn("mt-0.5 text-[17px] leading-none font-bold tabular-nums", READOUT_TONE[it.tone ?? "neutral"])}>
               {it.value}
               {it.unit && <span className="ml-0.5 text-[11px] font-medium text-white/45">{it.unit}</span>}
             </p>
@@ -168,7 +168,7 @@ export function Readouts({ items }: { items: { label: string; value: ReactNode; 
 
 export function LockedPanel({ reason, detail, children }: { reason: string; detail?: string; children?: ReactNode }) {
   return (
-    <div className="bg-surface-sunken text-muted-foreground flex flex-col items-center gap-2 rounded-xl border border-dashed p-6 text-center">
+    <div className="bg-surface-sunken text-muted-foreground flex flex-col items-center gap-1.5 rounded-xl border border-dashed p-4 text-center">
       <span className="bg-muted grid size-10 place-items-center rounded-full">
         <Lock className="size-4" />
       </span>
@@ -204,7 +204,7 @@ export function Segmented<T extends string>({
           disabled={disabled}
           onClick={() => onChange(o.value)}
           className={cn(
-            "h-9 cursor-pointer rounded-md px-2 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none disabled:cursor-not-allowed",
+            "h-8 cursor-pointer rounded-md px-2 text-[12px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none disabled:cursor-not-allowed",
             value === o.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -278,7 +278,7 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 }
 
 export const inputClass =
-  "bg-background border-input h-11 w-full rounded-lg border px-3 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 aria-invalid:border-destructive";
+  "bg-background border-input h-10 w-full rounded-lg border px-3 text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 aria-invalid:border-destructive";
 
 export function Select<T extends string>({
   value,
@@ -301,7 +301,7 @@ export function Select<T extends string>({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as T)}
-      className={cn(inputClass, "h-11 cursor-pointer text-[14px]", className)}
+      className={cn(inputClass, "h-9 cursor-pointer px-2 text-[13px]", className)}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -315,18 +315,18 @@ export function Select<T extends string>({
 /** A list row: label left, value/control right. 44pt minimum. */
 export function Row({ label, sub, children, className }: { label: ReactNode; sub?: ReactNode; children?: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex min-h-11 items-center justify-between gap-3 py-1.5", className)}>
+    <div className={cn("flex min-h-10 items-center justify-between gap-3 py-1", className)}>
       <div className="min-w-0">
-        <p className="truncate text-[14px]">{label}</p>
-        {sub && <p className="text-muted-foreground truncate text-xs">{sub}</p>}
+        <p className="truncate text-[13px]">{label}</p>
+        {sub && <p className="text-muted-foreground truncate text-[11px]">{sub}</p>}
       </div>
-      {children !== undefined && <div className="flex shrink-0 items-center gap-2 text-[14px] tabular-nums">{children}</div>}
+      {children !== undefined && <div className="flex shrink-0 items-center gap-2 text-[13px] tabular-nums">{children}</div>}
     </div>
   );
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("bg-card rounded-xl border p-3.5", className)}>{children}</div>;
+  return <div className={cn("bg-card rounded-xl border px-3 py-2.5", className)}>{children}</div>;
 }
 
 // ── Tone pill (dashboard StatusBadge semantics: dot + hue) ──────────────────
@@ -343,7 +343,7 @@ export type Tone = keyof typeof TONE;
 
 export function Pill({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return (
-    <span className={cn("inline-flex h-6 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium whitespace-nowrap", TONE[tone], className)}>
+    <span className={cn("inline-flex h-5 shrink-0 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium whitespace-nowrap", TONE[tone], className)}>
       <span aria-hidden className="size-1.5 rounded-full bg-current" />
       {children}
     </span>

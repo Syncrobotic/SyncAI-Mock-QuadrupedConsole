@@ -100,10 +100,10 @@ export function Console() {
   const ESTOP = 56;
   const COLLAPSED_HEADER = 64;
   let sheetH = Math.round(usable * SNAP_PCT[snap]);
-  // Teleop is locked at "50%" — but on a short phone 50% cannot hold sticks
-  // AND the posture keys (measured: 266px for 360px of content on an SE), and
+  // Teleop's open height: on a short phone 50% cannot hold the sticks AND the
+  // posture keys (measured: 266px for 360px of content on an SE), and
   // "recover" is the key you need right after an E-Stop. It takes up to 62%.
-  if (tab === "teleop") sheetH = Math.round(Math.max(usable * 0.5, Math.min(usable * 0.62, 400)));
+  if (tab === "teleop" && snap > 0) sheetH = Math.round(Math.max(usable * 0.5, Math.min(usable * 0.62, 380)));
   // At 90% the map would be a 57–73px sliver entirely covered by its own
   // header. Collapse it to the header instead, and give the rest to the sheet.
   const collapsed = snap === 2 && tab !== "teleop";
@@ -117,7 +117,7 @@ export function Console() {
   if (unlicensed)
     return (
       <div ref={root} className={shell}>
-        <div className="bg-surface relative min-h-0 flex-1 overflow-y-auto rounded-xl border">
+        <div className="bg-surface relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
           <LicenseGate />
         </div>
         <div ref={estop}>
@@ -161,18 +161,21 @@ export function Console() {
 function Sheet({ height, usable }: { height: number; usable: number }) {
   const tab = useStore((s) => s.tab);
   const snap = useStore((s) => s.snap);
-  const locked = tab === "teleop";
+  // Teleop can be dragged too (it used to be locked at 50% per §7 — reviewers
+  // could not find the handle doing anything). It moves between the 20% summary
+  // and its own height only: 90% would collapse the map while driving.
+  const maxSnap: SheetSnap = tab === "teleop" ? 1 : 2;
   const drag = useRef<{ y: number; h: number } | null>(null);
   const [live, setLive] = useState<number | null>(null);
 
   const onDown = (e: React.PointerEvent) => {
-    if (locked) return;
     drag.current = { y: e.clientY, h: height };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onMove = (e: React.PointerEvent) => {
     if (!drag.current) return;
-    setLive(Math.max(usable * 0.15, Math.min(usable * 0.84, drag.current.h + drag.current.y - e.clientY)));
+    const top = maxSnap === 1 ? height : usable * 0.84;
+    setLive(Math.max(usable * 0.15, Math.min(Math.max(top, drag.current.h), drag.current.h + drag.current.y - e.clientY)));
   };
   const onUp = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -181,13 +184,13 @@ function Sheet({ height, usable }: { height: number; usable: number }) {
     const h = live ?? d.h;
     setLive(null);
     if (Math.abs(e.clientY - d.y) < 6) {
-      // A tap on the handle steps up; from the top it drops back to the middle.
-      set({ snap: snap === 2 ? 1 : ((snap + 1) as SheetSnap) });
+      // A tap on the handle steps up; from the top it drops back down.
+      set({ snap: snap >= maxSnap ? (maxSnap === 1 ? 0 : 1) : ((snap + 1) as SheetSnap) });
       return;
     }
     const pct = h / usable;
     const nearest = SNAP_PCT.reduce((best, p, i) => (Math.abs(p - pct) < Math.abs(SNAP_PCT[best] - pct) ? i : best), 0);
-    set({ snap: nearest as SheetSnap });
+    set({ snap: Math.min(nearest, maxSnap) as SheetSnap });
   };
 
   return (
@@ -198,13 +201,15 @@ function Sheet({ height, usable }: { height: number; usable: number }) {
       )}
       style={{ height: live ?? height }}
     >
-      <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} className={cn("shrink-0 touch-none", !locked && "cursor-grab active:cursor-grabbing")}>
-        <div className="flex justify-center pt-1.5 pb-1">
-          <span className={cn("h-1 w-9 rounded-full", locked ? "bg-muted-foreground/15" : "bg-muted-foreground/35")} />
+      {/* The whole strip is the grab area — the bar and the gaps around the
+          tabs, not just a 4px pill. */}
+      <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} className="shrink-0 cursor-grab touch-none pb-1 active:cursor-grabbing" aria-label="拖曳調整面板高度">
+        <div className="flex h-4 items-center justify-center">
+          <span className="bg-muted-foreground/40 h-1 w-10 rounded-full" />
         </div>
         <TabBar />
       </div>
-      <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain pt-2 pb-[var(--kb,0px)]">
+      <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1.5 pb-[var(--kb,0px)]">
         <TabBoundary resetKey={tab}>{snap === 0 ? <Summary /> : <TabContent />}</TabBoundary>
       </div>
     </div>
@@ -232,13 +237,13 @@ function TabButton({ id, label, icon: Icon, active }: { id: Tab; label: string; 
       onPointerDown={(e) => e.stopPropagation()}
       onClick={() => set((s) => ({ tab: id, snap: s.snap === 0 ? 1 : s.snap }))}
       className={cn(
-        "group relative flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none",
+        "group relative flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-[12px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none",
         active ? "font-semibold text-white" : "text-muted-foreground hover:text-foreground hover:bg-violet-500/8"
       )}
     >
-      {active && <ActivePlate />}
+      {active && <ActivePlate className="rounded-lg" />}
       <span className="relative flex items-center gap-1.5">
-        {access.locked ? <Lock className="size-4 opacity-70" /> : <Icon className="size-4" />}
+        {access.locked ? <Lock className="size-3.5 opacity-70" /> : <Icon className="size-3.5" />}
         {label}
       </span>
     </button>

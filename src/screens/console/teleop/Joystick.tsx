@@ -4,8 +4,8 @@ import { useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-const SIZE = 124;
-const KNOB = 52;
+const SIZE = 116;
+const KNOB = 48;
 const TRAVEL = (SIZE - KNOB) / 2;
 
 /**

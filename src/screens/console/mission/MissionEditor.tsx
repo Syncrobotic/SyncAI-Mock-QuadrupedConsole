@@ -40,7 +40,7 @@ export function MissionEditor() {
         <Button size="icon" variant="ghost" onClick={closeEditor} aria-label="取消編輯">
           <X />
         </Button>
-        <p className="flex-1 truncate text-[15px] font-semibold">{editor.isNew ? "新任務" : "編輯任務"}</p>
+        <p className="flex-1 truncate text-[14px] font-semibold">{editor.isNew ? "新任務" : "編輯任務"}</p>
         <Button
           loading={saving}
           disabled={errors.length > 0 || d.route.length === 0}
@@ -63,7 +63,7 @@ export function MissionEditor() {
           <Field label="名稱">
             <input className={inputClass} value={d.name} onChange={(e) => patchDraft({ name: e.target.value })} />
           </Field>
-          <label className="flex min-h-11 items-center justify-between">
+          <label className="flex min-h-10 items-center justify-between text-[13px]">
             <span className="text-[14px]">啟用</span>
             <Switch checked={d.enabled} onCheckedChange={(v) => patchDraft({ enabled: v })} />
           </label>
@@ -437,7 +437,7 @@ function PolicyEditor({ mission }: { mission: Mission }) {
   const patch = (x: Partial<Mission["policy"]>) => patchDraft({ policy: { ...p, ...x } });
   return (
     <div className="divide-y">
-      <div className="flex min-h-12 items-center justify-between gap-3">
+      <div className="flex min-h-10 items-center justify-between gap-3 text-[13px]">
         <span className="text-[14px]">低電量時</span>
         <Select
           label="低電量時"
@@ -450,7 +450,7 @@ function PolicyEditor({ mission }: { mission: Mission }) {
           onChange={(onLowBattery) => patch({ onLowBattery })}
         />
       </div>
-      <div className="flex min-h-12 items-center justify-between gap-3">
+      <div className="flex min-h-10 items-center justify-between gap-3 text-[13px]">
         <span className="text-[14px]">遇到障礙</span>
         <div className="flex items-center gap-1.5">
           {p.onObstacle === "wait" && (
@@ -469,11 +469,11 @@ function PolicyEditor({ mission }: { mission: Mission }) {
           />
         </div>
       </div>
-      <label className="flex min-h-12 items-center justify-between gap-3">
+      <label className="flex min-h-10 items-center justify-between gap-3 text-[13px]">
         <span className="text-[14px]">允許操控搶佔</span>
         <Switch checked={p.allowTeleopPreempt} onCheckedChange={(allowTeleopPreempt) => patch({ allowTeleopPreempt })} />
       </label>
-      <label className="flex min-h-12 items-center justify-between gap-3">
+      <label className="flex min-h-10 items-center justify-between gap-3 text-[13px]">
         <span className="text-[14px]">結束後返回充電座</span>
         <Switch checked={mission.returnToDock} onCheckedChange={(returnToDock) => patchDraft({ returnToDock })} />
       </label>

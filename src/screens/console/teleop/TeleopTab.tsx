@@ -167,7 +167,7 @@ function Prompt({
       <p className="font-semibold">{title}</p>
       <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">{body}</p>
       <Button
-        className="mt-4 h-11 w-full"
+        className="mt-3 w-full"
         loading={pending || busy}
         onClick={async () => {
           setPending(true);
@@ -387,7 +387,7 @@ function PostureRow() {
           key={p.id}
           variant={posture === p.id ? "secondary" : "outline"}
           size="sm"
-          className="h-11 flex-1 px-0"
+          className="h-9 flex-1 px-0"
           disabled={moving || blocked || pending !== null}
           loading={pending === p.id}
           onClick={async () => {
@@ -406,7 +406,7 @@ function PostureRow() {
         options={GAITS}
         disabled={moving || blocked}
         onChange={(g) => void rpc("gait.set", { gait: g })}
-        className="h-11 w-[104px] shrink-0 text-[12px]"
+        className="w-[100px] shrink-0 text-[12px]"
       />
     </div>
   );

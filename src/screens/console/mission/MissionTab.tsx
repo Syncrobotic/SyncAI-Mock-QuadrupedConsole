@@ -63,13 +63,13 @@ function MissionList() {
   const run = useStore((s) => s.telemetry?.run ?? null);
 
   return (
-    <div className="space-y-4 px-4 pt-2 pb-6">
+    <div className="space-y-3 px-3 pt-1 pb-4">
       {run && <RunCard />}
       <div className="space-y-2">
         <SectionTitle
           description="存在狗上，依排程或事件觸發"
           action={
-            <Button size="sm" variant="ghost" className="text-primary-accent -mr-2 h-11" onClick={() => openEditor()}>
+            <Button size="sm" variant="ghost" className="text-primary-accent -mr-2" onClick={() => openEditor()}>
               <Plus />
               新任務
             </Button>
@@ -123,31 +123,31 @@ function RunCard() {
       {paused && run.pausedReason && <p className="text-severity-warning text-[13px]">暫停原因：{run.pausedReason}</p>}
       <div className="grid grid-cols-2 gap-2">
         {paused ? (
-          <Button className="h-11" onClick={() => void rpc("mission.resume", undefined)}>
+          <Button  onClick={() => void rpc("mission.resume", undefined)}>
             <Play />
             恢復
           </Button>
         ) : (
-          <Button variant="secondary" className="h-11" onClick={() => void rpc("mission.pause", { reason: "使用者暫停" })}>
+          <Button variant="secondary"  onClick={() => void rpc("mission.pause", { reason: "使用者暫停" })}>
             <Pause />
             暫停
           </Button>
         )}
-        <Button variant="outline" className="h-11" onClick={() => setConfirmAbort(true)}>
+        <Button variant="outline"  onClick={() => setConfirmAbort(true)}>
           <Square />
           中止
         </Button>
       </div>
       <Modal open={confirmAbort} onClose={() => setConfirmAbort(false)}>
-        <p className="text-lg font-semibold">中止任務？</p>
+        <p className="text-[16px] font-semibold">中止任務？</p>
         <p className="text-muted-foreground mt-1 text-sm">狗會停在原地，這次執行會記為「中止」。</p>
         <div className="mt-5 grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-11" onClick={() => setConfirmAbort(false)}>
+          <Button variant="outline"  onClick={() => setConfirmAbort(false)}>
             取消
           </Button>
           <Button
             variant="destructive"
-            className="h-11"
+            
             onClick={() => {
               setConfirmAbort(false);
               void rpc("mission.abort", undefined);
@@ -168,14 +168,14 @@ function MissionRow({ mission, readOnly }: { mission: Mission; readOnly?: boolea
   const next = mission.enabled ? nextTrigger(mission.trigger, now, last?.startedAt) : null;
 
   return (
-    <div className="bg-card flex items-center gap-3 rounded-xl border py-2.5 pr-2.5 pl-3.5">
+    <div className="bg-card flex items-center gap-2.5 rounded-xl border py-1.5 pr-2 pl-3">
       <button
         disabled={readOnly}
         onClick={() => set({ detailMissionId: mission.id, snap: 2 })}
-        className="min-h-11 min-w-0 flex-1 cursor-pointer text-left disabled:cursor-default"
+        className="min-h-10 min-w-0 flex-1 cursor-pointer text-left disabled:cursor-default"
       >
-        <p className={cn("truncate text-[14px] font-medium", !mission.enabled && "text-muted-foreground")}>{mission.name}</p>
-        <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[12px]">
+        <p className={cn("truncate text-[13px] font-medium", !mission.enabled && "text-muted-foreground")}>{mission.name}</p>
+        <p className="text-muted-foreground line-clamp-2 text-[11px]">
           {describeTrigger(mission.trigger)}
           {next !== null && ` · ${formatRelative(next, now)}`}
           {!mission.enabled && " · 已停用"}
@@ -216,15 +216,15 @@ function MissionDetail({ mission }: { mission: Mission }) {
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <Button className="h-11" disabled={running} onClick={() => void rpc("mission.start", { id: mission.id })}>
+        <Button  disabled={running} onClick={() => void rpc("mission.start", { id: mission.id })}>
           <Play />
           立即執行
         </Button>
-        <Button variant="secondary" className="h-11" onClick={() => openEditor(mission)}>
+        <Button variant="secondary"  onClick={() => openEditor(mission)}>
           <Pencil />
           編輯
         </Button>
-        <Button variant="outline" className="h-11" onClick={() => setConfirmDelete(true)}>
+        <Button variant="outline"  onClick={() => setConfirmDelete(true)}>
           <Trash2 />
           刪除
         </Button>
@@ -239,15 +239,15 @@ function MissionDetail({ mission }: { mission: Mission }) {
       </div>
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)}>
-        <p className="text-lg font-semibold">刪除「{mission.name}」？</p>
+        <p className="text-[16px] font-semibold">刪除「{mission.name}」？</p>
         <p className="text-muted-foreground mt-1 text-sm">任務與它的排程會從狗上移除，執行紀錄保留。</p>
         <div className="mt-5 grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-11" onClick={() => setConfirmDelete(false)}>
+          <Button variant="outline"  onClick={() => setConfirmDelete(false)}>
             取消
           </Button>
           <Button
             variant="destructive"
-            className="h-11"
+            
             onClick={async () => {
               setConfirmDelete(false);
               await rpc("mission.delete", { id: mission.id });

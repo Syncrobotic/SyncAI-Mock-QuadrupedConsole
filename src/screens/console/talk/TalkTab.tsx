@@ -117,11 +117,11 @@ function Call({ landscape, videoMain, onSwap }: { landscape: boolean; videoMain:
           onPointerLeave={() => call.ptt && setPtt(false)}
           onContextMenu={(e) => e.preventDefault()}
           className={cn(
-            "flex h-14 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-[11px] font-medium select-none disabled:cursor-not-allowed disabled:opacity-40",
+            "flex h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border text-[10px] font-medium select-none disabled:cursor-not-allowed disabled:opacity-40",
             call.ptt ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-accent"
           )}
         >
-          <Mic className="size-5" />
+          <Mic className="size-4" />
           {call.ptt ? "說話中" : "按住說"}
         </button>
         <Ctl label={call.speaker ? "喇叭" : "靜音"} active={call.speaker} onClick={() => setSpeaker(!call.speaker)} icon={call.speaker ? <Volume2 /> : <VolumeX />} />
@@ -148,7 +148,7 @@ function Call({ landscape, videoMain, onSwap }: { landscape: boolean; videoMain:
 
   const broadcast = (
     <Modal open={broadcastOpen} onClose={() => setBroadcastOpen(false)}>
-      <p className="mb-3 text-lg font-semibold">從狗的喇叭播放</p>
+      <p className="mb-3 text-[16px] font-semibold">從狗的喇叭播放</p>
       <div className="space-y-1.5">
         {(clips ?? []).map((c) => (
           <button
@@ -158,7 +158,7 @@ function Call({ landscape, videoMain, onSwap }: { landscape: boolean; videoMain:
               const ok = await rpc("media.broadcast", { clipId: c.id });
               if (ok !== null) toast(`正在播放「${c.name}」`);
             }}
-            className="hover:bg-accent flex h-12 w-full cursor-pointer items-center justify-between rounded-lg border px-3 text-left text-[14px]"
+            className="hover:bg-accent flex h-10 w-full cursor-pointer items-center justify-between rounded-lg border px-3 text-left text-[13px]"
           >
             {c.name}
             <span className="text-muted-foreground text-xs tabular-nums">{c.sec}s</span>
@@ -212,7 +212,7 @@ function Ctl({ label, icon, onClick, active, disabled, danger }: { label: string
       disabled={disabled}
       aria-pressed={active}
       className={cn(
-        "flex h-14 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 [&_svg]:size-5",
+        "flex h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 [&_svg]:size-4",
         danger ? "bg-status-error/10 text-status-error border-status-error/30 hover:bg-status-error/20" : active ? "bg-primary/15 text-primary-accent border-primary/40" : "bg-card hover:bg-accent"
       )}
     >

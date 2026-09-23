@@ -64,7 +64,7 @@ function Unreachable() {
         <li>手機與狗距離 5 m 內（藍牙）</li>
         <li>手機是否連在同一個 Wi-Fi</li>
       </ul>
-      <Button className="mt-6 h-12" onClick={() => void retry()}>
+      <Button className="mt-5" onClick={() => void retry()}>
         <RefreshCw />
         重新連線
       </Button>
@@ -85,13 +85,13 @@ function Approval() {
       <div className="bg-primary/15 text-primary-accent mb-3 grid size-11 place-items-center rounded-xl">
         <Smartphone className="size-5" />
       </div>
-      <h2 className="text-lg font-semibold">有手機請求加入</h2>
+      <h2 className="text-[16px] font-semibold">有手機請求加入</h2>
       <p className="text-muted-foreground mt-1 text-[14px]">{req?.text}。核准後它可以操控、排任務與通話，但不能管理裝置。</p>
       <div className="mt-5 grid grid-cols-2 gap-2">
-        <Button variant="outline" className="h-11" onClick={() => void answer(false)}>
+        <Button variant="outline"  onClick={() => void answer(false)}>
           拒絕
         </Button>
-        <Button className="h-11" onClick={() => void answer(true)}>
+        <Button  onClick={() => void answer(true)}>
           核准為操作員
         </Button>
       </div>

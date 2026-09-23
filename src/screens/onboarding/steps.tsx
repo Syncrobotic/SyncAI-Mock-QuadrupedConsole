@@ -56,25 +56,40 @@ function Screen({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-full flex-col px-5 pt-6 pb-5">
-      {/* The login page's column: mark, title, one muted line — centred on one axis. */}
-      <div className="flex flex-col items-center text-center">
-        {Icon && (
-          <span className="bg-primary/10 text-primary-accent dark:bg-primary/20 mb-4 grid size-12 place-items-center rounded-2xl ring-1 ring-violet-400/15">
-            <Icon className="size-6" />
-          </span>
-        )}
-        <h1 className="text-[22px] leading-tight font-semibold tracking-tight">{title}</h1>
-        {lead && <p className="text-muted-foreground mt-2 max-w-[320px] text-[14px] leading-relaxed">{lead}</p>}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-4">
+        {/* The login page's column: mark, title, one muted line — centred on one axis. */}
+        <div className="flex flex-col items-center text-center">
+          {Icon && (
+            <span className="bg-primary/10 text-primary-accent dark:bg-primary/20 mb-3 grid size-10 place-items-center rounded-xl ring-1 ring-violet-400/15">
+              <Icon className="size-5" />
+            </span>
+          )}
+          <h1 className="text-[20px] leading-tight font-semibold tracking-tight">{title}</h1>
+          {lead && <p className="text-muted-foreground mt-1.5 max-w-[320px] text-[13px] leading-relaxed">{lead}</p>}
+        </div>
+        <div className="mt-5 space-y-3">{children}</div>
       </div>
-      <div className="mt-7 flex-1 space-y-4">{children}</div>
-      {footer && <div className="mt-6 space-y-2">{footer}</div>}
+      {footer && <ActionBar>{footer}</ActionBar>}
+    </div>
+  );
+}
+
+/**
+ * The step's actions, pinned to the bottom of the phone (above the home
+ * indicator, and above the keyboard when one is up). Only the content above
+ * scrolls — a primary button that scrolls away is a flow that stalls.
+ */
+function ActionBar({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-background/85 shrink-0 space-y-1.5 border-t px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom),var(--kb,0px))] backdrop-blur">
+      {children}
     </div>
   );
 }
 
 function Primary(props: React.ComponentProps<typeof Button>) {
-  return <Button {...props} className={cn("h-12 w-full rounded-lg text-[15px]", props.className)} />;
+  return <Button {...props} className={cn("h-11 w-full rounded-lg text-[14px]", props.className)} />;
 }
 
 /** The login page's account row: letter tile, two lines, a badge, an arrow. */
@@ -102,7 +117,7 @@ function ChoiceRow({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "border-border bg-card/60 group flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+        "border-border bg-card/60 group flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
         onClick && "hover:border-primary/50 hover:bg-primary/5 focus-visible:ring-primary/40 cursor-pointer focus-visible:ring-2 focus-visible:outline-none disabled:opacity-60"
       )}
     >
@@ -110,8 +125,8 @@ function ChoiceRow({
         {tile}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{title}</span>
-        <span className="text-muted-foreground block truncate text-xs">{sub}</span>
+        <span className="block truncate text-[13px] font-medium">{title}</span>
+        <span className="text-muted-foreground block truncate text-[11px]">{sub}</span>
       </span>
       {badge}
       {trailing ?? (onClick && <ArrowRight className="text-muted-foreground/40 group-hover:text-primary-accent size-4 shrink-0 transition-colors" />)}
@@ -143,51 +158,53 @@ export function StepWelcome({ go }: StepProps) {
   const later = <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">稍後</Badge>;
 
   return (
-    <div className="flex min-h-full flex-col px-5 pt-16 pb-5">
-      <div className="flex flex-col items-center text-center">
-        <BrandGlyph className="size-11" />
-        <h1 className="mt-7 text-[24px] font-semibold tracking-tight">連接你的 SyncAI-Dog</h1>
-        <p className="text-muted-foreground mt-2 max-w-[300px] text-[14px] leading-relaxed">不用帳號。靠近狗、用藍牙配對，這支手機就是它的遙控器。</p>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-5 pt-12 pb-4">
+        <div className="flex flex-col items-center text-center">
+          <BrandGlyph className="size-10" />
+          <h1 className="mt-6 text-[22px] font-semibold tracking-tight">連接你的 SyncAI-Dog</h1>
+          <p className="text-muted-foreground mt-1.5 max-w-[300px] text-[13px] leading-relaxed">不用帳號。靠近狗、用藍牙配對，這支手機就是它的遙控器。</p>
+        </div>
+
+        <div className="mt-7 space-y-2">
+          {revoked && (
+            <Note tone="bad" icon={<CircleAlert />}>
+              這支手機已被擁有者撤銷，本機憑證已清除。需要的話請重新配對，並請擁有者核准。
+            </Note>
+          )}
+          <ChoiceRow
+            tile={<Bluetooth />}
+            title="藍牙"
+            sub="配對，以及斷網時的緊急停止"
+            badge={
+              <Badge variant="outline" className={cn("shrink-0 text-[10px]", denied && "text-status-error border-status-error/40")}>
+                {denied ? "已拒絕" : "必要"}
+              </Badge>
+            }
+            trailing={<span className="w-4" />}
+          />
+          <ChoiceRow tile={<Mic />} title="麥克風" sub="對現場說話 · 第一次開通話時才詢問" badge={later} trailing={<span className="w-4" />} />
+          <ChoiceRow tile={<Camera />} title="相機" sub="拍照存證 · 第一次使用時才詢問" badge={later} trailing={<span className="w-4" />} />
+          {denied && (
+            <Note tone="warn" icon={<CircleAlert />}>
+              沒有藍牙就無法配對，也無法在斷網時送出緊急停止。請到「設定 → SyncAI → 藍牙」開啟後回來。
+            </Note>
+          )}
+        </div>
       </div>
 
-      <div className="mt-8 flex-1 space-y-2">
-        {revoked && (
-          <Note tone="bad" icon={<CircleAlert />}>
-            這支手機已被擁有者撤銷，本機憑證已清除。需要的話請重新配對，並請擁有者核准。
-          </Note>
-        )}
-        <ChoiceRow
-          tile={<Bluetooth />}
-          title="藍牙"
-          sub="配對，以及斷網時的緊急停止"
-          badge={
-            <Badge variant="outline" className={cn("shrink-0 text-[10px]", denied && "text-status-error border-status-error/40")}>
-              {denied ? "已拒絕" : "必要"}
-            </Badge>
-          }
-          trailing={<span className="w-4" />}
-        />
-        <ChoiceRow tile={<Mic />} title="麥克風" sub="對現場說話 · 第一次開通話時才詢問" badge={later} trailing={<span className="w-4" />} />
-        <ChoiceRow tile={<Camera />} title="相機" sub="拍照存證 · 第一次使用時才詢問" badge={later} trailing={<span className="w-4" />} />
-        {denied && (
-          <Note tone="warn" icon={<CircleAlert />}>
-            沒有藍牙就無法配對，也無法在斷網時送出緊急停止。請到「設定 → SyncAI → 藍牙」開啟後回來。
-          </Note>
-        )}
-      </div>
-
-      <div className="mt-6 space-y-2">
+      <ActionBar>
         <Primary onClick={() => setAsking(true)}>
           {denied ? "我已開啟，再試一次" : "允許藍牙並開始"}
           <ArrowRight />
         </Primary>
         {denied && (
-          <Button variant="outline" className="h-10 w-full rounded-lg" onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>
+          <Button variant="outline" className="w-full rounded-lg" onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>
             開啟系統設定
           </Button>
         )}
-        <p className="text-muted-foreground/60 pt-3 text-center text-xs">© 2026 SyncAI · Mock 版本</p>
-      </div>
+        <p className="text-muted-foreground/60 pt-1 text-center text-[11px]">© 2026 SyncAI · Mock 版本</p>
+      </ActionBar>
 
       {/* A stand-in for the OS permission sheet, so the deny path is reviewable. */}
       <Modal open={asking} dismissable={false} className="max-w-[300px] p-0 text-center">
@@ -425,7 +442,7 @@ export function StepEnroll({ flow, patch, go }: StepProps) {
           <Primary onClick={() => go("license")}>繼續</Primary>
         ) : enrollment?.kind === "needs_approval" ? (
           <>
-            <Button variant="outline" className="h-12 w-full" onClick={() => void asViewer()}>
+            <Button variant="outline" className="w-full" onClick={() => void asViewer()}>
               先以檢視者身分加入（唯讀）
             </Button>
             <Button
@@ -559,7 +576,7 @@ export function StepLicense({ flow, go }: StepProps) {
             <ArrowRight />
           </Primary>
           {owner && (
-            <Button variant="ghost" className="h-11 w-full" onClick={() => setChanging(true)}>
+            <Button variant="ghost" className="w-full" onClick={() => setChanging(true)}>
               更換金鑰
             </Button>
           )}
@@ -610,7 +627,7 @@ export function LicenseEntry({
             啟用
           </Primary>
           {changing && (
-            <Button variant="ghost" className="h-11 w-full" onClick={onCancel}>
+            <Button variant="ghost" className="w-full" onClick={onCancel}>
               取消
             </Button>
           )}
@@ -700,7 +717,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
             讓狗連線
             <ArrowRight />
           </Primary>
-          <Button variant="ghost" className="h-11 w-full" onClick={() => setSkipAsk(true)}>
+          <Button variant="ghost" className="w-full" onClick={() => setSkipAsk(true)}>
             略過，之後再設
           </Button>
         </>
@@ -723,14 +740,13 @@ export function StepWifi({ flow, patch, go }: StepProps) {
       <MockHint>網路名稱含 fail → 密碼錯；none → 找不到；slow → 25 秒才連上</MockHint>
 
       <Modal open={skipAsk} onClose={() => setSkipAsk(false)}>
-        <p className="text-lg font-semibold">先不設 Wi-Fi？</p>
+        <p className="text-[16px] font-semibold">先不設 Wi-Fi？</p>
         <p className="text-muted-foreground mt-1 text-sm">只剩藍牙：看不到地圖、不能操控、不能通話。E-Stop 與裝置頁可用，之後可以在裝置頁設定 Wi-Fi。</p>
         <div className="mt-5 grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-11" onClick={() => setSkipAsk(false)}>
+          <Button variant="outline" onClick={() => setSkipAsk(false)}>
             回去設定
           </Button>
           <Button
-            className="h-11"
             onClick={() => {
               setSkipAsk(false);
               patch({ endpoint: null });
@@ -803,7 +819,7 @@ export function StepWait({ flow, patch, go }: StepProps) {
               <RotateCcw />
               回去重新設定
             </Primary>
-            <Button variant="ghost" disabled className="h-11 w-full">
+            <Button variant="ghost" disabled className="w-full">
               改用 SoftAP 備援（v1 未開放）
             </Button>
           </>

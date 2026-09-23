@@ -19,17 +19,17 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary-accent underline-offset-4 hover:underline",
       },
-      // Phone app: no `md:` shrink. The dashboard's sizes step down at 768px
-      // because a desktop has a mouse; here ≥768px means a tablet, which is
-      // still a finger. Every size clears 44pt except `sm`, which is for
-      // secondary inline actions only.
+      // Phone app: no `md:` shrink (≥768px here means a tablet, still a
+      // finger). Sized for density after review ("buttons too big, too little
+      // information"): 40px default, 36px for secondary inline actions. The
+      // safety-critical controls (E-Stop 56pt, joysticks) keep their size.
       size: {
-        default: "h-11 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-10 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-12 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-11",
-        "icon-sm": "size-11",
-        "icon-lg": "size-12",
+        default: "h-10 px-3.5 py-2 text-[13px] has-[>svg]:px-3",
+        sm: "h-9 rounded-md gap-1.5 px-3 text-[13px] has-[>svg]:px-2.5",
+        lg: "h-11 rounded-md px-5 has-[>svg]:px-4",
+        icon: "size-10",
+        "icon-sm": "size-9",
+        "icon-lg": "size-11",
       },
     },
     defaultVariants: {

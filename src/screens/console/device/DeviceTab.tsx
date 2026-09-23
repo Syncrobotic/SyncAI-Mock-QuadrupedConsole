@@ -39,7 +39,7 @@ export function DeviceTab() {
   }, [live]);
 
   return (
-    <div className="space-y-6 px-4 pt-2 pb-8">
+    <div className="space-y-4 px-3 pt-1 pb-6">
       {!live && (
         <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <Bluetooth className="size-3.5" />
@@ -83,7 +83,7 @@ function ThisDog({ owner, live }: { owner: boolean; live: boolean }) {
                 setEditing(false);
               }}
             >
-              <input autoFocus className={cn(inputClass, "h-11 w-36")} value={name} onChange={(e) => setName(e.target.value)} />
+              <input autoFocus className={cn(inputClass, "h-9 w-36")} value={name} onChange={(e) => setName(e.target.value)} />
               <Button size="sm" type="submit">
                 儲存
               </Button>
@@ -171,7 +171,7 @@ function Health({ owner }: { owner: boolean }) {
             onPointerUp={cancel}
             onPointerLeave={cancel}
             onContextMenu={(e) => e.preventDefault()}
-            className="bg-card relative flex h-12 w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-xl border text-[14px] font-medium select-none disabled:cursor-default"
+            className="bg-card relative flex h-10 w-full cursor-pointer items-center justify-center gap-2 text-[13px] overflow-hidden rounded-xl border text-[14px] font-medium select-none disabled:cursor-default"
           >
             {holding && <span aria-hidden className="bg-status-error/20 absolute inset-0 origin-left" style={{ animation: "hold-fill 2000ms linear forwards" }} />}
             <span className="relative flex items-center gap-2">
@@ -214,15 +214,15 @@ function Phones({ owner }: { owner: boolean }) {
             <Tag
               key={p.id}
               onClick={actionable ? () => setSelected(p.id) : undefined}
-              className={cn("flex min-h-14 w-full items-center gap-3 px-3.5 py-2 text-left", actionable && "hover:bg-accent/50 cursor-pointer")}
+              className={cn("flex min-h-12 w-full items-center gap-2.5 px-3 py-1.5 text-left", actionable && "hover:bg-accent/50 cursor-pointer")}
             >
-              <span className="bg-muted relative grid size-9 shrink-0 place-items-center rounded-full">
-                <Smartphone className="size-4" />
+              <span className="bg-muted relative grid size-8 shrink-0 place-items-center rounded-full">
+                <Smartphone className="size-3.5" />
                 {p.online && <span className="bg-status-ok ring-card absolute right-0 bottom-0 size-2.5 rounded-full ring-2" />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px]">{p.nickname}</p>
-                <p className="text-muted-foreground text-xs">{p.pending ? "等待核准" : p.online ? "在線" : `最後連線 ${formatClock(p.lastSeen)}`}</p>
+                <p className="truncate text-[13px]">{p.nickname}</p>
+                <p className="text-muted-foreground text-[11px]">{p.pending ? "等待核准" : p.online ? "在線" : `最後連線 ${formatClock(p.lastSeen)}`}</p>
               </div>
               <Pill tone={p.pending ? "warn" : p.mine ? "busy" : "neutral"}>
                 {p.pending ? "待核准" : ROLE_LABEL[p.role]}
@@ -237,7 +237,7 @@ function Phones({ owner }: { owner: boolean }) {
       <Modal open={!!target} onClose={close}>
         {target && !confirmRevoke && (
           <>
-            <p className="text-lg font-semibold">{target.nickname}</p>
+            <p className="text-[16px] font-semibold">{target.nickname}</p>
             <p className="text-muted-foreground mt-0.5 mb-4 text-sm">{target.pending ? "請求加入為操作員" : `目前角色：${ROLE_LABEL[target.role]}`}</p>
             {target.pending ? (
               <div className="grid grid-cols-2 gap-2">
@@ -270,7 +270,7 @@ function Phones({ owner }: { owner: boolean }) {
         )}
         {target && confirmRevoke && (
           <>
-            <p className="text-lg font-semibold">撤銷「{target.nickname}」？</p>
+            <p className="text-[16px] font-semibold">撤銷「{target.nickname}」？</p>
             <p className="text-muted-foreground mt-1 text-sm">立即生效。對方的連線會被關閉並清除本機憑證，要再使用必須重新配對。</p>
             <div className="mt-5 grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={() => setConfirmRevoke(false)}>
@@ -312,7 +312,7 @@ function Network({ owner }: { owner: boolean }) {
         </Row>
       </Card>
       {owner && (
-        <Button variant="outline" className="h-11 w-full" onClick={() => setOpen(true)}>
+        <Button variant="outline" className="w-full" onClick={() => setOpen(true)}>
           <Wifi />
           換 Wi-Fi（經藍牙）
         </Button>
@@ -337,7 +337,7 @@ function WifiModal({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <Modal open={open} onClose={onClose}>
-      <p className="mb-4 text-lg font-semibold">換 Wi-Fi</p>
+      <p className="mb-4 text-[16px] font-semibold">換 Wi-Fi</p>
       <div className="space-y-3">
         <Field label="SSID">
           <input className={inputClass} value={ssid} onChange={(e) => setSsid(e.target.value)} />
@@ -349,10 +349,10 @@ function WifiModal({ open, onClose }: { open: boolean; onClose: () => void }) {
         {status === "connected" && <p className="text-status-ok text-sm">已連上。WS 會自動改用新的端點。</p>}
       </div>
       <div className="mt-5 grid grid-cols-2 gap-2">
-        <Button variant="outline" className="h-11" onClick={onClose}>
+        <Button variant="outline"  onClick={onClose}>
           {status === "connected" ? "完成" : "取消"}
         </Button>
-        <Button className="h-11" loading={status === "connecting"} disabled={status === "connected"} onClick={() => void submit()}>
+        <Button  loading={status === "connecting"} disabled={status === "connected"} onClick={() => void submit()}>
           送出
         </Button>
       </div>
@@ -456,13 +456,13 @@ function License({ owner }: { owner: boolean }) {
         )}
       </Card>
       {owner && (
-        <Button variant={none ? "default" : "outline"} className="h-11 w-full" onClick={() => setOpen(true)}>
+        <Button variant={none ? "default" : "outline"} className="w-full" onClick={() => setOpen(true)}>
           <KeyRound />
           {none ? "輸入 License 金鑰" : "更換金鑰"}
         </Button>
       )}
       <Modal open={open} onClose={() => setOpen(false)}>
-        <p className="text-lg font-semibold">{none ? "輸入 License 金鑰" : "更換 License 金鑰"}</p>
+        <p className="text-[16px] font-semibold">{none ? "輸入 License 金鑰" : "更換 License 金鑰"}</p>
         <p className="text-muted-foreground mt-1 mb-4 text-sm">4 組、每組 4 個英數字，可以整串貼上。</p>
         <KeyInput
           value={key}
@@ -476,10 +476,10 @@ function License({ owner }: { owner: boolean }) {
         />
         {error && <p className="text-status-error mt-2 text-[13px]">{error}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-11" onClick={() => setOpen(false)}>
+          <Button variant="outline"  onClick={() => setOpen(false)}>
             取消
           </Button>
-          <Button className="h-11" disabled={!isCompleteKey(key)} loading={busy} onClick={() => void activate()}>
+          <Button  disabled={!isCompleteKey(key)} loading={busy} onClick={() => void activate()}>
             啟用
           </Button>
         </div>
@@ -518,7 +518,7 @@ function Plugins({ owner }: { owner: boolean }) {
         ))}
       </Card>
       {owner && (
-        <Button variant="outline" className="h-11 w-full" disabled>
+        <Button variant="outline" className="w-full" disabled>
           <Upload />
           上傳 plugin（驗簽在狗端）
         </Button>
@@ -540,7 +540,7 @@ function Clips({ owner }: { owner: boolean }) {
         ))}
       </Card>
       {owner && (
-        <Button variant="outline" className="h-11 w-full" disabled>
+        <Button variant="outline" className="w-full" disabled>
           <Upload />
           上傳音檔（格式待定）
         </Button>
@@ -562,12 +562,12 @@ function Diagnostics() {
     <section className="space-y-2">
       <SectionTitle description="系統事件與日誌匯出">診斷</SectionTitle>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" className="h-11" onClick={() => void load()}>
+        <Button variant="outline"  onClick={() => void load()}>
           最近 200 條事件
         </Button>
         <Button
           variant="outline"
-          className="h-11"
+          
           onClick={async () => {
             const e = await loadEvents();
             const blob = new Blob([JSON.stringify(e, null, 2)], { type: "application/json" });
@@ -614,7 +614,7 @@ function Local() {
           <Row label="App 版本">0.1.0-mock</Row>
         </button>
       </Card>
-      <Button variant="outline" className="text-status-error h-11 w-full" onClick={() => setConfirm(true)}>
+      <Button variant="outline" className="text-status-error w-full" onClick={() => setConfirm(true)}>
         清除本機配對資料
       </Button>
       {dev && (
@@ -630,15 +630,15 @@ function Local() {
         </Card>
       )}
       <Modal open={confirm} onClose={() => setConfirm(false)}>
-        <p className="text-lg font-semibold">清除本機配對資料？</p>
+        <p className="text-[16px] font-semibold">清除本機配對資料？</p>
         <p className="text-muted-foreground mt-1 text-sm">這支手機會忘記這隻狗並退回 Onboarding。狗上的配對紀錄要由擁有者撤銷。</p>
         <div className="mt-5 grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-11" onClick={() => setConfirm(false)}>
+          <Button variant="outline"  onClick={() => setConfirm(false)}>
             取消
           </Button>
           <Button
             variant="destructive"
-            className="h-11"
+            
             onClick={() => {
               setConfirm(false);
               set({ tab: "teleop" });

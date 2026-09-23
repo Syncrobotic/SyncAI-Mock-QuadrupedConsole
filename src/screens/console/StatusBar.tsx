@@ -55,11 +55,11 @@ export function DogHeader() {
         <button
           onClick={toggle}
           aria-expanded={open}
-          className="bg-surface/85 hover:bg-surface flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left shadow-sm backdrop-blur transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+          className="bg-surface/85 hover:bg-surface flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-xl border px-2 py-1.5 text-left shadow-sm backdrop-blur transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
         >
           <IconPlate icon={Dog} size="sm" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[14px] leading-tight font-semibold">{name}</span>
+            <span className="block truncate text-[13px] leading-tight font-semibold">{name}</span>
             <span className={cn("block truncate text-[11px] leading-tight", modeBad ? "text-status-error font-semibold" : mode === "PAUSED" ? "text-severity-warning" : "text-muted-foreground")}>
               {subtitle}
             </span>
@@ -72,14 +72,14 @@ export function DogHeader() {
 
         <button
           onClick={toggle}
-          className="bg-surface/85 hover:bg-surface flex shrink-0 cursor-pointer items-center gap-3 rounded-xl border px-3 shadow-sm backdrop-blur transition-colors"
+          className="bg-surface/85 hover:bg-surface flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 shadow-sm backdrop-blur transition-colors"
           aria-label="電量與連線"
         >
-          <span className={cn("flex items-center gap-1 text-[13px] font-semibold tabular-nums", batteryTone)}>
+          <span className={cn("flex items-center gap-1 text-[12px] font-semibold tabular-nums", batteryTone)}>
             <BatteryIcon className="size-4" />
             {battery !== null ? `${Math.round(battery)}%` : "—"}
           </span>
-          <span className={cn("flex items-center gap-1.5 text-[13px] font-semibold tabular-nums", rttTone)}>
+          <span className={cn("flex items-center gap-1.5 text-[12px] font-semibold tabular-nums", rttTone)}>
             {live ? (
               <span aria-hidden className="flex h-3 items-end gap-[2px]">
                 {[1, 2, 3].map((b) => (
