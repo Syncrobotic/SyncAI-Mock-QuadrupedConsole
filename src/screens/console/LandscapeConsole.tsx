@@ -81,13 +81,8 @@ export function LandscapeConsole() {
               squeezed the name to 巡邏犬… when the E-Stop sat in the middle). No z-index on the
               row itself: that would trap the E-Stop's z-[60] under a dialog's backdrop (z-50). */}
           <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start gap-2">
-            {/* Open, the island takes all the width up to 影像 / the E-Stop (never over them). */}
-            <div
-              className={cn(
-                "relative z-30 flex min-w-0 shrink grow-0 flex-col gap-1.5 transition-[flex-basis] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-                statusOpen ? "basis-full" : "basis-[340px]"
-              )}
-            >
+            {/* A fixed 340 pt, open or closed: in landscape the island never takes the map. */}
+            <div className="relative z-30 flex min-w-0 flex-[0_1_340px] flex-col gap-1.5">
               <DogHeader landscape />
               {!statusOpen && <MapChips />}
             </div>

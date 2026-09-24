@@ -217,8 +217,14 @@ export function Console() {
           {/* Full-height, click-through column: the status details can grow into
               it and scroll, instead of being clipped by the panel (they were,
               at 337px inside a 253–332px panel). */}
-          <div className={cn("pointer-events-none absolute inset-0 z-20 flex flex-col gap-1.5", collapsed ? "p-1.5" : "p-2")}>
-            <DogHeader />
+          {/* Open, the island fills the map panel: the inset animates away. */}
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-0 z-20 flex flex-col gap-1.5 transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+              statusOpen ? "p-0" : collapsed ? "p-1.5" : "p-2"
+            )}
+          >
+            <DogHeader flush={statusOpen} />
             {!statusOpen && roomy && <MapChips />}
           </div>
           {!collapsed && (videoMain || !statusOpen) && <CallLayer />}

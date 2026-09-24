@@ -105,7 +105,17 @@ const SPRING = { type: "spring", bounce: 0.15, duration: 0.42 } as const;
  * A notification that arrives while the details are open appears at their top; the bar
  * still closes the island.
  */
-export function DogHeader({ landscape = false }: { landscape?: boolean }) {
+/**
+ * `flush`: portrait, open — the island fills the map panel edge to edge, so its own border
+ * gives way to the panel's (two hairlines side by side read as a double line).
+ */
+export function DogHeader({
+  landscape = false,
+  flush = false,
+}: {
+  landscape?: boolean;
+  flush?: boolean;
+}) {
   useFlashHost();
   const open = useStore((s) => s.statusOpen);
   const flash = useStore((s) => s.flash);
@@ -225,7 +235,10 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
         style={measured ? { height: h } : undefined}
         // One look in every face: a notification changes what the island says, never its
         // colour, border, shadow or height. Only opening the details makes it bigger.
-        className="bg-surface/95 @container relative overflow-hidden rounded-xl border shadow-sm backdrop-blur"
+        className={cn(
+          "bg-surface/95 @container relative overflow-hidden rounded-xl border shadow-sm backdrop-blur transition-[border-color] duration-300",
+          flush && "border-transparent"
+        )}
       >
         {/* One column no wider than the card: an auto column grows to its content and clips it. */}
         <div className="grid grid-cols-1 items-start">
@@ -244,12 +257,14 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
                   className="flex flex-col"
                   style={{ maxHeight: cap, height: held ? h : undefined }}
                 >
-                  {shown && (
-                    <div className="shrink-0 border-b">
-                      <Notice flash={shown} landscape={landscape} />
-                    </div>
-                  )}
-                  <StatusRow landscape={landscape} open onToggle={closeDetails} alerts={alerts} />
+                  <div className="shrink-0">
+                    {shown && (
+                      <div className="border-b">
+                        <Notice flash={shown} landscape={landscape} />
+                      </div>
+                    )}
+                    <StatusRow landscape={landscape} open onToggle={closeDetails} alerts={alerts} />
+                  </div>
                   <Details />
                   <m.button
                     aria-label="收起狀態"
