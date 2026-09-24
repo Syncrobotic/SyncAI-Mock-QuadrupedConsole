@@ -92,7 +92,8 @@ export function Onboarding() {
 
   // Every step has a top-left action: back (‹) here; the automatic steps (pair, wait) put
   // a cancel (✕) there themselves.
-  const back: Partial<Record<Step, Step>> = { scan: "splash", license: "scan", wifi: "license", safety: "wifi" };
+  // Safety has none: the dog is online, there is nothing to go back and change.
+  const back: Partial<Record<Step, Step>> = { scan: "splash", license: "scan", wifi: "license" };
 
   // BLE link watch.
   const [ble, setBle] = useState<OnboardingCtx["ble"]>("ok");

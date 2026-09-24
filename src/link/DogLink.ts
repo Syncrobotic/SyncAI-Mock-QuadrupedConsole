@@ -195,6 +195,11 @@ export interface PhoneChannel {
    * Real: getUserMedia + BarcodeDetector. Resolves once; call again to rescan.
    */
   scanLicenseCard(signal: AbortSignal): Promise<string | null>;
+  /**
+   * After a refusal the OS will not ask again: the only way back is the app's page in the
+   * system Settings. Opens it; resolves with whether the permission is on when the user returns.
+   */
+  openSettings(permission: "bluetooth" | "camera" | "location"): Promise<boolean>;
 }
 
 export interface DogLink {

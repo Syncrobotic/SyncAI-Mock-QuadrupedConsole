@@ -427,6 +427,14 @@ function createPhone(world: MockWorld): PhoneChannel {
       return d.cameraPermission === "granted";
     },
 
+    async openSettings(permission) {
+      // No Settings app in the mock: pretend the reviewer switched it on there.
+      await sleep(700);
+      if (permission === "camera") world.dev.cameraPermission = "granted";
+      if (permission === "location") world.dev.locationPermission = "granted";
+      return true;
+    },
+
     scanLicenseCard(signal) {
       // No camera in the mock: the card is "in view" and read after a moment.
       return new Promise((resolve) => {

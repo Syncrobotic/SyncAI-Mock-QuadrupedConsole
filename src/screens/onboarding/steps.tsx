@@ -338,6 +338,7 @@ export function StepSplash({ go }: StepProps) {
   const revoked = useStore((s) => s.revokedNotice);
   const [asking, setAsking] = useState(false);
   const [denied, setDenied] = useState(false);
+  const [opening, setOpening] = useState(false);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -361,17 +362,35 @@ export function StepSplash({ go }: StepProps) {
                 <CircleAlert className="size-4 shrink-0" />
                 {denied ? "需要藍牙才能配對" : "這支手機已被撤銷，請重新配對"}
               </p>
-              {denied && <TextLink onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>開啟系統設定</TextLink>}
+
             </m.div>
           )}
         </AnimatePresence>
       </div>
 
       <ActionBar>
-        <Primary onClick={() => setAsking(true)}>
-          {denied ? "重試" : "開始配對"}
-          <ArrowRight />
-        </Primary>
+        {/* After a refusal the OS will not ask again — "retry" would do nothing. The one button
+            goes to the app's page in Settings instead. */}
+        {denied ? (
+          <Primary
+            loading={opening}
+            onClick={async () => {
+              setOpening(true);
+              const ok = await getDogLink().phone.openSettings("bluetooth");
+              setOpening(false);
+              if (!ok) return;
+              beginOnboarding();
+              go("scan");
+            }}
+          >
+            開啟設定
+          </Primary>
+        ) : (
+          <Primary onClick={() => setAsking(true)}>
+            開始配對
+            <ArrowRight />
+          </Primary>
+        )}
       </ActionBar>
 
       {/* A stand-in for the OS permission sheet, so the deny path is reviewable. */}
@@ -637,6 +656,16 @@ export function StepLicense({ flow, go }: StepProps) {
   const [changing, setChanging] = useState(false);
   const [features, setFeatures] = useState(false);
   const [asked, setAsked] = useState<"no" | "sending" | "sent">("no");
+  // Once the Owner has been asked, watch for the licence and move on by itself.
+  useEffect(() => {
+    if (asked !== "sent") return;
+    const t = setInterval(() => {
+      void getDogLink()
+        .ble.readLicense()
+        .then((l) => l.edition !== "none" && setLicense(l));
+    }, 4000);
+    return () => clearInterval(t);
+  }, [asked]);
   const owner = flow.role === "owner";
 
   useEffect(() => {
@@ -784,6 +813,9 @@ export function LicenseEntry({
   activate?: (key: string) => Promise<LicenseActivation | null>;
 }) {
   const [mode, setMode] = useState<"scan" | "manual">("scan");
+  // Camera refused: asking again does nothing, so the scan icon leads to Settings.
+  const [camBlocked, setCamBlocked] = useState(false);
+  const [askSettings, setAskSettings] = useState(false);
   const [scan, setScan] = useState<ScanState | "asking">("asking");
   const [scanTick, setScanTick] = useState(0);
   // Manual entry starts empty (a mock review can prefill from the review panel's card key).
@@ -818,7 +850,9 @@ export function LicenseEntry({
     (async () => {
       const phone = getDogLink().phone;
       if (!(await phone.camera())) {
-        if (!ctl.signal.aborted) setMode("manual");
+        if (ctl.signal.aborted) return;
+        setCamBlocked(true);
+        setMode("manual");
         return;
       }
       if (ctl.signal.aborted) return;
@@ -918,6 +952,7 @@ export function LicenseEntry({
         <BarButton
           label="掃描授權卡"
           onClick={() => {
+            if (camBlocked) return setAskSettings(true);
             setError(null);
             setScan("asking");
             setMode("scan");
@@ -938,6 +973,27 @@ export function LicenseEntry({
         autoFocus
       />
       {errorLine}
+
+      <Modal open={askSettings} onClose={() => setAskSettings(false)}>
+        <p className="text-[15px] font-semibold">相機權限已關閉</p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button variant="outline" onClick={() => setAskSettings(false)}>
+            取消
+          </Button>
+          <Button
+            onClick={async () => {
+              setAskSettings(false);
+              if (!(await getDogLink().phone.openSettings("camera"))) return;
+              setCamBlocked(false);
+              setError(null);
+              setScan("asking");
+              setMode("scan");
+            }}
+          >
+            開啟設定
+          </Button>
+        </div>
+      </Modal>
       <MockHint>
         <code className="font-mono">SYNC</code> 專業 · <code className="font-mono">BASE</code> 無 AI · <code className="font-mono">CTRL</code> 只操控 · 試{" "}
         <button className="cursor-pointer font-mono underline underline-offset-2" onClick={() => setKey("CTRL01AB2026DEMO")}>
@@ -1032,7 +1088,8 @@ export function StepWifi({ flow, patch, go }: StepProps) {
         name="psk"
         autoComplete="current-password"
         enterKeyHint="go"
-        autoFocus={userPicked}
+        autoFocus={userPicked || !!flow.wifiError}
+        onFocus={(e) => flow.wifiError && e.currentTarget.select()}
         value={flow.psk}
         aria-invalid={!!flow.wifiError}
         onChange={(e) => patch({ psk: e.target.value, wifiError: null })}
@@ -1221,7 +1278,7 @@ export function StepWait({ flow, patch, go }: StepProps) {
         )
       }
       title={online ? "狗已上線" : stuck ? "還沒連上" : "狗正在連上 Wi-Fi"}
-      sub={online ? (flow.endpoint?.ip ?? "讀取位址…") : stuck ? "訊號太弱，或網路需要網頁登入" : `${flow.ssid} · ${elapsed} 秒`}
+      sub={online ? flow.ssid : stuck ? "訊號太弱，或網路需要網頁登入" : `${flow.ssid} · ${elapsed} 秒`}
       live
       primary={
         stuck ? (
