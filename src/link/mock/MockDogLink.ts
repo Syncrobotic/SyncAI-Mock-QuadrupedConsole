@@ -59,6 +59,7 @@ function createBle(world: MockWorld): BleChannel {
     return { serial: d.serial, fingerprint: ENDPOINT.fingerprint, firmware: FIRMWARE.cerebellum, hasOwner: d.hasOwner };
   };
   let flakyFailures = 0;
+  let provisionRun = 0;
 
   return {
     async *scan() {
@@ -150,21 +151,32 @@ function createBle(world: MockWorld): BleChannel {
       ] satisfies WifiNetwork[];
     },
 
+    async cancelWifi() {
+      await world.bleReady();
+      provisionRun++;
+      await sleep(200);
+    },
+
     async *provisionWifi(ssid): AsyncGenerator<WifiStatus> {
       await world.bleReady();
+      // A cancel (or a newer provisioning) retires this run: it stops reporting.
+      const run = ++provisionRun;
       yield "connecting";
       const s = ssid.toLowerCase();
       if (s.includes("fail")) {
         await sleep(2500);
+        if (run !== provisionRun) return;
         yield "auth_failed";
         return;
       }
       if (s.includes("none")) {
         await sleep(3000);
+        if (run !== provisionRun) return;
         yield "not_found";
         return;
       }
       await sleep(s.includes("slow") ? 25_000 : 3200);
+      if (run !== provisionRun) return;
       yield "connected";
     },
 

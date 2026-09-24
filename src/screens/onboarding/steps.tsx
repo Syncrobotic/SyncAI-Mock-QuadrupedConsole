@@ -2,7 +2,7 @@
 
 import { AnimatePresence, m } from "framer-motion";
 import { ArrowRight, BadgeCheck, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, Plus, RotateCcw, ScanLine, Wifi, WifiHigh, WifiLow, WifiZero, X } from "lucide-react";
-import { isValidElement, useContext, useEffect, useRef, useState } from "react";
+import { isValidElement, useContext, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { BrandGlyph } from "@/components/brand-mark";
@@ -111,6 +111,44 @@ function Frame({
       primary
     );
 
+  // Visual + title. Hero: centred with the content. List: a header above the scroller. The
+  // two are different parents, so a shared layoutId carries the header across the switch
+  // (the radar shrinks from centre to top rather than jumping).
+  const headId = useId();
+  const header = (
+    <m.div layoutId={`${headId}-head`} transition={LAYOUT} className={cn(PAD, list && "shrink-0 pb-1")}>
+      <m.div
+        layout
+        transition={LAYOUT}
+        className={cn(
+          "flex shrink-0 items-center justify-center",
+          list
+            ? "h-[88px] pt-1 [--band-h:80px] [--link-w:300px] [--node-sm:40px] [--node:44px] [--plate:3.5rem]"
+            : "h-[clamp(170px,31vh,250px)] [--band-h:clamp(170px,31vh,250px)] [--link-w:400px] [--node-sm:clamp(52px,15vw,66px)] [--node:clamp(64px,19vw,80px)] [--plate:6rem]"
+        )}
+      >
+        {visual}
+      </m.div>
+      <m.div layout="position" transition={LAYOUT} className={cn("text-center", list ? "mt-2" : "mt-3")} aria-live={live ? "polite" : undefined}>
+        {/* Text that changes inside a step cross-fades in place; nothing animates on
+            entry — the step transition already did (one layer, never two). */}
+        <Swap k={title} className="text-[20px] leading-tight font-semibold tracking-tight" as="h1">
+          {title}
+        </Swap>
+        {sub && (
+          <Swap k={textOf(sub)} className="text-muted-foreground mt-1.5 text-[13px]">
+            {sub}
+          </Swap>
+        )}
+      </m.div>
+    </m.div>
+  );
+  const body = children && (
+    <div className={cn(PAD, "pb-4", list ? "pt-3" : "mt-5")}>
+      <div className="mx-auto w-full max-w-[360px] space-y-2.5">{children}</div>
+    </div>
+  );
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Step actions live in the shell's top bar row (48px, directly above this step); with
@@ -128,47 +166,24 @@ function Frame({
           </div>
         )
       )}
-      <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <div className={cn("flex min-h-full flex-col", !list && "justify-center py-4")}>
-          {/* Visual + title: centred in hero, a pinned header in list. One element across the
-              switch, so framer's layout animation carries it (the radar shrinks, not jumps). */}
-          <m.div
-            layout
-            transition={LAYOUT}
-            className={cn(PAD, "z-10", list && "bg-background/90 sticky top-0 pb-3 backdrop-blur")}
-          >
-            <m.div
-              layout
-              transition={LAYOUT}
-              className={cn(
-                "flex shrink-0 items-center justify-center",
-                list
-                  ? "h-[88px] pt-1 [--band-h:80px] [--link-w:300px] [--node-sm:40px] [--node:44px] [--plate:3.5rem]"
-                  : "h-[clamp(170px,31vh,250px)] [--band-h:clamp(170px,31vh,250px)] [--link-w:400px] [--node-sm:clamp(52px,15vw,66px)] [--node:clamp(64px,19vw,80px)] [--plate:6rem]"
-              )}
-            >
-              {visual}
-            </m.div>
-            <m.div layout="position" transition={LAYOUT} className={cn("text-center", list ? "mt-2" : "mt-3")} aria-live={live ? "polite" : undefined}>
-              {/* Text that changes inside a step cross-fades in place; nothing animates on
-                  entry — the step transition already did (one layer, never two). */}
-              <Swap k={title} className="text-[20px] leading-tight font-semibold tracking-tight" as="h1">
-                {title}
-              </Swap>
-              {sub && (
-                <Swap k={textOf(sub)} className="text-muted-foreground mt-1.5 text-[13px]">
-                  {sub}
-                </Swap>
-              )}
-            </m.div>
-          </m.div>
-          {children && (
-            <m.div layout="position" transition={LAYOUT} className={cn(PAD, "pb-4", list ? "mt-1" : "mt-5")}>
-              <div className="mx-auto w-full max-w-[360px] space-y-2.5">{children}</div>
-            </m.div>
-          )}
+      {list ? (
+        <>
+          {/* List: the header sits outside the scroller with no background of its own, so the
+              page's backdrop runs on unbroken (a solid sticky header left a seam in light mode);
+              the list fades out at its top edge instead of sliding under a panel. */}
+          {header}
+          <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto [mask-image:linear-gradient(to_bottom,transparent,black_14px)]">
+            {body}
+          </div>
+        </>
+      ) : (
+        <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <div className="flex min-h-full flex-col justify-center py-4">
+            {header}
+            {body}
+          </div>
         </div>
-      </div>
+      )}
       <ActionBar above={shell.ble === "ok" ? above : undefined}>{action}</ActionBar>
     </div>
   );
@@ -1272,7 +1287,13 @@ export function StepWait({ flow, patch, go }: StepProps) {
       visual={<NetLink phase={online ? "online" : stuck ? "failed" : "joining"} sameNet={flow.sameNet} progress={elapsed / 30} />}
       left={
         !online && (
-          <BarButton label="取消連線" onClick={() => go("wifi")}>
+          <BarButton
+            label="取消連線"
+            onClick={() => {
+              void getDogLink().ble.cancelWifi();
+              go("wifi");
+            }}
+          >
             <X />
           </BarButton>
         )

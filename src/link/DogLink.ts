@@ -128,6 +128,11 @@ export interface BleChannel {
   /** Networks the dog can hear, strongest first. Over BLE, before the dog has any network. */
   scanWifi(): Promise<WifiNetwork[]>;
   provisionWifi(ssid: string, psk: string): AsyncIterable<WifiStatus>;
+  /**
+   * Stop a provisioning in progress (the guard pressed ✕): the dog abandons the join and
+   * forgets the credentials it was given. Firmware contract — the dog must honour it.
+   */
+  cancelWifi(): Promise<void>;
   readEndpoint(): Promise<Endpoint>;
   estop(): Promise<void>;
   restartGateway(): Promise<void>;
