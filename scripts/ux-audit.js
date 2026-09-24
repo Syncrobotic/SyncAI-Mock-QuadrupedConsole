@@ -149,15 +149,9 @@ async (page) => {
   // Generic walk: audit, then press the pinned primary action (or the first choice row when the
   // action bar has nothing enabled — e.g. picking a dog / a network).
   for (let i = 0; i < 16; i++) {
-    const title = await page.evaluate(() => document.body.innerText.match(/\S+ · \d \/ 8/)?.[0] ?? (document.querySelector("[data-actionbar]") ? "welcome" : "done"));
-    if (title === "done") {
-      if (i < 15 && !(await page.getByRole("tab", { name: "操控" }).count())) {
-        await wait(3000);
-        const again = await page.evaluate(() => /\S+ · \d \/ 8/.test(document.body.innerText) || !!document.querySelector("[data-actionbar]"));
-        if (again) continue;
-      }
-      break;
-    }
+    // Onboarding is on screen until the console's tab bar appears; the page's h1 names the step.
+    const title = await page.evaluate(() => (document.querySelector('[role="tablist"]') ? "done" : document.querySelector("h1")?.textContent?.trim() || "…"));
+    if (title === "done") break;
     await step(`${String(i + 1).padStart(2, "0")} ${title}`);
     const pw = page.locator('input[type="password"]:visible');
     if (await pw.count()) {

@@ -1,11 +1,11 @@
 "use client";
 
+import { AnimatePresence, m } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { useState } from "react";
 
-import { cn } from "@/lib/utils";
-
 import { StepConnect, StepEnroll, StepLicense, StepSafety, StepScan, StepWait, StepWelcome, StepWifi } from "./steps";
+import { Stepper } from "./visuals";
 
 import type { DogAdvert, Endpoint, PairSession, Role } from "@/proto/types";
 
@@ -25,16 +25,11 @@ export type Step = "welcome" | "scan" | "connect" | "enroll" | "license" | "wifi
  */
 export const STEPS: Step[] = ["welcome", "scan", "connect", "enroll", "license", "wifi", "wait", "safety"];
 
-const TITLES: Record<Step, string> = {
-  welcome: "歡迎",
-  scan: "找狗",
-  connect: "藍牙連線",
-  enroll: "註冊",
-  license: "License",
-  wifi: "現場 Wi-Fi",
-  wait: "等狗上線",
-  safety: "安全須知",
-};
+/**
+ * What the guard experiences is four stages, not eight screens: the automatic
+ * screens (connect, enroll, wait) belong to the stage they serve.
+ */
+const PHASE_OF: Record<Step, number> = { welcome: 0, scan: 0, connect: 0, enroll: 0, license: 1, wifi: 2, wait: 2, safety: 3 };
 
 export interface Flow {
   dog: DogAdvert | null;
@@ -54,7 +49,13 @@ export interface StepProps {
 }
 
 export function Onboarding() {
-  const [step, setStep] = useState<Step>("welcome");
+  const [step, setStepRaw] = useState<Step>("welcome");
+  // Direction of travel, so going back slides the other way.
+  const [dir, setDir] = useState(1);
+  const setStep = (s: Step) => {
+    setDir(STEPS.indexOf(s) >= STEPS.indexOf(step) ? 1 : -1);
+    setStepRaw(s);
+  };
   const [flow, setFlow] = useState<Flow>({
     dog: null,
     session: null,
@@ -67,7 +68,6 @@ export function Onboarding() {
   });
   const patch = (p: Partial<Flow>) => setFlow((f) => ({ ...f, ...p }));
   const props: StepProps = { flow, patch, go: setStep };
-  const index = STEPS.indexOf(step);
 
   // Back is offered only where going back is safe and meaningful.
   const back: Partial<Record<Step, Step>> = { scan: "welcome" };
@@ -84,37 +84,49 @@ export function Onboarding() {
       </div>
 
       {step !== "welcome" && (
-        <header className="relative shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <div className="flex h-10 items-center">
+        <header className="relative shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1">
+          <div className="flex items-start">
             {back[step] ? (
-              <button onClick={() => setStep(back[step]!)} className="hover:bg-accent -ml-1.5 grid size-10 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
+              <button onClick={() => setStep(back[step]!)} className="hover:bg-accent -ml-1.5 grid size-9 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
                 <ChevronLeft className="size-5" />
               </button>
             ) : (
-              <span className="size-10" />
+              <span className="size-9" />
             )}
-            <p className="text-muted-foreground flex-1 text-center text-[12px] font-medium tabular-nums">
-              {TITLES[step]} · {index + 1} / {STEPS.length}
-            </p>
-            <span className="size-10" />
-          </div>
-          <div className="mx-auto mt-1 flex max-w-[260px] gap-1">
-            {STEPS.map((s, i) => (
-              <span key={s} className={cn("h-1 flex-1 rounded-full transition-colors", i < index ? "bg-primary" : i === index ? "bg-primary-accent" : "bg-muted")} />
-            ))}
+            <div className="flex-1 pt-1">
+              <Stepper phase={PHASE_OF[step]} />
+            </div>
+            <span className="size-9" />
           </div>
         </header>
       )}
-      {/* Each step owns its scroll: content scrolls, the action bar does not. */}
+      {/* Each step owns its scroll: content scrolls, the action bar does not.
+          Steps slide in the direction of travel — enter ease-out, exit ease-in. */}
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {step === "welcome" && <StepWelcome {...props} />}
-        {step === "scan" && <StepScan {...props} />}
-        {step === "connect" && <StepConnect {...props} />}
-        {step === "enroll" && <StepEnroll {...props} />}
-        {step === "license" && <StepLicense {...props} />}
-        {step === "wifi" && <StepWifi {...props} />}
-        {step === "wait" && <StepWait {...props} />}
-        {step === "safety" && <StepSafety {...props} />}
+        <AnimatePresence mode="wait" initial={false} custom={dir}>
+          <m.div
+            key={step}
+            custom={dir}
+            className="flex min-h-0 flex-1 flex-col"
+            variants={{
+              enter: (d: number) => ({ opacity: 0, x: d * 28 }),
+              center: { opacity: 1, x: 0, transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] } },
+              exit: (d: number) => ({ opacity: 0, x: d * -28, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] } }),
+            }}
+            initial="enter"
+            animate="center"
+            exit="exit"
+          >
+            {step === "welcome" && <StepWelcome {...props} />}
+            {step === "scan" && <StepScan {...props} />}
+            {step === "connect" && <StepConnect {...props} />}
+            {step === "enroll" && <StepEnroll {...props} />}
+            {step === "license" && <StepLicense {...props} />}
+            {step === "wifi" && <StepWifi {...props} />}
+            {step === "wait" && <StepWait {...props} />}
+            {step === "safety" && <StepSafety {...props} />}
+          </m.div>
+        </AnimatePresence>
       </div>
     </div>
   );
