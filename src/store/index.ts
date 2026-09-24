@@ -73,7 +73,8 @@ export interface State {
   rules: Rule[];
   ruleLog: RuleLogEntry[];
   /** Mission tab sub-view: rules (when/why) · missions (what) · agenda (next 24 h). */
-  missionView: "rules" | "missions" | "agenda";
+  /** The mission tab's three lists: time rules, event rules, mission templates (routes). */
+  missionView: "time" | "event" | "routes";
   ruleEditor: { draft: Rule; isNew: boolean; verdict: string | null } | null;
   detailRuleId: string | null;
 
@@ -149,7 +150,7 @@ export const useStore = create<State>(() => ({
   detailMissionId: null,
   rules: [],
   ruleLog: [],
-  missionView: "rules",
+  missionView: "time",
   ruleEditor: null,
   detailRuleId: null,
 

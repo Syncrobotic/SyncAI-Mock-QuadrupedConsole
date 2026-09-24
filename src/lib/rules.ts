@@ -1,4 +1,13 @@
-import type { EventSource, EventType, LicenseFeature, Priority, Rule, Schedule, TimeWindow, Trigger } from "@/proto/types";
+import type {
+  EventSource,
+  EventType,
+  LicenseFeature,
+  Priority,
+  Rule,
+  Schedule,
+  TimeWindow,
+  Trigger,
+} from "@/proto/types";
 
 /**
  * Rule vocabulary and arithmetic, shared by the rule editor, the agenda and
@@ -18,17 +27,74 @@ export interface EventTypeInfo {
 }
 
 export const EVENT_TYPES: Record<EventType, EventTypeInfo> = {
-  person: { label: "偵測到人員", source: "ai", located: true, requires: "ai", hint: "任何人員出現在範圍內" },
-  intrusion: { label: "限制區入侵", source: "ai", located: true, requires: "ai", hint: "人員進入限制區或圍欄內" },
-  fall: { label: "人員倒地", source: "ai", located: true, requires: "ai", hint: "偵測到跌倒或長時間倒臥" },
-  smoke: { label: "煙霧 / 火焰", source: "ai", located: true, requires: "ai", hint: "影像偵測到煙霧或明火" },
-  abandoned: { label: "遺留物", source: "ai", located: true, requires: "ai", hint: "物品停留超過設定時間" },
-  door_open: { label: "門未關", source: "ai", located: true, requires: "ai", hint: "應關閉的門處於開啟" },
-  thermal: { label: "熱像異常", source: "ai", located: true, requires: "ai", hint: "溫度超出正常範圍" },
+  person: {
+    label: "偵測到人員",
+    source: "ai",
+    located: true,
+    requires: "ai",
+    hint: "任何人員出現在範圍內",
+  },
+  intrusion: {
+    label: "限制區入侵",
+    source: "ai",
+    located: true,
+    requires: "ai",
+    hint: "人員進入限制區或圍欄內",
+  },
+  fall: {
+    label: "人員倒地",
+    source: "ai",
+    located: true,
+    requires: "ai",
+    hint: "偵測到跌倒或長時間倒臥",
+  },
+  smoke: {
+    label: "煙霧 / 火焰",
+    source: "ai",
+    located: true,
+    requires: "ai",
+    hint: "影像偵測到煙霧或明火",
+  },
+  abandoned: {
+    label: "遺留物",
+    source: "ai",
+    located: true,
+    requires: "ai",
+    hint: "物品停留超過設定時間",
+  },
+  door_open: {
+    label: "門未關",
+    source: "ai",
+    located: true,
+    requires: "ai",
+    hint: "應關閉的門處於開啟",
+  },
+  thermal: {
+    label: "熱像異常",
+    source: "ai",
+    located: true,
+    requires: "ai",
+    hint: "溫度超出正常範圍",
+  },
   low_battery: { label: "電量過低", source: "system", located: false, hint: "低於設定門檻" },
-  fence_breach: { label: "狗離開圍欄", source: "system", located: true, hint: "狗的位置超出地理圍欄" },
-  mission_failed: { label: "任務失敗", source: "system", located: false, hint: "任何任務以失敗結束" },
-  gas_high: { label: "氣體超標", source: "sensor", located: true, hint: "氣體偵測 plugin 回報超標" },
+  fence_breach: {
+    label: "狗離開圍欄",
+    source: "system",
+    located: true,
+    hint: "狗的位置超出地理圍欄",
+  },
+  mission_failed: {
+    label: "任務失敗",
+    source: "system",
+    located: false,
+    hint: "任何任務以失敗結束",
+  },
+  gas_high: {
+    label: "氣體超標",
+    source: "sensor",
+    located: true,
+    hint: "氣體偵測 plugin 回報超標",
+  },
 };
 
 export const SOURCE_LABEL: Record<EventSource, string> = {
@@ -45,7 +111,11 @@ export const PRIORITY: Record<Priority, { label: string; short: string; hint: st
   3: { label: "P3 維護", short: "P3", hint: "最後才執行" },
 };
 
-export const MODE_LABEL: Record<Rule["mode"], string> = { auto: "自動", confirm: "先確認", notify: "只通知" };
+export const MODE_LABEL: Record<Rule["mode"], string> = {
+  auto: "自動",
+  confirm: "先確認",
+  notify: "只通知",
+};
 
 /** Operators may create routine and maintenance rules; P0/P1 are the Owner's. */
 export function canSetPriority(p: Priority, isOwner: boolean) {
@@ -109,10 +179,13 @@ export function nextSlots(schedule: Schedule, from: number, count = 5): number[]
       // ends (the window may wrap past midnight). No window = the whole day.
       const step = Math.max(5, schedule.minutes) * MIN;
       const w = schedule.window;
-      const span = w ? (((minutesOf(w.to) - minutesOf(w.from)) % 1440) + 1440) % 1440 || 1440 : 1440;
+      const span = w
+        ? (((minutesOf(w.to) - minutesOf(w.from)) % 1440) + 1440) % 1440 || 1440
+        : 1440;
       for (let d = -1; d < 9 && out.length < count; d++) {
         const anchor = atTime(from + d * DAY, w?.from ?? "00:00");
-        for (let t = anchor; t < anchor + span * MIN && out.length < count; t += step) if (t > from) out.push(t);
+        for (let t = anchor; t < anchor + span * MIN && out.length < count; t += step)
+          if (t > from) out.push(t);
       }
       return out;
     }
@@ -130,6 +203,39 @@ export function describeSchedule(s: Schedule): string {
     case "interval":
       return `${s.window ? `${s.window.from}–${s.window.to} ` : ""}每 ${s.minutes} 分鐘`;
   }
+}
+
+/**
+ * The schedule in a guard's words, short enough for a list row: 每 2 小時、每天 21:30、
+ * 每週一、四 02:00. The window, if any, is the detail page's business.
+ */
+export function shortSchedule(s: Schedule, withTime = true): string {
+  switch (s.type) {
+    case "once":
+      return withTime
+        ? `單次 ${new Date(s.at).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}`
+        : "單次";
+    case "daily":
+      return withTime ? `每天 ${s.time}` : "每天";
+    case "weekly":
+      return `每週${s.days.map((d) => WEEKDAYS[d]).join("、")}${withTime ? ` ${s.time}` : ""}`;
+    case "interval":
+      return s.minutes >= 60 && s.minutes % 60 === 0
+        ? `每 ${s.minutes / 60} 小時`
+        : `每 ${s.minutes} 分鐘`;
+  }
+}
+
+/** A time a list can say: 15:54 today, 明天 02:00, 週四 02:00 within the week, else m/d. */
+export function dayClock(t: number, now: number): string {
+  const day = (x: number) => new Date(new Date(x).toDateString()).getTime();
+  const diff = Math.round((day(t) - day(now)) / 86_400_000);
+  const hm = clock(t);
+  if (diff === 0) return hm;
+  if (diff === 1) return `明天 ${hm}`;
+  if (diff < 7) return `週${WEEKDAYS[new Date(t).getDay()]} ${hm}`;
+  const d = new Date(t);
+  return `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
 }
 
 /** RFC 5545 RRULE for storage/interop (shown under "進階"). */
@@ -170,7 +276,9 @@ export function describeTrigger(t: Trigger, zoneName: (id: string) => string = (
   const info = EVENT_TYPES[t.type];
   const where = t.zones.length ? ` @ ${t.zones.map(zoneName).join("、")}` : "";
   const filters = [
-    info.source === "ai" && t.minConfidence > 0 ? `信心 ≥ ${Math.round(t.minConfidence * 100)}%` : null,
+    info.source === "ai" && t.minConfidence > 0
+      ? `信心 ≥ ${Math.round(t.minConfidence * 100)}%`
+      : null,
     t.persistSec ? `持續 ${t.persistSec} 秒` : null,
     t.countWithin ? `${t.countWithin.sec} 秒內 ${t.countWithin.n} 次` : null,
     t.activeWindow ? `${t.activeWindow.from}–${t.activeWindow.to}` : null,
@@ -178,9 +286,21 @@ export function describeTrigger(t: Trigger, zoneName: (id: string) => string = (
   return `${info.label}${where}${filters.length ? `（${filters.join("、")}）` : ""}`;
 }
 
-export function ruleSentence(r: Rule, missionName: string, zoneName?: (id: string) => string): string {
-  const when = r.trigger.kind === "time" ? describeTrigger(r.trigger) : `當${describeTrigger(r.trigger, zoneName)}`;
-  const how = r.mode === "notify" ? "只通知" : r.mode === "confirm" ? `先詢問，${r.confirmTimeoutSec} 秒沒回應就${r.onTimeout === "run" ? "執行" : "取消"}` : "自動";
+export function ruleSentence(
+  r: Rule,
+  missionName: string,
+  zoneName?: (id: string) => string
+): string {
+  const when =
+    r.trigger.kind === "time"
+      ? describeTrigger(r.trigger)
+      : `當${describeTrigger(r.trigger, zoneName)}`;
+  const how =
+    r.mode === "notify"
+      ? "只通知"
+      : r.mode === "confirm"
+        ? `先詢問，${r.confirmTimeoutSec} 秒沒回應就${r.onTimeout === "run" ? "執行" : "取消"}`
+        : "自動";
   return `${when} → ${missionName}（${how}）`;
 }
 
@@ -194,10 +314,20 @@ export function formatRelative(at: number, now: number): string {
   const diff = at - now;
   const mins = Math.round(Math.abs(diff) / 60_000);
   const label =
-    mins < 1 ? "不到 1 分鐘" : mins < 60 ? `${mins} 分鐘` : mins < 1440 ? `${Math.round(mins / 60)} 小時` : `${Math.round(mins / 1440)} 天`;
+    mins < 1
+      ? "不到 1 分鐘"
+      : mins < 60
+        ? `${mins} 分鐘`
+        : mins < 1440
+          ? `${Math.round(mins / 60)} 小時`
+          : `${Math.round(mins / 1440)} 天`;
   return diff >= 0 ? `${label}後` : `${label}前`;
 }
 
 export function clock(t: number) {
-  return new Date(t).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(t).toLocaleTimeString("zh-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
