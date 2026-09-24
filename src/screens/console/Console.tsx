@@ -65,6 +65,18 @@ export function Console() {
   const estop = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ h: 760, pad: 16 });
   const [zone, setZone] = useState<{ top: number; bottom: number; height: number } | null>(null);
+  const mapPanel = useRef<HTMLDivElement>(null);
+  const [mapPanelH, setMapPanelH] = useState(400);
+
+  // Rounded to 8px: only the collapsed threshold and the call PiP size read it,
+  // so a per-frame resize during the sheet animation re-renders at most a few times.
+  useLayoutEffect(() => {
+    const el = mapPanel.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setMapPanelH(Math.round(el.clientHeight / 8) * 8));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [unlicensed, landscape]);
 
   useLayoutEffect(() => {
     const el = root.current;
@@ -114,13 +126,17 @@ export function Console() {
   // posture keys (measured: 266px for 360px of content on an SE), and
   // "recover" is the key you need right after an E-Stop. It takes up to 62%.
 
-  // At 90% the map would be a 57–73px sliver entirely covered by its own
-  // header. Collapse it to the header instead, and give the rest to the sheet.
-  const collapsed = snap === 2 && tab !== "teleop";
-  if (snap === 2 && !collapsed) sheetH = heights[1];
-  // In a call with the video as the main view, the map shrinks to a window at the right —
-  // smaller on a short panel so it stays clear of the status header.
-  const mapH = usable - ESTOP - sheetH - 2 * GAP;
+  // At 90% the map is left with exactly its header's height (heights[2]). The
+  // panel is always flex-1, so it follows the sheet frame by frame — while
+  // dragging and during the snap animation — and "collapsed" is what the
+  // panel's measured height says, not the snap: the map fades out as the
+  // sheet covers it instead of switching off at a threshold.
+  if (snap === 2 && tab === "teleop") sheetH = heights[1];
+  const collapsed = mapPanelH < COLLAPSED_HEADER + 40;
+  // The map fades in with the room it gets, so its corner controls never pop in
+  // squeezed against the header; banners wait until there is room below it.
+  const mapOpacity = Math.min(1, Math.max(0, (mapPanelH - COLLAPSED_HEADER) / 140));
+  const roomy = mapPanelH >= COLLAPSED_HEADER + 96;
 
   // Safe areas: notch / Dynamic Island on top, home indicator at the bottom.
   // The background runs under the cutout and the home bar; the panels start inside the safe area.
@@ -145,18 +161,24 @@ export function Console() {
     <EStopZone.Provider value={zone}>
       <div ref={root} className={shell}>
         <div
+          ref={mapPanel}
           className={cn(
-            "relative overflow-hidden rounded-xl border",
-            collapsed ? "bg-surface h-16 shrink-0" : "bg-map-ground min-h-0 flex-1"
+            "relative min-h-16 flex-1 overflow-hidden rounded-xl border transition-colors duration-300",
+            collapsed ? "bg-surface" : "bg-map-ground"
           )}
         >
+          {/* In a call with the video as the main view, the map shrinks to a window at the right —
+              smaller on a short panel so it stays clear of the status header. */}
           <div
+            aria-hidden={collapsed || undefined}
             className={cn(
-              collapsed && "hidden",
+              "transition-opacity duration-100 motion-reduce:transition-none",
+              collapsed && "pointer-events-none",
               videoMain
-                ? cn("absolute right-2 bottom-[60px] z-20 aspect-video overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15", mapH < 260 ? "w-24" : "w-36")
+                ? cn("absolute right-2 bottom-[60px] z-20 aspect-video overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15", mapPanelH < 260 ? "w-24" : "w-36")
                 : "absolute inset-0"
             )}
+            style={videoMain ? undefined : { opacity: mapOpacity }}
           >
             <MapView bare={videoMain} />
             {videoMain && (
@@ -172,7 +194,7 @@ export function Console() {
               at 337px inside a 253–332px panel). */}
           <div className={cn("pointer-events-none absolute inset-0 z-20 flex flex-col gap-1.5", collapsed ? "p-1.5" : "p-2")}>
             <DogHeader />
-            {!statusOpen && !collapsed && <Banners />}
+            {!statusOpen && roomy && <Banners />}
           </div>
           {!collapsed && (videoMain || !statusOpen) && <CallLayer />}
           {!collapsed && <FaultOverlay />}
