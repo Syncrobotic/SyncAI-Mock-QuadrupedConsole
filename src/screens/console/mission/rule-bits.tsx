@@ -1,33 +1,31 @@
 "use client";
 
-import { Activity, CircleCheck, CircleSlash, Clock, Cpu, Hourglass, Plug, Radar, Sparkles, Timer, X, type LucideIcon } from "lucide-react";
+import {
+  Activity,
+  CircleCheck,
+  CircleSlash,
+  Clock,
+  Cpu,
+  Hourglass,
+  Plug,
+  Radar,
+  Sparkles,
+  Timer,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 
-import { EVENT_TYPES, PRIORITY } from "@/lib/rules";
-import { cn } from "@/lib/utils";
+import { EVENT_TYPES } from "@/lib/rules";
 
-import type { Priority, Rule, RuleOutcome } from "@/proto/types";
-
-/**
- * Priority colour follows the dashboard's severity ramp — it IS a severity:
- * P0 reads as emergency, P1 as warning, routine and maintenance stay quiet.
- */
-const P_TONE: Record<Priority, string> = {
-  0: "bg-severity-emergency/15 text-red-700 dark:text-red-300 border-severity-emergency/40",
-  1: "bg-severity-warning/15 text-severity-warning border-severity-warning/35",
-  2: "bg-muted text-muted-foreground border-border",
-  3: "bg-muted text-muted-foreground border-border border-dashed",
-};
-
-export function PriorityPill({ p, long, className }: { p: Priority; long?: boolean; className?: string }) {
-  return (
-    <span className={cn("inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[11px] font-bold tabular-nums", P_TONE[p], className)}>
-      {long ? PRIORITY[p].label : PRIORITY[p].short}
-    </span>
-  );
-}
+import type { Rule, RuleOutcome, Zone } from "@/proto/types";
 
 export function RuleIcon({ rule, className }: { rule: Rule; className?: string }) {
-  if (rule.trigger.kind === "time") return rule.trigger.schedule.type === "interval" ? <Timer className={className} /> : <Clock className={className} />;
+  if (rule.trigger.kind === "time")
+    return rule.trigger.schedule.type === "interval" ? (
+      <Timer className={className} />
+    ) : (
+      <Clock className={className} />
+    );
   const src = EVENT_TYPES[rule.trigger.type].source;
   if (src === "ai") return <Sparkles className={className} />;
   if (src === "system") return <Cpu className={className} />;
@@ -46,3 +44,14 @@ export const OUTCOME: Record<RuleOutcome, { label: string; icon: LucideIcon; ton
   cancelled: { label: "取消", icon: X, tone: "text-muted-foreground" },
   filtered: { label: "未觸發", icon: CircleSlash, tone: "text-muted-foreground" },
 };
+
+/** The zone a point is in — the smallest one when zones overlap (a room inside a hall). */
+export function zoneAt(zones: Zone[] | undefined, x: number, y: number): Zone | undefined {
+  const inside = (zones ?? []).filter((z) => {
+    const [x1, x2] = [Math.min(z.rect.x1, z.rect.x2), Math.max(z.rect.x1, z.rect.x2)];
+    const [y1, y2] = [Math.min(z.rect.y1, z.rect.y2), Math.max(z.rect.y1, z.rect.y2)];
+    return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+  });
+  const area = (z: Zone) => Math.abs((z.rect.x2 - z.rect.x1) * (z.rect.y2 - z.rect.y1));
+  return inside.sort((a, b) => area(a) - area(b))[0];
+}

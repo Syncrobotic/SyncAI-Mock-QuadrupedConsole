@@ -1,23 +1,62 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Camera, ChevronDown, CircleAlert, Clock, FlaskConical, Gauge, Lock, Megaphone, Plus, Thermometer, Trash2, TriangleAlert, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Camera,
+  ChevronDown,
+  CircleAlert,
+  Clock,
+  FlaskConical,
+  Gauge,
+  Lock,
+  Megaphone,
+  Plus,
+  Puzzle,
+  Thermometer,
+  Trash2,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 
-import { Field, SectionTitle, Segmented, Select, Slider, inputClass } from "@/components/kit";
+import {
+  Field,
+  Modal,
+  SectionTitle,
+  Segmented,
+  Select,
+  Slider,
+  inputClass,
+} from "@/components/kit";
 import { SchemaForm, defaultsFor } from "@/components/SchemaForm";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { estimateMission } from "@/lib/schedule";
 import { cn, formatDuration } from "@/lib/utils";
 import { set, useStore } from "@/store";
+import { rpc } from "@/store/controller";
 
-import { closeEditor, moveWaypointOrder, patchDraft, removeWaypoint, saveDraft, updateWaypoint } from "./editor";
+import {
+  closeEditor,
+  moveWaypointOrder,
+  patchDraft,
+  removeWaypoint,
+  saveDraft,
+  updateWaypoint,
+} from "./editor";
+import { zoneAt } from "./rule-bits";
 
 import type { Action, Mission, PluginManifest, Waypoint } from "@/proto/types";
 
 /** §8 Sheet 90%: mission editor. Returning is closing the sheet, not "back". */
 export function MissionEditor() {
-  const editor = useStore((s) => s.editor)!;
+  // While it slides out after closing, the store's editor is already gone: keep showing
+  // the last one instead of reading null.
+  const live = useStore((s) => s.editor);
+  const [held, setHeld] = useState(live);
+  if (live && live !== held) setHeld(live);
+  const editor = (live ?? held)!;
   const pose = useStore((s) => s.telemetry?.pose);
   const [saving, setSaving] = useState(false);
   const d = editor.draft;
@@ -27,11 +66,15 @@ export function MissionEditor() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="bg-surface sticky top-0 z-10 flex items-center gap-2 border-b px-2 py-1">
+      {/* The sheet's scroller has 6 pt of top padding: stuck at top-0, content showed through
+          above the bar. It sticks 6 pt higher over the padding and pads itself back down. */}
+      <div className="bg-surface sticky -top-1.5 z-10 -mt-1.5 flex items-center gap-2 border-b px-2 pt-2.5 pb-1">
         <Button size="icon" variant="ghost" onClick={closeEditor} aria-label="取消編輯">
           <X />
         </Button>
-        <p className="flex-1 truncate text-[14px] font-semibold">{editor.isNew ? "新任務" : "編輯任務"}</p>
+        <p className="flex-1 truncate text-[14px] font-semibold">
+          {editor.isNew ? "新路線" : "編輯路線"}
+        </p>
         <Button
           loading={saving}
           disabled={errors.length > 0 || (d.kind === "patrol" && d.route.length === 0)}
@@ -50,9 +93,15 @@ export function MissionEditor() {
       <div className="flex flex-1 flex-col gap-5 px-3 pt-3 pb-8">
         {/* 1 基本 */}
         <section className="order-2 space-y-3">
-          <SectionTitle description="任務只定義「做什麼」；什麼時候、為什麼執行，在「規則」設定">1 · 基本</SectionTitle>
+          <SectionTitle description="路線只定義「做什麼」；什麼時候跑，在「排程」和「事件」設定">
+            基本
+          </SectionTitle>
           <Field label="名稱">
-            <input className={inputClass} value={d.name} onChange={(e) => patchDraft({ name: e.target.value })} />
+            <input
+              className={inputClass}
+              value={d.name}
+              onChange={(e) => patchDraft({ name: e.target.value })}
+            />
           </Field>
           <Segmented
             value={d.kind}
@@ -63,19 +112,32 @@ export function MissionEditor() {
             onChange={(kind) => patchDraft({ kind })}
           />
           <p className="text-muted-foreground text-[11px]">
-            {d.kind === "patrol" ? "沿固定航點巡邏，由時間或事件規則啟動。" : "前往觸發事件的位置，到場後執行動作。只能由事件規則啟動。"}
+            {d.kind === "patrol"
+              ? "沿固定航點巡邏，由時間或事件規則啟動。"
+              : "前往觸發事件的位置，到場後執行動作。只能由事件規則啟動。"}
           </p>
         </section>
 
         {d.kind === "response" && (
           <section className="order-1 space-y-3">
-            <SectionTitle description="狗會規劃路徑到事件位置附近，停在安全距離外">2 · 到場後</SectionTitle>
+            <SectionTitle description="狗會規劃路徑到事件位置附近，停在安全距離外">
+              到場後
+            </SectionTitle>
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[13px]">
                 停在距離事件
-                <span className="font-semibold tabular-nums">{d.response.approachM.toFixed(1)} m</span>
+                <span className="font-semibold tabular-nums">
+                  {d.response.approachM.toFixed(1)} m
+                </span>
               </div>
-              <Slider label="靠近距離" min={0.5} max={6} step={0.5} value={d.response.approachM} onChange={(v) => patchDraft({ response: { ...d.response, approachM: v } })} />
+              <Slider
+                label="靠近距離"
+                min={0.5}
+                max={6}
+                step={0.5}
+                value={d.response.approachM}
+                onChange={(v) => patchDraft({ response: { ...d.response, approachM: v } })}
+              />
             </div>
             <ActionList
               actions={d.response.actions}
@@ -86,51 +148,111 @@ export function MissionEditor() {
 
         {/* 2 路線 */}
         {d.kind === "patrol" && (
-        <section className="order-1 space-y-2">
-          <SectionTitle>2 · 路線 · {d.route.length} 個航點</SectionTitle>
-          <p className="text-muted-foreground text-xs">
-            約 {est.meters.toFixed(0)} m · {formatDuration(est.sec)} · 耗電約 {est.batteryPct.toFixed(0)}%
-          </p>
-          {d.route.length === 0 && (
-            <div className="bg-surface-sunken text-muted-foreground rounded-xl border border-dashed p-4 text-center text-sm">在地圖上長按 0.5 秒放第一個航點</div>
-          )}
-          <ol className="space-y-2">
-            {d.route.map((wp, i) => (
-              <WaypointItem key={wp.id} wp={wp} index={i} last={i === d.route.length - 1} />
-            ))}
-          </ol>
-        </section>
+          <section className="order-1 space-y-2">
+            <SectionTitle>路線 · {d.route.length} 個航點</SectionTitle>
+            <p className="text-muted-foreground text-xs">
+              約 {est.meters.toFixed(0)} m · {formatDuration(est.sec)} · 耗電約{" "}
+              {est.batteryPct.toFixed(0)}%
+            </p>
+            {d.route.length === 0 && (
+              <div className="bg-surface-sunken text-muted-foreground rounded-xl border border-dashed p-4 text-center text-sm">
+                在地圖上長按 0.5 秒放第一個航點
+              </div>
+            )}
+            <ol className="space-y-2">
+              {d.route.map((wp, i) => (
+                <WaypointItem key={wp.id} wp={wp} index={i} last={i === d.route.length - 1} />
+              ))}
+            </ol>
+          </section>
         )}
 
         {/* 4 策略 */}
         <section className="order-4 space-y-1">
-          <SectionTitle>3 · 策略</SectionTitle>
+          <SectionTitle>策略</SectionTitle>
           <PolicyEditor mission={d} />
         </section>
 
         {/* 5 驗證 */}
         <section className="order-5 space-y-2">
-          <SectionTitle>4 · 儲存前驗證</SectionTitle>
-          {editor.issues.length === 0 && (d.kind === "response" || d.route.length > 0) && <p className="text-status-ok text-[13px]">航點可達、電量足夠</p>}
+          <SectionTitle>儲存前檢查</SectionTitle>
+          {editor.issues.length === 0 && (d.kind === "response" || d.route.length > 0) && (
+            <p className="text-status-ok text-[13px]">航點可達、電量足夠</p>
+          )}
           {[...errors, ...warnings].map((issue, i) => (
             <button
               key={i}
-              onClick={() => issue.waypointId && set({ editor: { ...editor, selectedWp: issue.waypointId } })}
+              onClick={() =>
+                issue.waypointId && set({ editor: { ...editor, selectedWp: issue.waypointId } })
+              }
               className={cn(
                 "flex w-full cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-left text-[13px]",
-                issue.level === "error" ? "border-status-error/30 bg-status-error/10 text-status-error" : "border-severity-warning/30 bg-severity-warning/10 text-severity-warning"
+                issue.level === "error"
+                  ? "border-status-error/30 bg-status-error/10 text-status-error"
+                  : "border-severity-warning/30 bg-severity-warning/10 text-severity-warning"
               )}
             >
-              {issue.level === "error" ? <CircleAlert className="mt-0.5 size-4 shrink-0" /> : <TriangleAlert className="mt-0.5 size-4 shrink-0" />}
+              {issue.level === "error" ? (
+                <CircleAlert className="mt-0.5 size-4 shrink-0" />
+              ) : (
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              )}
               <span>
                 {issue.message}
-                <span className="block text-[11px] opacity-75">{issue.level === "error" ? "無法儲存" : "可以儲存"}</span>
+                <span className="block text-[11px] opacity-75">
+                  {issue.level === "error" ? "無法儲存" : "可以儲存"}
+                </span>
               </span>
             </button>
           ))}
         </section>
+
+        {!editor.isNew && (
+          <div className="order-6">
+            <DeleteMission id={d.id} name={d.name} />
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+/** Deleting sits at the end of the editor, away from the everyday keys. */
+function DeleteMission({ id, name }: { id: string; name: string }) {
+  const usedBy = useStore((s) => s.rules.filter((r) => r.missionId === id).length);
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <>
+      <Button variant="ghost" className="text-status-error w-full" onClick={() => setConfirm(true)}>
+        <Trash2 />
+        刪除這條路線
+      </Button>
+      <Modal open={confirm} onClose={() => setConfirm(false)}>
+        <p className="text-[15px] font-semibold">刪除「{name}」？</p>
+        <p className="text-muted-foreground mt-1">
+          {usedBy
+            ? `還有 ${usedBy} 條規則使用它，要先修改那些規則。`
+            : "路線會從狗上移除，執行紀錄保留。"}
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button variant="outline" onClick={() => setConfirm(false)}>
+            取消
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={usedBy > 0}
+            onClick={async () => {
+              setConfirm(false);
+              await rpc("mission.delete", { id });
+              closeEditor();
+              set({ detailMissionId: null });
+            }}
+          >
+            刪除
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -144,15 +266,29 @@ const BUILTIN: { label: string; icon: typeof Clock; make: () => Action }[] = [
 ];
 
 const PLUGIN_ICON: Record<string, typeof Clock> = { flask: FlaskConical, gauge: Gauge };
+const ACTION_ICON: Record<Action["type"], typeof Clock> = {
+  wait: Clock,
+  snapshot: Camera,
+  thermal: Thermometer,
+  announce: Megaphone,
+  plugin: Puzzle,
+};
 
 function WaypointItem({ wp, index, last }: { wp: Waypoint; index: number; last: boolean }) {
   const selected = useStore((s) => s.editor?.selectedWp === wp.id);
-  const error = useStore((s) => s.editor?.issues.some((i) => i.level === "error" && i.waypointId === wp.id));
+  const error = useStore((s) =>
+    s.editor?.issues.some((i) => i.level === "error" && i.waypointId === wp.id)
+  );
   const plugins = useStore((s) => s.device?.plugins);
+  const zone = useStore((s) => zoneAt(s.plan?.zones, wp.x, wp.y)?.name);
 
   return (
     <li
-      className={cn("bg-card rounded-xl border", selected && "ring-primary/50 ring-2", error && "border-status-error/50")}
+      className={cn(
+        "bg-card rounded-xl border",
+        selected && "ring-primary/50 ring-2",
+        error && "border-status-error/50"
+      )}
       ref={(el) => {
         // §8: selecting a waypoint on the map scrolls the list to it.
         if (el && selected) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -160,33 +296,76 @@ function WaypointItem({ wp, index, last }: { wp: Waypoint; index: number; last: 
     >
       <div className="flex items-center gap-1 py-0.5 pr-1 pl-2.5">
         <button
-          onClick={() => set((s) => (s.editor ? { editor: { ...s.editor, selectedWp: selected ? null : wp.id } } : {}))}
+          onClick={() =>
+            set((s) =>
+              s.editor ? { editor: { ...s.editor, selectedWp: selected ? null : wp.id } } : {}
+            )
+          }
           className="flex min-h-10 min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left"
         >
-          <span className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white", error ? "bg-status-error" : "bg-[var(--map-path-planned)]")}>
+          <span
+            className={cn(
+              "grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white",
+              error ? "bg-status-error" : "bg-[var(--map-path-planned)]"
+            )}
+          >
             {index + 1}
           </span>
-          {/* One line per waypoint: coordinates, then what happens there. */}
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="shrink-0 text-[13px] font-medium tabular-nums">
-              ({wp.x.toFixed(1)}, {wp.y.toFixed(1)})
-            </span>
-            <span className="text-muted-foreground truncate text-[11px]">{wp.actions.length ? wp.actions.map(actionLabel(plugins)).join(" → ") : "無動作"}</span>
+          {/* One line per waypoint: where it is (the zone, not coordinates), then what happens there as icons. */}
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="truncate text-[13px] font-medium">{zone ?? "未標示區域"}</span>
+            {wp.actions.length > 0 && (
+              <span
+                className="text-muted-foreground flex shrink-0 items-center gap-1"
+                aria-label={wp.actions.map(actionLabel(plugins)).join("、")}
+              >
+                {wp.actions.map((a, k) => {
+                  const I = ACTION_ICON[a.type];
+                  return <I key={k} aria-hidden className="size-3.5" />;
+                })}
+              </span>
+            )}
           </span>
-          <ChevronDown className={cn("text-muted-foreground ml-auto size-4 shrink-0 transition-transform", selected && "rotate-180")} />
+          <ChevronDown
+            className={cn(
+              "text-muted-foreground ml-auto size-4 shrink-0 transition-transform",
+              selected && "rotate-180"
+            )}
+          />
         </button>
-        <Button size="icon-sm" variant="ghost" className="shrink-0" disabled={index === 0} onClick={() => moveWaypointOrder(wp.id, -1)} aria-label="上移">
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="shrink-0"
+          disabled={index === 0}
+          onClick={() => moveWaypointOrder(wp.id, -1)}
+          aria-label="上移"
+        >
           <ArrowUp />
         </Button>
-        <Button size="icon-sm" variant="ghost" disabled={last} onClick={() => moveWaypointOrder(wp.id, 1)} aria-label="下移">
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          disabled={last}
+          onClick={() => moveWaypointOrder(wp.id, 1)}
+          aria-label="下移"
+        >
           <ArrowDown />
         </Button>
       </div>
 
       {selected && (
         <div className="space-y-2 border-t px-3 py-3">
-          <ActionList actions={wp.actions} onChange={(actions) => updateWaypoint(wp.id, { actions })} />
-          <Button variant="ghost" size="sm" className="text-status-error w-full" onClick={() => removeWaypoint(wp.id)}>
+          <ActionList
+            actions={wp.actions}
+            onChange={(actions) => updateWaypoint(wp.id, { actions })}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-status-error w-full"
+            onClick={() => removeWaypoint(wp.id)}
+          >
             <Trash2 />
             刪除航點
           </Button>
@@ -208,7 +387,10 @@ function actionLabel(plugins: PluginManifest[] | undefined) {
       case "announce":
         return "廣播";
       case "plugin":
-        return plugins?.find((p) => p.id === a.pluginId)?.missionActions.find((x) => x.id === a.actionId)?.label ?? a.actionId;
+        return (
+          plugins?.find((p) => p.id === a.pluginId)?.missionActions.find((x) => x.id === a.actionId)
+            ?.label ?? a.actionId
+        );
     }
   };
 }
@@ -241,7 +423,11 @@ function ActionList({ actions, onChange }: { actions: Action[]; onChange: (a: Ac
         <div className="bg-popover space-y-2 rounded-xl border p-2 shadow-lg">
           <div className="grid grid-cols-4 gap-1">
             {BUILTIN.map((b) => (
-              <button key={b.label} onClick={() => add(b.make())} className="hover:bg-accent flex h-10 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg text-[11px]">
+              <button
+                key={b.label}
+                onClick={() => add(b.make())}
+                className="hover:bg-accent flex h-10 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg text-[11px]"
+              >
                 <b.icon className="size-3.5" />
                 {b.label}
               </button>
@@ -261,7 +447,14 @@ function ActionList({ actions, onChange }: { actions: Action[]; onChange: (a: Ac
                   <button
                     key={a.id}
                     disabled={locked}
-                    onClick={() => add({ type: "plugin", pluginId: p.id, actionId: a.id, params: defaultsFor(a.schema) })}
+                    onClick={() =>
+                      add({
+                        type: "plugin",
+                        pluginId: p.id,
+                        actionId: a.id,
+                        params: defaultsFor(a.schema),
+                      })
+                    }
                     className="hover:bg-accent flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Icon className="size-4" />
@@ -298,15 +491,26 @@ function ActionItem({
 }) {
   const clips = useStore((s) => s.device?.clips);
   const [open, setOpen] = useState(action.type === "plugin");
-  const plugin = action.type === "plugin" ? plugins.find((p) => p.id === action.pluginId) : undefined;
-  const contribution = action.type === "plugin" ? plugin?.missionActions.find((a) => a.id === action.actionId) : undefined;
+  const plugin =
+    action.type === "plugin" ? plugins.find((p) => p.id === action.pluginId) : undefined;
+  const contribution =
+    action.type === "plugin"
+      ? plugin?.missionActions.find((a) => a.id === action.actionId)
+      : undefined;
 
   return (
     <div className="bg-surface-sunken rounded-lg border">
       <div className="flex items-center gap-2 py-1 pr-1 pl-3">
-        <button onClick={() => setOpen((o) => !o)} className="min-h-9 flex-1 cursor-pointer text-left text-[13px] font-medium">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="min-h-9 flex-1 cursor-pointer text-left text-[13px] font-medium"
+        >
           {index + 1}. {actionLabel(plugins)(action)}
-          {plugin && <span className="text-muted-foreground ml-1.5 text-[11px] font-normal">{plugin.name}</span>}
+          {plugin && (
+            <span className="text-muted-foreground ml-1.5 text-[11px] font-normal">
+              {plugin.name}
+            </span>
+          )}
         </button>
         <Button size="icon-sm" variant="ghost" onClick={onRemove} aria-label="移除動作">
           <X />
@@ -316,7 +520,14 @@ function ActionItem({
         <div className="border-t px-3 py-2.5">
           {action.type === "wait" && (
             <Field label="等待秒數">
-              <input className={inputClass} type="number" min={1} max={600} value={action.sec} onChange={(e) => onChange({ ...action, sec: Number(e.target.value) })} />
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                max={600}
+                value={action.sec}
+                onChange={(e) => onChange({ ...action, sec: Number(e.target.value) })}
+              />
             </Field>
           )}
           {action.type === "snapshot" && (
@@ -329,7 +540,9 @@ function ActionItem({
               onChange={(camera) => onChange({ ...action, camera })}
             />
           )}
-          {action.type === "thermal" && <p className="text-muted-foreground text-xs">在此航點做 360° 熱像掃描，約 4 秒。</p>}
+          {action.type === "thermal" && (
+            <p className="text-muted-foreground text-xs">在此航點做 360° 熱像掃描，約 4 秒。</p>
+          )}
           {action.type === "announce" && (
             <Select
               label="廣播音檔"
@@ -340,7 +553,11 @@ function ActionItem({
           )}
           {action.type === "plugin" &&
             (contribution ? (
-              <SchemaForm schema={contribution.schema} value={action.params} onChange={(params) => onChange({ ...action, params })} />
+              <SchemaForm
+                schema={contribution.schema}
+                value={action.params}
+                onChange={(params) => onChange({ ...action, params })}
+              />
             ) : (
               <p className="text-muted-foreground text-xs">此 plugin 已移除</p>
             ))}
@@ -374,7 +591,13 @@ function PolicyEditor({ mission }: { mission: Mission }) {
         <span className="text-[14px]">遇到障礙</span>
         <div className="flex items-center gap-1.5">
           {p.onObstacle === "wait" && (
-            <input aria-label="等待秒數" className={cn(inputClass, "w-16 text-center")} type="number" value={p.waitSec} onChange={(e) => patch({ waitSec: Number(e.target.value) })} />
+            <input
+              aria-label="等待秒數"
+              className={cn(inputClass, "w-16 text-center")}
+              type="number"
+              value={p.waitSec}
+              onChange={(e) => patch({ waitSec: Number(e.target.value) })}
+            />
           )}
           <Select
             label="遇到障礙"
@@ -391,11 +614,17 @@ function PolicyEditor({ mission }: { mission: Mission }) {
       </div>
       <label className="flex min-h-10 items-center justify-between gap-3 text-[13px]">
         <span className="text-[14px]">允許操控搶佔</span>
-        <Switch checked={p.allowTeleopPreempt} onCheckedChange={(allowTeleopPreempt) => patch({ allowTeleopPreempt })} />
+        <Switch
+          checked={p.allowTeleopPreempt}
+          onCheckedChange={(allowTeleopPreempt) => patch({ allowTeleopPreempt })}
+        />
       </label>
       <label className="flex min-h-10 items-center justify-between gap-3 text-[13px]">
         <span className="text-[14px]">結束後返回充電座</span>
-        <Switch checked={mission.returnToDock} onCheckedChange={(returnToDock) => patchDraft({ returnToDock })} />
+        <Switch
+          checked={mission.returnToDock}
+          onCheckedChange={(returnToDock) => patchDraft({ returnToDock })}
+        />
       </label>
     </div>
   );

@@ -13,21 +13,13 @@ import {
   Plus,
   Route,
   Square,
-  Trash2,
   TriangleAlert,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { AnimatePresence, m, type Variants } from "framer-motion";
+import { useLayoutEffect, useRef, useState } from "react";
 
-import {
-  Card,
-  LockedPanel,
-  Modal,
-  Pill,
-  SectionTitle,
-  Segmented,
-  type Tone,
-} from "@/components/kit";
+import { Card, LockedPanel, Modal, Pill, Segmented, type Tone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -35,13 +27,13 @@ import {
   MODE_LABEL,
   PRIORITY,
   clock,
-  describeTrigger,
   formatRelative,
   inWindow,
   jitterFor,
   nextSlots,
   shortSchedule,
   dayClock,
+  plainRule,
 } from "@/lib/rules";
 import { estimateMission } from "@/lib/schedule";
 import { cn, formatDuration } from "@/lib/utils";
@@ -54,7 +46,7 @@ import { useAccess } from "../Console";
 import { MissionEditor } from "./MissionEditor";
 import { RuleEditor } from "./RuleEditor";
 import { openEditor } from "./editor";
-import { OUTCOME, PriorityPill, RuleIcon } from "./rule-bits";
+import { OUTCOME, RuleIcon, zoneAt } from "./rule-bits";
 import { openRuleEditor, testRule } from "./rule-state";
 
 import type { Mission, Rule, RunRecord, RunResult } from "@/proto/types";
@@ -87,6 +79,40 @@ export function MissionTab() {
   const run = useStore((s) => s.telemetry?.run ?? null);
   const queue = useStore((s) => s.telemetry?.queue);
 
+  // Which screen, and how deep: list 0, a detail 1, an editor 2. Going deeper slides in
+  // from the right, coming back from the left (the sheet keeps its height either way).
+  const rule = rules.find((r) => r.id === detailRule);
+  const mission = missions.find((m) => m.id === detail);
+  const screen = ruleEditor
+    ? { key: "rule-editor", depth: 2 }
+    : editor
+      ? { key: "route-editor", depth: 2 }
+      : rule
+        ? { key: `rule:${rule.id}`, depth: 1 }
+        : mission
+          ? { key: `route:${mission.id}`, depth: 1 }
+          : { key: "list", depth: 0 };
+  const [trail, setTrail] = useState({ key: screen.key, depth: screen.depth, dir: 1 });
+  if (trail.key !== screen.key)
+    setTrail({ key: screen.key, depth: screen.depth, dir: screen.depth >= trail.depth ? 1 : -1 });
+
+  // A detail opens at its top; the list comes back where it was left.
+  const root = useRef<HTMLDivElement>(null);
+  const lastDepth = useRef(screen.depth);
+  const listScroll = useRef(0);
+  const nextScroll = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const sc = root.current?.closest(".overflow-y-auto");
+    if (sc && lastDepth.current === 0 && screen.depth !== 0) listScroll.current = sc.scrollTop;
+    nextScroll.current = screen.depth === 0 ? listScroll.current : 0;
+    lastDepth.current = screen.depth;
+  }, [screen.key, screen.depth]);
+  const onSwapped = () => {
+    const sc = root.current?.closest(".overflow-y-auto");
+    if (sc && nextScroll.current !== null) sc.scrollTop = nextScroll.current;
+    nextScroll.current = null;
+  };
+
   if (access.locked) {
     return (
       <div className="space-y-3 p-3">
@@ -105,14 +131,7 @@ export function MissionTab() {
     );
   }
 
-  if (ruleEditor) return <RuleEditor />;
-  if (editor) return <MissionEditor />;
-  const rule = rules.find((r) => r.id === detailRule);
-  if (rule) return <RuleDetail rule={rule} />;
-  const mission = missions.find((m) => m.id === detail);
-  if (mission) return <MissionDetail mission={mission} />;
-
-  return (
+  const list = (
     <div className="space-y-3 px-3 pt-1 pb-4">
       {run ? <RunCard /> : queue && queue.length > 0 ? <QueueCard /> : <NextCard />}
       <Segmented
@@ -153,7 +172,45 @@ export function MissionTab() {
       {view === "routes" && <RoutesView />}
     </div>
   );
+
+  return (
+    <div ref={root} className="overflow-x-clip">
+      <AnimatePresence mode="wait" initial={false} custom={trail.dir} onExitComplete={onSwapped}>
+        <m.div
+          key={screen.key}
+          custom={trail.dir}
+          variants={SLIDE}
+          initial="enter"
+          animate="center"
+          exit="exit"
+        >
+          {ruleEditor ? (
+            <RuleEditor />
+          ) : editor ? (
+            <MissionEditor />
+          ) : rule ? (
+            <RuleDetail rule={rule} />
+          ) : mission ? (
+            <MissionDetail mission={mission} />
+          ) : (
+            list
+          )}
+        </m.div>
+      </AnimatePresence>
+    </div>
+  );
 }
+
+/**
+ * Deeper slides in from the right, back from the left. The outgoing screen leaves fast (90 ms)
+ * and the incoming one takes its time (210 ms): with equal halves the two faded ends met in
+ * an all-but-empty frame.
+ */
+const SLIDE: Variants = {
+  enter: (dir: number) => ({ opacity: 0, x: dir * 28 }),
+  center: { opacity: 1, x: 0, transition: { duration: 0.21, ease: [0.32, 0.72, 0, 1] as const } },
+  exit: (dir: number) => ({ opacity: 0, x: dir * -16, transition: { duration: 0.09, ease: [0.4, 0, 1, 1] as const } }),
+};
 
 /** One card per list, hairlines between rows (same as the event log). */
 const LIST = "bg-card divide-y overflow-hidden rounded-xl border";
@@ -257,54 +314,78 @@ function NextCard() {
 
 // ── Running / queue ─────────────────────────────────────────────────────────
 
+/**
+ * What the dog is doing now: where it is headed and how long is left, big; progress one
+ * segment per waypoint; why it runs only when a rule started it (a manual run needs no why).
+ */
 function RunCard() {
   const run = useStore((s) => s.telemetry!.run!);
   const queue = useStore((s) => s.telemetry?.queue);
   const mission = useStore((s) => s.missions.find((m) => m.id === s.telemetry?.run?.missionId));
+  const zones = useStore((s) => s.plan?.zones);
   const [confirmAbort, setConfirmAbort] = useState(false);
   const paused = run.state === "paused";
-  const progress = run.totalWp
-    ? (Math.min(run.completedWp.length, run.totalWp) / run.totalWp) * 100
-    : 0;
+  const n = Math.min(run.currentWp + 1, run.totalWp);
+  const wp = mission?.kind === "patrol" ? mission.route[run.currentWp] : undefined;
+  const zone = wp && zoneAt(zones, wp.x, wp.y)?.name;
+  const where =
+    mission?.kind === "response" ? "前往事件位置" : `前往 航點 ${n}${zone ? ` · ${zone}` : ""}`;
+  const left = `${Math.floor(run.etaSec / 60)}:${String(Math.round(run.etaSec % 60)).padStart(2, "0")}`;
 
   return (
-    <Card className={cn("space-y-2", paused && "border-severity-warning/40")}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium">
-            <PriorityPill p={run.priority} />
-            {paused ? "暫停中" : "進行中"}
+    <Card className={cn("space-y-2.5", paused && "border-severity-warning/40")}>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-[14px] font-semibold">
+            <PriorityDot p={run.priority} />
+            <span className="truncate">{mission?.name ?? run.missionId}</span>
           </p>
-          <p className="mt-0.5 truncate text-[14px] font-semibold">
-            {mission?.name ?? run.missionId}
-          </p>
-          {/* Why it is running — the cause travels with the run (§7.1). */}
-          <p className="text-muted-foreground truncate text-[11px]">
-            {run.cause.text}
-            {run.cause.confirmedBy ? ` · 確認：${run.cause.confirmedBy}` : ""}
+          <p
+            className={cn(
+              "truncate text-[12px]",
+              paused ? "text-severity-warning font-medium" : "text-muted-foreground"
+            )}
+          >
+            {paused ? `暫停中${run.pausedReason ? ` · ${run.pausedReason}` : ""}` : where}
           </p>
         </div>
-        <Pill tone={paused ? "warn" : "busy"}>
-          {Math.min(run.currentWp + 1, run.totalWp)}/{run.totalWp}
-        </Pill>
+        <p className="shrink-0 text-right leading-tight">
+          <span className="text-muted-foreground block text-[11px]">剩餘</span>
+          <span className="text-[15px] font-semibold tabular-nums">{left}</span>
+        </p>
       </div>
-      <div className="bg-muted h-1 overflow-hidden rounded-full">
-        <div
-          className={cn(
-            "h-full rounded-full transition-[width] duration-500",
-            paused ? "bg-severity-warning" : "bg-primary"
-          )}
-          style={{ width: `${progress}%` }}
-        />
+      {/* One segment per waypoint: done, the one it is on, still ahead. */}
+      <div
+        className="flex gap-1"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={run.totalWp}
+        aria-valuenow={run.completedWp.length}
+        aria-label={`航點 ${n} / ${run.totalWp}`}
+      >
+        {Array.from({ length: Math.max(1, run.totalWp) }, (_, k) => (
+          <span
+            key={k}
+            className={cn(
+              "h-1.5 flex-1 rounded-full transition-colors duration-500",
+              run.completedWp.includes(k)
+                ? paused
+                  ? "bg-severity-warning"
+                  : "bg-primary-accent"
+                : k === run.currentWp
+                  ? paused
+                    ? "bg-severity-warning/40"
+                    : "bg-primary-accent/40 animate-pulse"
+                  : "bg-muted"
+            )}
+          />
+        ))}
       </div>
-      <div className="text-muted-foreground flex justify-between text-[11px] tabular-nums">
-        <span>
-          {mission?.kind === "response" ? "前往事件位置" : `目前航點 ${run.currentWp + 1}`}
-        </span>
-        <span>預估剩餘 {formatDuration(run.etaSec)}</span>
-      </div>
-      {paused && run.pausedReason && (
-        <p className="text-severity-warning text-[12px]">暫停原因：{run.pausedReason}</p>
+      {run.cause.kind !== "manual" && (
+        <p className="text-muted-foreground truncate text-[11px]">
+          {run.cause.text}
+          {run.cause.confirmedBy ? ` · 確認：${run.cause.confirmedBy}` : ""}
+        </p>
       )}
       <div className="grid grid-cols-2 gap-2">
         {paused ? (
@@ -371,7 +452,7 @@ function QueueList() {
     <ul className="border-t pt-1.5">
       {queue.map((q) => (
         <li key={q.activationId} className="flex items-center gap-2 py-0.5 text-[12px]">
-          <PriorityPill p={q.priority} />
+          <PriorityDot p={q.priority} />
           <span className="min-w-0 flex-1 truncate">
             {missions.find((m) => m.id === q.missionId)?.name}
             <span className="text-muted-foreground"> · {q.resumed ? "待續" : q.cause}</span>
@@ -498,15 +579,13 @@ function EventView() {
 /** Only the ones that matter get a mark: 緊急 red, 重要 amber; routine and maintenance stay quiet. */
 function PriorityDot({ p }: { p: Rule["priority"] }) {
   if (p > 1) return null;
+  // The label for screen readers sits beside the dot, not inside it (inside, it is "text"
+  // on the dot's colour).
   return (
-    <span
-      className={cn(
-        "size-2 shrink-0 rounded-full",
-        p === 0 ? "bg-status-error" : "bg-severity-warning"
-      )}
-    >
+    <>
+      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", p === 0 ? "bg-status-error" : "bg-severity-warning")} />
       <span className="sr-only">{PRIORITY[p].label}</span>
-    </span>
+    </>
   );
 }
 
@@ -567,7 +646,7 @@ function RuleRow({ rule, readOnly }: { rule: Rule; readOnly?: boolean }) {
       </span>
       <button
         disabled={readOnly}
-        onClick={() => set({ detailRuleId: rule.id, snap: 2 })}
+        onClick={() => set({ detailRuleId: rule.id })}
         className="min-w-0 flex-1 cursor-pointer text-left disabled:cursor-default"
       >
         <span
@@ -594,6 +673,10 @@ function RuleRow({ rule, readOnly }: { rule: Rule; readOnly?: boolean }) {
   );
 }
 
+/**
+ * A rule, read: one plain sentence of what it does, one key to change it, and — the question
+ * people come here with — why it did or did not run. Deleting is in the editor.
+ */
 function RuleDetail({ rule }: { rule: Rule }) {
   const missions = useStore((s) => s.missions);
   const zones = useStore((s) => s.plan?.zones);
@@ -601,7 +684,7 @@ function RuleDetail({ rule }: { rule: Rule }) {
   const history = useStore((s) => s.history);
   const owner = useStore((s) => !!s.session?.scopes.includes("admin"));
   const [verdict, setVerdict] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [testing, setTesting] = useState(false);
   const mission = missions.find((m) => m.id === rule.missionId);
   const entries = log.filter((l) => l.ruleId === rule.id).slice(0, 20);
   const runs = history.filter((h) => h.cause?.ruleId === rule.id).slice(0, 10);
@@ -614,117 +697,92 @@ function RuleDetail({ rule }: { rule: Rule }) {
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => set({ detailRuleId: null, snap: 1 })}
+          onClick={() => set({ detailRuleId: null })}
           aria-label="返回規則列表"
         >
           <ChevronLeft />
         </Button>
-        <span className="bg-primary/12 text-primary-accent grid size-8 shrink-0 place-items-center rounded-lg">
-          <RuleIcon rule={rule} className="size-4" />
-        </span>
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 truncate text-[14px] font-semibold">
-            <PriorityPill p={rule.priority} long />
+          <p className="flex items-center gap-1.5 text-[14px] font-semibold">
+            <PriorityDot p={rule.priority} />
             <span className="truncate">{rule.name}</span>
           </p>
           <p className="text-muted-foreground truncate text-[11px]">
-            {rule.enabled ? "啟用中" : "已停用"} · {MODE_LABEL[rule.mode]}
+            {rule.enabled ? "啟用中" : "已停用"} · {PRIORITY[rule.priority].label}
           </p>
         </div>
       </div>
 
-      <Card className="space-y-1 text-[12px]">
-        <p>
-          <span className="text-muted-foreground">當 </span>
-          {describeTrigger(rule.trigger, zoneName)}
-        </p>
-        <p>
-          <span className="text-muted-foreground">就 </span>
-          {mission?.name}
-          {mission && (
-            <span className="text-muted-foreground">
-              {" "}
-              · 約 {formatDuration(estimateMission(mission).sec)}
-            </span>
-          )}
-        </p>
-        <p className="text-muted-foreground">
-          {PRIORITY[rule.priority].hint} · 冷卻{" "}
-          {rule.cooldownSec ? `${rule.cooldownSec / 60} 分` : "無"} · 每小時最多 {rule.maxPerHour}{" "}
-          次 · 電量 ≥ {rule.minBattery}%
-        </p>
-      </Card>
+      <p className="px-1 text-[14px] leading-relaxed">
+        {plainRule(rule, mission?.name ?? "（未選路線）", zoneName)}
+      </p>
 
-      <div className="grid grid-cols-3 gap-2">
-        <Button variant="secondary" disabled={locked} onClick={() => openRuleEditor(rule)}>
+      <div className="space-y-1.5">
+        <Button
+          className="w-full"
+          variant="secondary"
+          disabled={locked}
+          onClick={() => openRuleEditor(rule)}
+        >
           <Pencil />
           編輯
         </Button>
-        <Button variant="outline" onClick={async () => setVerdict(await testRule(rule))}>
-          <FlaskConical />
-          模擬
-        </Button>
-        <Button variant="outline" disabled={locked} onClick={() => setConfirmDelete(true)}>
-          <Trash2 />
-          刪除
-        </Button>
+        {locked && (
+          <p className="text-muted-foreground px-1 text-[11px]">
+            緊急與重要的規則只有擁有者能修改。
+          </p>
+        )}
+        <button
+          className="text-primary-accent flex min-h-9 cursor-pointer items-center gap-1.5 px-1 text-[12px] font-medium disabled:opacity-60"
+          disabled={testing}
+          onClick={async () => {
+            setTesting(true);
+            setVerdict(await testRule(rule));
+            setTesting(false);
+          }}
+        >
+          <FlaskConical className="size-3.5" />
+          試跑判斷：現在觸發會怎樣？
+        </button>
+        {verdict && (
+          <p className="bg-surface-sunken rounded-lg border px-3 py-2 text-[12px]">{verdict}</p>
+        )}
       </div>
-      {locked && (
-        <p className="text-muted-foreground text-[11px]">P0 / P1 規則只有擁有者能修改。</p>
-      )}
-      {verdict && (
-        <p className="bg-surface-sunken rounded-lg border px-3 py-2 text-[12px]">{verdict}</p>
-      )}
 
       {/* §7.2: "why didn't it run?" is the question — every decision is here. */}
-      <div className="space-y-1.5">
-        <SectionTitle description="包含沒有出動的原因">最近的決策</SectionTitle>
-        {entries.length === 0 && <p className="text-muted-foreground text-[12px]">還沒有觸發過</p>}
-        <ul className="bg-card divide-y rounded-xl border">
-          {entries.map((e) => {
-            const o = OUTCOME[e.outcome];
-            return (
-              <li key={e.id} className="flex items-start gap-2 px-3 py-1.5 text-[12px]">
-                <o.icon className={cn("mt-0.5 size-3.5 shrink-0", o.tone)} />
-                <span className="min-w-0 flex-1">
-                  <span className={cn("font-medium", o.tone)}>{o.label}</span>
-                  <span className="text-muted-foreground"> · {e.reason}</span>
-                </span>
-                <span className="text-muted-foreground shrink-0 tabular-nums">{clock(e.at)}</span>
-              </li>
-            );
-          })}
-        </ul>
+      <div className="space-y-1">
+        <ListHeader title="最近的決策" />
+        {entries.length === 0 ? (
+          <p className="text-muted-foreground px-1 text-[12px]">還沒有觸發過</p>
+        ) : (
+          <ul className={LIST}>
+            {entries.map((e) => {
+              const o = OUTCOME[e.outcome];
+              return (
+                <li key={e.id} className="flex items-start gap-2 px-3 py-2 text-[12px]">
+                  <o.icon className={cn("mt-0.5 size-3.5 shrink-0", o.tone)} />
+                  <span className="min-w-0 flex-1">
+                    <span className={cn("font-medium", o.tone)}>{o.label}</span>
+                    <span className="text-muted-foreground"> · {e.reason}</span>
+                  </span>
+                  <span className="text-muted-foreground shrink-0 tabular-nums">{clock(e.at)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       {runs.length > 0 && (
-        <div className="space-y-1.5">
-          <SectionTitle>最近的執行</SectionTitle>
-          {runs.map((r) => (
-            <RunRow key={r.id} run={r} />
-          ))}
+        <div className="space-y-1">
+          <ListHeader title="最近的執行" />
+          <ul className={LIST}>
+            {runs.map((r) => (
+              <RunRow key={r.id} run={r} />
+            ))}
+          </ul>
         </div>
       )}
-
-      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)}>
-        <p className="text-[15px] font-semibold">刪除規則「{rule.name}」？</p>
-        <p className="text-muted-foreground mt-1">任務範本會保留，只是不再由這條規則啟動。</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={() => setConfirmDelete(false)}>
-            取消
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={async () => {
-              setConfirmDelete(false);
-              await rpc("rule.delete", { id: rule.id });
-              set({ detailRuleId: null, snap: 1 });
-            }}
-          >
-            刪除
-          </Button>
-        </div>
-      </Modal>
     </div>
   );
 }
@@ -764,7 +822,7 @@ function RouteRow({ mission: m }: { mission: Mission }) {
   return (
     <li>
       <button
-        onClick={() => set({ detailMissionId: m.id, snap: 2 })}
+        onClick={() => set({ detailMissionId: m.id })}
         className="hover:bg-accent/50 flex min-h-12 w-full cursor-pointer items-center gap-2.5 py-2 pr-2.5 pl-3 text-left transition-colors"
       >
         <span className="bg-muted text-muted-foreground grid size-7 shrink-0 place-items-center rounded-lg">
@@ -788,13 +846,18 @@ function RouteRow({ mission: m }: { mission: Mission }) {
   );
 }
 
+/**
+ * A route: the map stays at half height with the route drawn on it (Scene reads
+ * detailMissionId), 現在跑 and 編輯, the rules that use it, and how its runs went.
+ * Deleting is in the editor.
+ */
 function MissionDetail({ mission }: { mission: Mission }) {
   const allHistory = useStore((s) => s.history);
   const rules = useStore((s) => s.rules);
   const history = allHistory.filter((h) => h.missionId === mission.id).slice(0, 20);
   const running = useStore((s) => s.telemetry?.run?.missionId === mission.id);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const usedBy = rules.filter((r) => r.missionId === mission.id);
+  const est = estimateMission(mission);
 
   return (
     <div className="space-y-3 px-3 pt-0.5 pb-5">
@@ -802,50 +865,44 @@ function MissionDetail({ mission }: { mission: Mission }) {
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => set({ detailMissionId: null, snap: 1 })}
-          aria-label="返回任務列表"
+          onClick={() => set({ detailMissionId: null })}
+          aria-label="返回路線列表"
         >
           <ChevronLeft />
         </Button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-semibold">{mission.name}</p>
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-muted-foreground text-[11px] tabular-nums">
             {mission.kind === "response"
-              ? "事件回應 · 前往事件位置"
-              : `巡邏路線 · ${mission.route.length} 個航點`}
+              ? `事件回應 · 前往事件位置 · ${mission.response.actions.length} 個動作`
+              : `${mission.route.length} 個航點 · 約 ${formatDuration(est.sec)}`}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <Button
-          disabled={running || mission.kind === "response"}
-          onClick={() => void rpc("mission.start", { id: mission.id })}
-        >
-          <Play />
-          立即執行
-        </Button>
+      <div className={cn("grid gap-2", mission.kind === "patrol" ? "grid-cols-2" : "grid-cols-1")}>
+        {mission.kind === "patrol" && (
+          <Button disabled={running} onClick={() => void rpc("mission.start", { id: mission.id })}>
+            <Play />
+            {running ? "執行中" : "現在跑"}
+          </Button>
+        )}
         <Button variant="secondary" onClick={() => openEditor(mission)}>
           <Pencil />
           編輯
         </Button>
-        <Button variant="outline" onClick={() => setConfirmDelete(true)}>
-          <Trash2 />
-          刪除
-        </Button>
       </div>
       {mission.kind === "response" && (
-        <p className="text-muted-foreground text-[11px]">
-          事件回應任務需要事件的位置，只能由事件規則啟動。
+        <p className="text-muted-foreground px-1 text-[11px]">
+          事件回應要有事件的位置，只能由事件規則啟動。
         </p>
       )}
 
-      <div className="space-y-1.5">
-        <SectionTitle>使用這個任務的規則</SectionTitle>
-        {usedBy.length === 0 && (
-          <p className="text-muted-foreground text-[12px]">沒有規則使用，只能手動執行</p>
-        )}
-        {usedBy.length > 0 && (
+      <div className="space-y-1">
+        <ListHeader title="使用這條路線的規則" />
+        {usedBy.length === 0 ? (
+          <p className="text-muted-foreground px-1 text-[12px]">沒有規則使用，只能手動執行</p>
+        ) : (
           <ul className={LIST}>
             {usedBy.map((r) => (
               <RuleRow key={r.id} rule={r} />
@@ -854,40 +911,18 @@ function MissionDetail({ mission }: { mission: Mission }) {
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <SectionTitle>最近 {history.length} 次執行</SectionTitle>
-        {history.length === 0 && (
-          <p className="text-muted-foreground text-[12px]">還沒有執行紀錄</p>
+      <div className="space-y-1">
+        <ListHeader title="最近的執行" />
+        {history.length === 0 ? (
+          <p className="text-muted-foreground px-1 text-[12px]">還沒有執行紀錄</p>
+        ) : (
+          <ul className={LIST}>
+            {history.map((r) => (
+              <RunRow key={r.id} run={r} mission={mission} />
+            ))}
+          </ul>
         )}
-        {history.map((r) => (
-          <RunRow key={r.id} run={r} mission={mission} />
-        ))}
       </div>
-
-      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)}>
-        <p className="text-[15px] font-semibold">刪除「{mission.name}」？</p>
-        <p className="text-muted-foreground mt-1">
-          {usedBy.length
-            ? `還有 ${usedBy.length} 條規則使用它，需要先修改那些規則。`
-            : "任務範本會從狗上移除，執行紀錄保留。"}
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={() => setConfirmDelete(false)}>
-            取消
-          </Button>
-          <Button
-            variant="destructive"
-            disabled={usedBy.length > 0}
-            onClick={async () => {
-              setConfirmDelete(false);
-              await rpc("mission.delete", { id: mission.id });
-              set({ detailMissionId: null, snap: 1 });
-            }}
-          >
-            刪除
-          </Button>
-        </div>
-      </Modal>
     </div>
   );
 }
@@ -896,7 +931,7 @@ function RunRow({ run, mission }: { run: RunRecord; mission?: Mission }) {
   const missions = useStore((s) => s.missions);
   const m = mission ?? missions.find((x) => x.id === run.missionId);
   return (
-    <Card className="flex items-center gap-2.5 py-1.5">
+    <li className="flex items-center gap-2.5 px-3 py-2">
       <div className="min-w-0 flex-1">
         <p className="text-[12px] font-medium tabular-nums">
           {new Date(run.startedAt).toLocaleString("zh-TW", {
@@ -910,12 +945,11 @@ function RunRow({ run, mission }: { run: RunRecord; mission?: Mission }) {
         </p>
         <p className="text-muted-foreground truncate text-[11px]">
           {run.cause?.text ?? "—"}
-          {run.cause?.confirmedBy ? ` · ${run.cause.confirmedBy}` : ""}
           {run.reason ? ` · ${run.reason}` : ""}
         </p>
       </div>
       <Pill tone={RESULT[run.result].tone}>{RESULT[run.result].label}</Pill>
-    </Card>
+    </li>
   );
 }
 
@@ -927,8 +961,8 @@ export function MissionSummary() {
   if (run)
     return (
       <span>
-        {PRIORITY[run.priority].short} {run.state === "paused" ? "暫停" : "進行中"}：{name} ·{" "}
-        {run.currentWp + 1}/{run.totalWp}
+        {run.state === "paused" ? "暫停" : "進行中"}：{name} · 航點{" "}
+        {Math.min(run.currentWp + 1, run.totalWp)}/{run.totalWp}
         {queued ? ` · ${queued} 個排隊` : ""}
       </span>
     );

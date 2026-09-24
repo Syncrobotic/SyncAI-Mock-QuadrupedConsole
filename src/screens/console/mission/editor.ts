@@ -36,7 +36,6 @@ export function openEditor(mission?: Mission) {
     editor: { draft: structuredClone(mission ?? blankMission()), isNew: !mission, selectedWp: null, issues: [] },
     snap: 1,
     view: "top",
-    detailMissionId: null,
   });
   void revalidate();
 }

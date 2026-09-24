@@ -2,7 +2,18 @@ import { EVENT_TYPES, PRIORITY, inWindow, jitterFor, nextSlots } from "@/lib/rul
 
 export { jitterFor };
 
-import type { Detection, EventType, Mission, PendingConfirm, Priority, QueueItem, Rule, RuleLogEntry, RuleOutcome, RunCause } from "@/proto/types";
+import type {
+  Detection,
+  EventType,
+  Mission,
+  PendingConfirm,
+  Priority,
+  QueueItem,
+  Rule,
+  RuleLogEntry,
+  RuleOutcome,
+  RunCause,
+} from "@/proto/types";
 
 /**
  * The dog-side rule engine (docs/2026-09-23-mission-triggers-design.md §2–§7).
@@ -81,7 +92,11 @@ export class RuleEngine {
         const due = slot + jitterFor(r.id, slot, t.jitterMin);
         if (due > from && due <= ctx.now) {
           const hhmm = new Date(slot).toTimeString().slice(0, 5);
-          const d = this.activate(ctx, r, { kind: "time", ruleId: r.id, text: `排程 ${hhmm}${t.jitterMin ? `（偏移 ${Math.round((due - slot) / MIN)} 分）` : ""}` });
+          const d = this.activate(ctx, r, {
+            kind: "time",
+            ruleId: r.id,
+            text: `排程 ${hhmm}${t.jitterMin ? `（偏移 ${Math.round((due - slot) / MIN)} 分）` : ""}`,
+          });
           if (d) out.push(d);
         }
         if (slot > ctx.now + pad) break;
@@ -103,7 +118,12 @@ export class RuleEngine {
       if (det.confidence < t.minConfidence) {
         if (!this.tracks.has(key)) {
           this.tracks.set(key, { first: ctx.now, seen: [], done: true });
-          this.note(r.id, "filtered", `信心 ${Math.round(det.confidence * 100)}% 低於門檻 ${Math.round(t.minConfidence * 100)}%`, ctx.now);
+          this.note(
+            r.id,
+            "filtered",
+            `信心 ${Math.round(det.confidence * 100)}% 低於門檻 ${Math.round(t.minConfidence * 100)}%`,
+            ctx.now
+          );
         }
         continue;
       }
@@ -112,7 +132,9 @@ export class RuleEngine {
       this.tracks.set(key, tr);
       if (tr.done) continue;
       const persisted = (ctx.now - tr.first) / 1000 >= t.persistSec;
-      const counted = !t.countWithin || tr.seen.filter((s) => ctx.now - s <= t.countWithin!.sec * 1000).length >= t.countWithin.n;
+      const counted =
+        !t.countWithin ||
+        tr.seen.filter((s) => ctx.now - s <= t.countWithin!.sec * 1000).length >= t.countWithin.n;
       if (!persisted || !counted) continue;
       tr.done = true; // one fire per track: the same person does not trigger twenty times
       const text = `${EVENT_TYPES[det.type].label} @ ${ctx.zoneName(det.zoneId)}（${Math.round(det.confidence * 100)}%）`;
@@ -127,7 +149,12 @@ export class RuleEngine {
     for (const r of ctx.rules) {
       const tr = this.tracks.get(`${r.id}:${trackId}`);
       if (tr && !tr.done && r.trigger.kind === "event") {
-        this.note(r.id, "filtered", `只持續 ${Math.round((ctx.now - tr.first) / 1000)} 秒，未達 ${r.trigger.persistSec} 秒`, ctx.now);
+        this.note(
+          r.id,
+          "filtered",
+          `只持續 ${Math.round((ctx.now - tr.first) / 1000)} 秒，未達 ${r.trigger.persistSec} 秒`,
+          ctx.now
+        );
       }
       this.tracks.delete(`${r.id}:${trackId}`);
     }
@@ -149,7 +176,13 @@ export class RuleEngine {
       id: `manual:${missionId}`,
       name: "手動執行",
       enabled: true,
-      trigger: { kind: "time", schedule: { type: "once", at: ctx.now }, jitterMin: 0, missed: "skip", graceMin: 0 },
+      trigger: {
+        kind: "time",
+        schedule: { type: "once", at: ctx.now },
+        jitterMin: 0,
+        missed: "skip",
+        graceMin: 0,
+      },
       missionId,
       priority: 1,
       mode: "auto",
@@ -161,18 +194,34 @@ export class RuleEngine {
       onPreempted: "resume",
       queueTtlSec: 600,
     };
-    this.enqueue(ctx, { id: uid("act"), rule, cause: { kind: "manual", text: `手動 · ${by}` }, createdAt: ctx.now, expiresAt: ctx.now + rule.queueTtlSec * 1000 });
+    this.enqueue(ctx, {
+      id: uid("act"),
+      rule,
+      cause: { kind: "manual", text: `手動 · ${by}` },
+      createdAt: ctx.now,
+      expiresAt: ctx.now + rule.queueTtlSec * 1000,
+    });
     return this.pick(ctx);
   }
 
   // ── Activation → mode ──────────────────────────────────────────────────────
 
-  private activate(ctx: EngineCtx, r: Rule, cause: RunCause, detection?: Detection): Decision | null {
+  private activate(
+    ctx: EngineCtx,
+    r: Rule,
+    cause: RunCause,
+    detection?: Detection
+  ): Decision | null {
     const fired = (this.fired[r.id] ??= []).filter((t) => ctx.now - t < 3_600_000);
     this.fired[r.id] = fired;
     const last = fired[fired.length - 1];
     if (last && ctx.now - last < r.cooldownSec * 1000) {
-      this.note(r.id, "filtered", `冷卻中（${Math.ceil((r.cooldownSec * 1000 - (ctx.now - last)) / 1000)} 秒後才能再觸發）`, ctx.now);
+      this.note(
+        r.id,
+        "filtered",
+        `冷卻中（${Math.ceil((r.cooldownSec * 1000 - (ctx.now - last)) / 1000)} 秒後才能再觸發）`,
+        ctx.now
+      );
       return null;
     }
     if (fired.length >= r.maxPerHour) {
@@ -181,7 +230,14 @@ export class RuleEngine {
     }
     fired.push(ctx.now);
 
-    const act: Activation = { id: uid("act"), rule: r, cause, detection, createdAt: ctx.now, expiresAt: ctx.now + r.queueTtlSec * 1000 };
+    const act: Activation = {
+      id: uid("act"),
+      rule: r,
+      cause,
+      detection,
+      createdAt: ctx.now,
+      expiresAt: ctx.now + r.queueTtlSec * 1000,
+    };
     if (r.mode === "notify") {
       this.note(r.id, "notified", `${cause.text} · 只通知`, ctx.now);
       return { do: "notify", act };
@@ -238,7 +294,12 @@ export class RuleEngine {
     }
     this.queue = this.queue.filter((a) => {
       if (ctx.now < a.expiresAt) return true;
-      this.note(a.rule.id, "expired", `排隊超過 ${Math.round((a.expiresAt - a.createdAt) / 1000)} 秒未執行，已丟棄`, ctx.now);
+      this.note(
+        a.rule.id,
+        "expired",
+        `排隊超過 ${Math.round((a.expiresAt - a.createdAt) / 1000)} 秒未執行，已丟棄`,
+        ctx.now
+      );
       return false;
     });
     out.push(...this.pick(ctx));
@@ -265,7 +326,10 @@ export class RuleEngine {
     if (!mission) return wait("任務範本已刪除", true);
     if (!ctx.licensed("mission")) return wait("License 不含任務排程", true);
     if (ctx.battery < best.rule.minBattery)
-      return wait(`電量 ${Math.round(ctx.battery)}% 低於門檻 ${best.rule.minBattery}%`, best.rule.trigger.kind === "time" && best.rule.trigger.missed === "skip");
+      return wait(
+        `電量 ${Math.round(ctx.battery)}% 低於門檻 ${best.rule.minBattery}%`,
+        best.rule.trigger.kind === "time" && best.rule.trigger.missed === "skip"
+      );
     if (ctx.blocked === "teleop") return wait("操作員正在手動操控，排隊等待（規則不會搶走操控權）");
     if (ctx.blocked === "estop") return wait("緊急停止中");
     if (ctx.blocked === "fault") return wait("故障中");
@@ -274,12 +338,22 @@ export class RuleEngine {
       // §5.1: only P0/P1 preempt, and only something strictly lower.
       if (best.rule.priority <= 1 && best.rule.priority < ctx.running.priority) {
         this.queue.shift();
-        this.note(best.rule.id, "started", `${best.cause.text} · 打斷 ${PRIORITY[ctx.running.priority].label}`, ctx.now);
+        this.note(
+          best.rule.id,
+          "started",
+          `${best.cause.text} · 打斷${PRIORITY[ctx.running.priority].label}任務`,
+          ctx.now
+        );
         return [{ do: "preempt", act: best }];
       }
       if (!this.waitingNoted.has(best.id)) {
         this.waitingNoted.add(best.id);
-        this.note(best.rule.id, "queued", `正在執行 ${PRIORITY[ctx.running.priority].label}，排隊中`, ctx.now);
+        this.note(
+          best.rule.id,
+          "queued",
+          `正在執行${PRIORITY[ctx.running.priority].label}任務，排隊中`,
+          ctx.now
+        );
       }
       return [];
     }
@@ -323,16 +397,27 @@ export class RuleEngine {
     const mission = ctx.missions.find((m) => m.id === r.missionId);
     if (!mission) return "找不到任務範本";
     if (!ctx.licensed("mission")) return "會被擋下：License 不含任務排程";
-    if (r.trigger.kind === "event" && EVENT_TYPES[r.trigger.type].requires === "ai" && !ctx.licensed("ai")) return "不會觸發：License 不含 AI 辨識";
-    if (r.trigger.kind === "event" && !inWindow(r.trigger.activeWindow, ctx.now)) return `現在不在生效時段（${r.trigger.activeWindow!.from}–${r.trigger.activeWindow!.to}）`;
+    if (
+      r.trigger.kind === "event" &&
+      EVENT_TYPES[r.trigger.type].requires === "ai" &&
+      !ctx.licensed("ai")
+    )
+      return "不會觸發：License 不含 AI 辨識";
+    if (r.trigger.kind === "event" && !inWindow(r.trigger.activeWindow, ctx.now))
+      return `現在不在生效時段（${r.trigger.activeWindow!.from}–${r.trigger.activeWindow!.to}）`;
     if (r.mode === "notify") return "觸發後只會通知，不會出動";
-    const head = r.mode === "confirm" ? `會先詢問在線手機（${r.confirmTimeoutSec} 秒，逾時${r.onTimeout === "run" ? "執行" : "取消"}），核准後` : "觸發後";
-    if (ctx.battery < r.minBattery) return `${head}會被擋下：電量 ${Math.round(ctx.battery)}% 低於 ${r.minBattery}%`;
+    const head =
+      r.mode === "confirm"
+        ? `會先詢問在線手機（${r.confirmTimeoutSec} 秒，逾時${r.onTimeout === "run" ? "執行" : "取消"}），核准後`
+        : "觸發後";
+    if (ctx.battery < r.minBattery)
+      return `${head}會被擋下：電量 ${Math.round(ctx.battery)}% 低於 ${r.minBattery}%`;
     if (ctx.blocked === "teleop") return `${head}會排隊：操作員正在手動操控`;
     if (ctx.blocked) return `${head}會排隊：狗目前${ctx.blocked === "estop" ? "緊急停止" : "故障"}`;
     if (ctx.running) {
-      if (r.priority <= 1 && r.priority < ctx.running.priority) return `${head}會打斷目前的 ${PRIORITY[ctx.running.priority].label}，立刻出動「${mission.name}」`;
-      return `${head}會排隊：正在執行 ${PRIORITY[ctx.running.priority].label}`;
+      if (r.priority <= 1 && r.priority < ctx.running.priority)
+        return `${head}會打斷目前的${PRIORITY[ctx.running.priority].label}任務，立刻出動「${mission.name}」`;
+      return `${head}會排隊：正在執行${PRIORITY[ctx.running.priority].label}任務`;
     }
     return `${head}會立刻出動「${mission.name}」`;
   }

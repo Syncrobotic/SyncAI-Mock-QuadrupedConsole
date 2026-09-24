@@ -221,7 +221,7 @@ async (page) => {
   await page.getByRole("tab", { name: "任務" }).click();
   await page.evaluate(() => window.__qcSet?.({ snap: 2 }));
   await wait(600);
-  for (const v of ["規則", "任務", "行程"]) {
+  for (const v of ["排程", "事件", "路線"]) {
     const b = page.getByRole("radio", { name: v }).or(page.getByRole("button", { name: v, exact: true }));
     if (await b.count()) {
       await b.first().click();
@@ -230,8 +230,8 @@ async (page) => {
       await shot(`mis-${v}`);
     }
   }
-  await page.getByRole("button", { name: "規則", exact: true }).first().click().catch(() => {});
-  const rule = page.getByText("白天例行巡邏").or(page.getByText(/例行巡邏/)).first();
+  await page.getByRole("radio", { name: "排程" }).first().click().catch(() => {});
+  const rule = page.locator("ul button", { hasText: "日間例行巡邏" }).first();
   if (await rule.count()) {
     await rule.click();
     await wait(600);

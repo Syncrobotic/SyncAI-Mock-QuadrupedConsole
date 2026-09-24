@@ -105,10 +105,11 @@ export const SOURCE_LABEL: Record<EventSource, string> = {
 };
 
 export const PRIORITY: Record<Priority, { label: string; short: string; hint: string }> = {
-  0: { label: "P0 緊急", short: "P0", hint: "可以打斷任何任務" },
-  1: { label: "P1 事件回應", short: "P1", hint: "可以打斷例行巡邏與維護" },
-  2: { label: "P2 例行巡邏", short: "P2", hint: "不打斷別人，只排隊" },
-  3: { label: "P3 維護", short: "P3", hint: "最後才執行" },
+  // Labels are what a guard reads — no P-codes on screen; `short` is for logs and interop.
+  0: { label: "緊急", short: "P0", hint: "可以打斷任何任務" },
+  1: { label: "事件回應", short: "P1", hint: "可以打斷例行巡邏與維護" },
+  2: { label: "例行巡邏", short: "P2", hint: "不打斷別人，只排隊" },
+  3: { label: "維護", short: "P3", hint: "最後才執行" },
 };
 
 export const MODE_LABEL: Record<Rule["mode"], string> = {
@@ -224,6 +225,36 @@ export function shortSchedule(s: Schedule, withTime = true): string {
         ? `每 ${s.minutes / 60} 小時`
         : `每 ${s.minutes} 分鐘`;
   }
+}
+
+/**
+ * A rule as one plain sentence for the detail page — no thresholds, no parameters:
+ *   08:00–20:00，每 2 小時執行「走廊巡邏一圈」（前後隨機 10 分）
+ *   北走廊、南走廊偵測到人員時，先詢問，再執行「前往查看」
+ */
+export function plainRule(
+  r: Rule,
+  missionName: string,
+  zoneName: (id: string) => string = (id) => id
+): string {
+  const t = r.trigger;
+  if (t.kind === "time") {
+    const w =
+      t.schedule.type === "interval" && t.schedule.window
+        ? `${t.schedule.window.from}–${t.schedule.window.to}，`
+        : "";
+    const jitter = t.jitterMin ? `（前後隨機 ${t.jitterMin} 分）` : "";
+    return `${w}${shortSchedule(t.schedule)}，執行「${missionName}」${jitter}`;
+  }
+  const where = t.zones.length ? t.zones.map(zoneName).join("、") : "任何地方";
+  const window = t.activeWindow ? `（只在 ${t.activeWindow.from}–${t.activeWindow.to}）` : "";
+  const then =
+    r.mode === "notify"
+      ? "只通知，不出動"
+      : r.mode === "confirm"
+        ? `先詢問，再執行「${missionName}」`
+        : `執行「${missionName}」`;
+  return `${where}${EVENT_TYPES[t.type].label}時，${then}${window}`;
 }
 
 /** A time a list can say: 15:54 today, 明天 02:00, 週四 02:00 within the week, else m/d. */

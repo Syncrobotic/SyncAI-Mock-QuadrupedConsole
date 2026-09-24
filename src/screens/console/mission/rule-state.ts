@@ -56,12 +56,16 @@ export function blankRule(kind: "time" | "event"): Rule {
   };
 }
 
+/**
+ * The sheet keeps the height the guard gave it. The rule's detail stays underneath, so
+ * closing the editor goes back to it — one level, not all the way to the list.
+ */
 export function openRuleEditor(rule?: Rule, kind: "time" | "event" = "time") {
-  set({ ruleEditor: { draft: structuredClone(rule ?? blankRule(kind)), isNew: !rule, verdict: null }, snap: 2, detailRuleId: null });
+  set({ ruleEditor: { draft: structuredClone(rule ?? blankRule(kind)), isNew: !rule, verdict: null } });
 }
 
 export function closeRuleEditor() {
-  set({ ruleEditor: null, snap: 1 });
+  set({ ruleEditor: null });
 }
 
 export function patchRule(patch: Partial<Rule>) {
@@ -118,7 +122,7 @@ export async function saveRule() {
   if (ok === null) return;
   await refreshMissions();
   toast.success(e.isNew ? "規則已建立" : "規則已儲存");
-  set({ ruleEditor: null, detailRuleId: e.draft.id, snap: 1 });
+  set({ ruleEditor: null, detailRuleId: e.draft.id });
 }
 
 export async function testRule(rule: Rule) {
