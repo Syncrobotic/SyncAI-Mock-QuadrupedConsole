@@ -42,13 +42,16 @@ export function PhoneFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The parts of the phone the app draws under but never on: cutout, status bar, home / nav bar. Desktop only. */
+/**
+ * The parts of the phone the app draws under but never on: cutout, status bar, home / nav
+ * bar. Desktop only. Status-bar ink and the home indicator follow the theme, as the OS does.
+ */
 function DeviceChrome({ device, landscape }: { device: Exclude<DeviceId, "none">; landscape: boolean }) {
   const ios = device === "iphone16pro" || device === "iphonese";
   // iOS hides the status bar in landscape; Android keeps a thin one.
   const showStatus = !(ios && landscape);
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-[200] hidden text-white sm:block">
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-[200] hidden text-black sm:block dark:text-white">
       {showStatus && (
         <div
           className={cn(
@@ -102,12 +105,12 @@ function DeviceChrome({ device, landscape }: { device: Exclude<DeviceId, "none">
         ))}
 
       {/* Home indicator / gesture pill / three-button bar */}
-      {device === "iphone16pro" && <span className="absolute bottom-2 left-1/2 h-[5px] w-[134px] -translate-x-1/2 rounded-full bg-white/90" />}
-      {device === "pixel9" && <span className="absolute bottom-[10px] left-1/2 h-1 w-[108px] -translate-x-1/2 rounded-full bg-white/80" />}
+      {device === "iphone16pro" && <span className="absolute bottom-2 left-1/2 h-[5px] w-[134px] -translate-x-1/2 rounded-full bg-black/85 dark:bg-white/90" />}
+      {device === "pixel9" && <span className="absolute bottom-[10px] left-1/2 h-1 w-[108px] -translate-x-1/2 rounded-full bg-black/70 dark:bg-white/80" />}
       {device === "galaxys24" && (
         <div
           className={cn(
-            "absolute flex items-center justify-around bg-black/90 text-white/80 [&_svg]:size-4",
+            "absolute flex items-center justify-around bg-white/90 text-black/70 dark:bg-black/90 dark:text-white/80 [&_svg]:size-4",
             landscape ? "inset-y-0 right-0 w-12 flex-col-reverse" : "inset-x-0 bottom-0 h-12"
           )}
         >

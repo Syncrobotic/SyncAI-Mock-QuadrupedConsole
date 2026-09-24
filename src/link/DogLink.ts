@@ -22,6 +22,7 @@ import type {
   RunRecord,
   Session,
   TelemetryFrame,
+  WifiNetwork,
   WifiStatus,
 } from "@/proto/types";
 
@@ -118,6 +119,8 @@ export interface BleChannel {
   readLicense(): Promise<LicenseInfo>;
   /** Owner only: bind a licence key to this dog. Goes over BLE — the dog may have no network yet. */
   activateLicense(key: string): Promise<LicenseActivation>;
+  /** Networks the dog can hear, strongest first. Over BLE, before the dog has any network. */
+  scanWifi(): Promise<WifiNetwork[]>;
   provisionWifi(ssid: string, psk: string): AsyncIterable<WifiStatus>;
   readEndpoint(): Promise<Endpoint>;
   estop(): Promise<void>;

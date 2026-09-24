@@ -2,6 +2,7 @@
 
 import { AnimatePresence, m } from "framer-motion";
 import { Check, Hourglass, KeyRound, Router, Smartphone } from "lucide-react";
+import { useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -199,35 +200,63 @@ export function Radar({ dogs }: { dogs: DogAdvert[] }) {
 
 export const PHASES = ["配對", "授權", "網路", "安全"] as const;
 
+/**
+ * Segmented progress: one 6px bar per stage, on the same line as the back button. No text
+ * by default — pressing (or focusing) the bar floats up which stage this is, and it fades
+ * again shortly after release. Screen readers get the stage from aria-valuetext.
+ */
 export function Stepper({ phase }: { phase: number }) {
+  const [hint, setHint] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const show = () => {
+    if (timer.current) clearTimeout(timer.current);
+    setHint(true);
+  };
+  const hide = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setHint(false), 1200);
+  };
   return (
-    <ol className="flex w-full items-center" aria-label={`第 ${phase + 1} 步，共 ${PHASES.length} 步：${PHASES[phase]}`}>
-      {PHASES.map((label, i) => {
-        const state = i < phase ? "done" : i === phase ? "now" : "todo";
-        return (
-          <li key={label} className={cn("flex items-center", i < PHASES.length - 1 && "min-w-0 flex-1")} aria-current={state === "now" ? "step" : undefined}>
-            <span className="flex shrink-0 items-center gap-1.5">
-              <span
-                className={cn(
-                  "grid size-5 place-items-center rounded-full border text-[11px] font-semibold transition-colors duration-300",
-                  state === "done" && "bg-primary border-primary text-primary-foreground",
-                  state === "now" && "border-primary-accent text-primary-accent bg-primary/15",
-                  state === "todo" && "text-muted-foreground"
-                )}
-              >
-                {state === "done" ? <Check className="size-3" strokeWidth={3} /> : i + 1}
-              </span>
-              <span className={cn("text-[12px] whitespace-nowrap", state === "now" ? "text-foreground font-semibold" : "text-muted-foreground")}>{label}</span>
-            </span>
-            {i < PHASES.length - 1 && (
-              <span className="bg-muted relative mx-2 h-px min-w-2 flex-1 overflow-hidden">
-                <m.span className="bg-primary absolute inset-0 origin-left" initial={false} animate={{ scaleX: i < phase ? 1 : 0 }} transition={{ duration: 0.4, ease: EASE_OUT }} />
-              </span>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <div
+      role="progressbar"
+      tabIndex={0}
+      aria-valuemin={1}
+      aria-valuemax={PHASES.length}
+      aria-valuenow={phase + 1}
+      aria-valuetext={`${PHASES[phase]}，第 ${phase + 1} 步，共 ${PHASES.length} 步`}
+      onPointerDown={show}
+      onPointerUp={hide}
+      onPointerLeave={hide}
+      onPointerCancel={hide}
+      onFocus={show}
+      onBlur={hide}
+      className="relative mx-auto flex h-11 w-full max-w-[220px] cursor-pointer touch-none items-center gap-1.5 outline-none select-none"
+    >
+      {PHASES.map((label, i) => (
+        <span key={label} className="bg-muted relative h-1.5 flex-1 overflow-hidden rounded-full">
+          <m.span
+            className={cn("absolute inset-0 origin-left rounded-full", i < phase ? "bg-primary" : "bg-primary-accent")}
+            initial={false}
+            animate={{ scaleX: i <= phase ? 1 : 0 }}
+            transition={{ duration: 0.4, ease: EASE_OUT }}
+          />
+        </span>
+      ))}
+      <AnimatePresence>
+        {hint && (
+          <m.span
+            key="hint"
+            className="bg-popover text-popover-foreground absolute top-full left-1/2 z-10 -translate-x-1/2 rounded-lg border px-2.5 py-1 text-[12px] font-medium whitespace-nowrap shadow-lg"
+            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18, ease: EASE_OUT }}
+          >
+            {PHASES[phase]} · 第 {phase + 1}/{PHASES.length} 步
+          </m.span>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { m } from "framer-motion";
-import { ArrowRight, BadgeCheck, Check, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, RotateCcw } from "lucide-react";
+import { AnimatePresence, m } from "framer-motion";
+import { ArrowRight, BadgeCheck, Check, ChevronRight, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, Plus, RotateCcw, Wifi, WifiHigh, WifiLow, WifiZero, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ import { getDogLink } from "@/link";
 import { IS_MOCK } from "@/lib/env";
 import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_LABEL, formatKey, isCompleteKey } from "@/lib/license";
 import { cn, sleep } from "@/lib/utils";
-import { ROLE_LABEL, type DogAdvert, type Enrollment, type LicenseActivation, type LicenseInfo, type WifiStatus } from "@/proto/types";
+import { ROLE_LABEL, type DogAdvert, type Enrollment, type LicenseActivation, type LicenseInfo, type WifiNetwork, type WifiStatus } from "@/proto/types";
 import { useStore } from "@/store";
 import { beginOnboarding, finishOnboarding } from "@/store/controller";
 
@@ -37,48 +37,63 @@ function Frame({
   sub,
   children,
   primary,
-  secondary,
+  above,
+  left,
+  right,
   live,
 }: {
   visual: React.ReactNode;
   title: string;
   sub?: React.ReactNode;
   children?: React.ReactNode;
-  /** Always present: automatic steps show it disabled with what is happening. */
+  /** The one action at the bottom. Always present: automatic steps show it disabled with what is happening. */
   primary: React.ReactNode;
-  secondary?: React.ReactNode;
+  /** A quiet text link directly above the primary button (e.g. 更換金鑰). The primary stays put. */
+  above?: React.ReactNode;
+  /** A step's own top-bar action, left of the stepper (cancel / back). */
+  left?: React.ReactNode;
+  /** A step's own top-bar action, right of the stepper (skip). */
+  right?: React.ReactNode;
   /** Automatic steps announce their title changes. */
   live?: boolean;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-[calc(1.25rem+var(--safe-right))] pb-4 pl-[calc(1.25rem+var(--safe-left))]">
-        <div className="flex h-[clamp(150px,28vh,210px)] items-center justify-center py-3">{visual}</div>
-        <div className="text-center" aria-live={live ? "polite" : undefined}>
-          <h1 className="text-[20px] leading-tight font-semibold tracking-tight">{title}</h1>
-          {sub && <p className="text-muted-foreground mt-1.5 text-[13px]">{sub}</p>}
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Step actions live in the shell's top bar row (48px, directly above this step). */}
+      {left && <div className="absolute -top-12 left-[calc(0.75rem+var(--safe-left))] flex h-12 w-12 items-center justify-start">{left}</div>}
+      {right && <div className="absolute -top-12 right-[calc(0.75rem+var(--safe-right))] flex h-12 w-12 items-center justify-end">{right}</div>}
+      <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-[calc(1.25rem+var(--safe-right))] pl-[calc(1.25rem+var(--safe-left))]">
+        {/* The group — visual, title, content — sits in the middle of the space between the top
+            bar and the action bar. */}
+        <div className="flex min-h-full flex-col justify-center py-4">
+          <div className="flex h-[clamp(130px,24vh,190px)] shrink-0 items-center justify-center">{visual}</div>
+          <div className="mt-3 text-center" aria-live={live ? "polite" : undefined}>
+            <h1 className="text-[20px] leading-tight font-semibold tracking-tight">{title}</h1>
+            {sub && <p className="text-muted-foreground mt-1.5 text-[13px]">{sub}</p>}
+          </div>
+          {children && <div className="mx-auto mt-5 w-full max-w-[360px] space-y-2.5">{children}</div>}
         </div>
-        {children && <div className="mx-auto mt-5 w-full max-w-[360px] space-y-2.5">{children}</div>}
       </div>
-      <ActionBar primary={primary} secondary={secondary} />
+      <ActionBar above={above}>{primary}</ActionBar>
     </div>
   );
 }
 
 /**
- * The step's actions, pinned to the bottom of the phone — above the home indicator / gesture
- * bar / button bar, and above the keyboard when one is up. Two fixed slots: the primary
- * action is always in the same place, and the secondary slot is reserved even when empty,
- * so no step moves the primary button up or down.
+ * The bottom of every step: ONE primary button, nothing else (docs/design-system.md §4).
+ * Pinned above the home indicator / gesture bar / button bar and the keyboard, so it sits
+ * in exactly the same place on every step. Secondary actions go to the top bar (skip,
+ * cancel) or into the content as a text link — never under or beside the primary.
  */
-function ActionBar({ primary, secondary }: { primary: React.ReactNode; secondary?: React.ReactNode }) {
+function ActionBar({ children, above }: { children: React.ReactNode; above?: React.ReactNode }) {
   return (
     <div
       data-actionbar
-      className="bg-background/85 shrink-0 pt-3 pr-[calc(1.25rem+var(--safe-right))] pb-[max(0.5rem,var(--safe-bottom),var(--kb,0px))] pl-[calc(1.25rem+var(--safe-left))] backdrop-blur"
+      className="bg-background/85 shrink-0 pt-3 pr-[calc(1.25rem+var(--safe-right))] pb-[max(1rem,calc(var(--safe-bottom)+0.5rem),var(--kb,0px))] pl-[calc(1.25rem+var(--safe-left))] backdrop-blur"
     >
-      {primary}
-      <div className="mt-1 flex h-9 items-center justify-center">{secondary}</div>
+      {/* Grows upward: the primary keeps its distance from the bottom edge. */}
+      {above && <div className="-mt-1 mb-1 flex justify-center">{above}</div>}
+      {children}
     </div>
   );
 }
@@ -87,19 +102,97 @@ function Primary(props: React.ComponentProps<typeof Button>) {
   return <Button {...props} className={cn("h-11 w-full rounded-xl text-[15px]", props.className)} />;
 }
 
-function Secondary(props: React.ComponentProps<typeof Button>) {
-  return <Button variant="ghost" {...props} className={cn("text-muted-foreground w-full", props.className)} />;
+/**
+ * One choice in a list — a dog, a network. Same card everywhere (docs/design-system.md §5):
+ * tile · title (+ badge) · one line · radio; selected = accent border and tint; whatever the
+ * choice needs next (a password) opens inside the same card.
+ */
+function ChoiceCard({
+  tile,
+  title,
+  badge,
+  sub,
+  subTone,
+  on,
+  disabled,
+  onSelect,
+  index,
+  children,
+}: {
+  tile: React.ReactNode;
+  title: string;
+  badge?: React.ReactNode;
+  sub: React.ReactNode;
+  subTone?: "accent" | "muted";
+  on: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+  index: number;
+  children?: React.ReactNode;
+}) {
+  return (
+    <m.div
+      className={cn("overflow-hidden rounded-xl border backdrop-blur transition-colors", on ? "border-primary bg-primary/10" : "bg-card/70", disabled && "opacity-50")}
+      {...rise(index)}
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={on}
+        disabled={disabled}
+        onClick={onSelect}
+        className={cn("focus-visible:ring-primary/40 flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed", !on && "hover:bg-accent/40")}
+      >
+        <span className="bg-primary/12 text-primary-accent grid h-9 w-12 shrink-0 place-items-center rounded-lg font-mono text-[13px] font-semibold [&_svg]:size-5">{tile}</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-[14px] font-medium">{title}</span>
+            {badge}
+          </span>
+          <span className={cn("block truncate text-[12px] tabular-nums", subTone === "accent" ? "text-primary-accent" : "text-muted-foreground")}>{sub}</span>
+        </span>
+        <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border-2 transition-colors", on ? "border-primary bg-primary" : "border-muted-foreground/40")}>
+          {on && <span className="size-2 rounded-full bg-white" />}
+        </span>
+      </button>
+      {on && children && <div className="space-y-2 px-3 pb-3">{children}</div>}
+    </m.div>
+  );
+}
+
+/** A secondary action inside the content: quiet, centred, one line. */
+function TextLink({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="text-primary-accent hover:text-foreground mx-auto flex cursor-pointer items-center gap-1 py-2 text-[13px] font-medium transition-colors [&_svg]:size-3.5">
+      {children}
+    </button>
+  );
+}
+
+/** A top-bar action (skip / cancel): text or an icon, never a filled button. */
+function BarButton({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      className="text-muted-foreground hover:text-foreground hover:bg-accent grid h-8 min-w-8 cursor-pointer place-items-center rounded-lg px-1.5 text-[14px] font-medium transition-colors [&_svg]:size-5"
+    >
+      {children}
+    </button>
+  );
 }
 
 /** A large icon on a lit plate — the visual for steps that have no motion of their own. */
-function Plate({ children, tone = "brand" }: { children: React.ReactNode; tone?: "brand" | "muted" }) {
+function Plate({ children, tone = "brand" }: { children: React.ReactNode; tone?: "brand" | "ok" | "muted" }) {
   return (
     <m.span className="relative grid size-20 place-items-center" {...popIn}>
-      {tone === "brand" && <span className="absolute inset-0 rounded-3xl bg-violet-500/20 blur-2xl" />}
+      {tone !== "muted" && <span className={cn("absolute inset-0 rounded-3xl blur-2xl", tone === "ok" ? "bg-emerald-500/20" : "bg-violet-500/20")} />}
       <span
         className={cn(
           "bg-card relative grid size-20 place-items-center rounded-3xl border shadow-lg [&_svg]:size-9",
-          tone === "brand" ? "text-primary-accent ring-1 ring-violet-400/20" : "text-muted-foreground"
+          tone === "brand" && "text-primary-accent ring-1 ring-violet-400/20",
+          tone === "ok" && "text-status-ok ring-1 ring-emerald-400/25",
+          tone === "muted" && "text-muted-foreground"
         )}
       >
         {children}
@@ -136,23 +229,15 @@ export function StepSplash({ go }: StepProps) {
             {denied ? "需要藍牙才能配對" : "這支手機已被撤銷，請重新配對"}
           </p>
         )}
+        {denied && <TextLink onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>開啟系統設定</TextLink>}
       </div>
 
-      <ActionBar
-        primary={
-          <Primary onClick={() => setAsking(true)}>
-            {denied ? "再試一次" : "開始配對"}
-            <ArrowRight />
-          </Primary>
-        }
-        secondary={
-          denied ? (
-            <Secondary onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>開啟系統設定</Secondary>
-          ) : (
-            <p className="text-muted-foreground text-[11px]">© 2026 SyncAI{IS_MOCK ? " · Mock" : ""}</p>
-          )
-        }
-      />
+      <ActionBar>
+        <Primary onClick={() => setAsking(true)}>
+          {denied ? "再試一次" : "開始配對"}
+          <ArrowRight />
+        </Primary>
+      </ActionBar>
 
       {/* A stand-in for the OS permission sheet, so the deny path is reviewable. */}
       <Modal open={asking} dismissable={false} className="max-w-[280px] p-0 text-center">
@@ -192,6 +277,17 @@ export function StepScan({ patch, go }: StepProps) {
   const [dogs, setDogs] = useState<DogAdvert[]>([]);
   const [sel, setSel] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
+  // The help link is not noise on arrival: it appears only after 15 s without any input.
+  const [idle, setIdle] = useState(false);
+  const [poke, setPoke] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setIdle(true), 15_000);
+    return () => clearTimeout(t);
+  }, [poke]);
+  const touched = () => {
+    setIdle(false);
+    setPoke((p) => p + 1);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -230,44 +326,35 @@ export function StepScan({ patch, go }: StepProps) {
           {picked && <ArrowRight />}
         </Primary>
       }
-      secondary={
-        <Secondary onClick={() => setHelp(true)}>
-          <CircleHelp />
-          找不到狗？
-        </Secondary>
-      }
     >
-      <div role="radiogroup" aria-label="附近的狗" className="space-y-2">
-        {dogs.map((d, i) => {
-          const on = d.id === sel;
-          return (
-            <m.button
-              key={d.id}
-              role="radio"
-              aria-checked={on}
-              onClick={() => setSel(d.id)}
-              className={cn(
-                "focus-visible:ring-primary/40 flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-left backdrop-blur transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                on ? "border-primary bg-primary/10" : "bg-card/70 hover:border-primary/40"
-              )}
-              {...rise(i)}
-            >
-              <span className="bg-primary/12 text-primary-accent grid h-9 w-12 shrink-0 place-items-center rounded-lg font-mono text-[13px] font-semibold">{d.serial.slice(-4)}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-medium">{d.name}</span>
-                <span className={cn("block text-[12px]", d.hasOwner ? "text-muted-foreground" : "text-primary-accent")}>{d.hasOwner ? "需要擁有者核准" : "新機"}</span>
-              </span>
-              <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border-2 transition-colors", on ? "border-primary bg-primary" : "border-muted-foreground/40")}>
-                {on && <span className="size-2 rounded-full bg-white" />}
-              </span>
-            </m.button>
-          );
-        })}
+      <div role="radiogroup" aria-label="附近的狗" className="space-y-2" onPointerDown={touched} onKeyDown={touched}>
+        {dogs.map((d, i) => (
+          <ChoiceCard
+            key={d.id}
+            index={i}
+            on={d.id === sel}
+            onSelect={() => setSel(d.id)}
+            tile={d.serial.slice(-4)}
+            title={d.name}
+            sub={d.hasOwner ? "需要擁有者核准" : "新機"}
+            subTone={d.hasOwner ? "muted" : "accent"}
+          />
+        ))}
         {dogs.length === 0 && <div className="bg-card/40 h-[60px] animate-pulse rounded-xl border border-dashed" />}
       </div>
+      <AnimatePresence>
+        {idle && (
+          <m.div key="help" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35, ease: EASE_OUT }}>
+            <TextLink onClick={() => setHelp(true)}>
+              <CircleHelp />
+              找不到你的狗嗎？
+            </TextLink>
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <Modal open={help} onClose={() => setHelp(false)}>
-        <p className="mb-2 text-[15px] font-semibold">找不到狗？</p>
+        <p className="mb-2 text-[15px] font-semibold">找不到你的狗嗎？</p>
         <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-[13px]">
           <li>確認狗已開機</li>
           <li>手機距離狗 5 公尺內</li>
@@ -381,23 +468,22 @@ export function StepPair({ flow, patch, go }: StepProps) {
             <ArrowRight />
           </Primary>
         ) : phase === "approval" ? (
-          <Primary variant="outline" onClick={() => void asViewer()}>
-            先以檢視者加入
-          </Primary>
+          <Primary onClick={() => void asViewer()}>先以檢視者加入</Primary>
         ) : (
           <Primary loading>{phase === "key" ? "登記中…" : "連線中…"}</Primary>
         )
       }
-      secondary={
+      left={
         phase === "approval" && (
-          <Secondary
+          <BarButton
+            label="取消配對"
             onClick={() => {
               abort.current?.abort();
               go("scan");
             }}
           >
-            取消
-          </Secondary>
+            <X />
+          </BarButton>
         )
       }
     />
@@ -413,6 +499,7 @@ export function StepPair({ flow, patch, go }: StepProps) {
 export function StepLicense({ flow, go }: StepProps) {
   const [license, setLicense] = useState<LicenseInfo | null>(null);
   const [changing, setChanging] = useState(false);
+  const [features, setFeatures] = useState(false);
   const owner = flow.role === "owner";
 
   useEffect(() => {
@@ -476,40 +563,52 @@ export function StepLicense({ flow, go }: StepProps) {
 
   return (
     <Frame
-      visual={<EditionPlate license={license} />}
-      title="License 已啟用"
-      sub={off.length ? `未含：${off.map((f) => FEATURE_LABEL[f.feature]).join("、")}` : `${on.length} 項功能全部開啟`}
+      visual={
+        <Plate tone="ok">
+          <BadgeCheck />
+        </Plate>
+      }
+      title={`${EDITION_LABEL[license.edition]}已啟用`}
+      above={owner && <TextLink onClick={() => setChanging(true)}>更換金鑰</TextLink>}
       primary={
         <Primary onClick={() => go("wifi")}>
           繼續
           <ArrowRight />
         </Primary>
       }
-      secondary={owner && <Secondary onClick={() => setChanging(true)}>更換金鑰</Secondary>}
-    />
-  );
-}
+    >
+      <TextLink onClick={() => setFeatures(true)}>
+        {off.length ? `${on.length} 項功能開啟 · ${off.length} 項未含` : `${on.length} 項功能全部開啟`}
+        <ChevronRight />
+      </TextLink>
 
-/** The edition as a card — what was just unlocked, at a glance. */
-function EditionPlate({ license }: { license: LicenseInfo }) {
-  return (
-    <m.div className="relative w-full max-w-[280px] overflow-hidden rounded-2xl border p-4 text-left shadow-xl" {...popIn}>
-      <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, color-mix(in oklab, var(--primary) 40%, var(--card)), var(--card) 72%)" }} />
-      <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-violet-300/70 to-transparent" />
-      <div className="relative flex items-center justify-between">
-        <p className="text-[22px] font-bold tracking-tight">{EDITION_LABEL[license.edition]}</p>
-        <m.span
-          className="bg-status-ok grid size-8 place-items-center rounded-full text-white shadow"
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 420, damping: 18, delay: 0.2 }}
-        >
-          <BadgeCheck className="size-4.5" />
-        </m.span>
-      </div>
-      <p className="relative mt-5 font-mono text-[12px] tracking-wide whitespace-nowrap text-white/80">{license.keyMasked}</p>
-      {license.expiresAt && <p className="text-muted-foreground relative mt-0.5 text-[11px]">到期 {new Date(license.expiresAt).toLocaleDateString("zh-TW")}</p>}
-    </m.div>
+      <Modal open={features} onClose={() => setFeatures(false)}>
+        <p className="text-[15px] font-semibold">{EDITION_LABEL[license.edition]}</p>
+        <p className="text-muted-foreground mt-0.5 font-mono text-[12px]">{license.keyMasked}</p>
+        <ul className="mt-3 divide-y rounded-xl border">
+          {license.features.map((f) => (
+            <li key={f.feature} className="flex h-10 items-center justify-between px-3 text-[13px]">
+              <span className={cn(!f.granted && "text-muted-foreground")}>{FEATURE_LABEL[f.feature]}</span>
+              {f.granted ? (
+                <span className="text-status-ok flex items-center gap-1 text-[12px] font-medium">
+                  <Check className="size-3.5" />
+                  開啟
+                </span>
+              ) : (
+                <span className="text-muted-foreground flex items-center gap-1 text-[12px]">
+                  <Lock className="size-3" />
+                  未含
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+        {license.expiresAt && <p className="text-muted-foreground mt-2 text-[12px]">到期 {new Date(license.expiresAt).toLocaleDateString("zh-TW")}</p>}
+        <Button className="mt-4 w-full" variant="outline" onClick={() => setFeatures(false)}>
+          關閉
+        </Button>
+      </Modal>
+    </Frame>
   );
 }
 
@@ -556,7 +655,13 @@ export function LicenseEntry({
           啟用
         </Primary>
       }
-      secondary={changing && <Secondary onClick={onCancel}>取消</Secondary>}
+      left={
+        changing && (
+          <BarButton label="取消更換" onClick={() => onCancel?.()}>
+            <X />
+          </BarButton>
+        )
+      }
     >
       <KeyInput
         value={key}
@@ -585,51 +690,149 @@ export function LicenseEntry({
 
 // ── 4 Wi-Fi ─────────────────────────────────────────────────────────────────
 
+const SECURITY_LABEL: Record<WifiNetwork["security"], string> = { open: "開放", wpa2: "WPA2", wpa3: "WPA3", enterprise: "企業 802.1X" };
+
+function WifiBars({ rssi, className }: { rssi: number; className?: string }) {
+  const Icon = rssi > -55 ? Wifi : rssi > -67 ? WifiHigh : rssi > -75 ? WifiLow : WifiZero;
+  return <Icon className={className} aria-label={`訊號 ${rssi} dBm`} />;
+}
+
+/**
+ * The networks the dog hears (scanned by the dog, over BLE — its signal, not the phone's),
+ * as a list: pick one, the password opens in place. 其他網路 covers hidden SSIDs.
+ */
 export function StepWifi({ flow, patch, go }: StepProps) {
   const [skipAsk, setSkipAsk] = useState(false);
+  const [nets, setNets] = useState<WifiNetwork[] | null>(null);
+  const [manual, setManual] = useState(false);
+  const [scanTick, setScanTick] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    void getDogLink()
+      .ble.scanWifi()
+      .then((n) => {
+        if (!alive) return;
+        setNets(n);
+        // Preselect the phone's own network when the dog can hear it.
+        if (!flow.ssid || !n.some((x) => x.ssid === flow.ssid)) {
+          const mine = n.find((x) => x.phone);
+          if (mine) patch({ ssid: mine.ssid });
+        }
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanTick]);
+
+  const sel = manual ? null : (nets?.find((n) => n.ssid === flow.ssid) ?? null);
+  const needsPsk = manual || (sel ? sel.security !== "open" : false);
+  const ready = !!flow.ssid && (!needsPsk || flow.psk.length >= 8) && sel?.security !== "enterprise";
+
+  const pick = (n: WifiNetwork) => {
+    setManual(false);
+    if (n.ssid !== flow.ssid) patch({ ssid: n.ssid, psk: "", wifiError: null });
+  };
+
+  const password = (
+    <Field label="密碼" error={flow.wifiError ?? undefined}>
+      <input
+        className={inputClass}
+        type="password"
+        name="psk"
+        autoComplete="current-password"
+        enterKeyHint="go"
+        autoFocus
+        value={flow.psk}
+        aria-invalid={!!flow.wifiError}
+        onChange={(e) => patch({ psk: e.target.value, wifiError: null })}
+      />
+    </Field>
+  );
 
   return (
     <Frame
       visual={<Link phase="router" />}
-      title="連上現場 Wi-Fi"
-      sub="手機不用切換網路"
+      title="選擇 Wi-Fi"
+      sub="狗收得到的網路，訊號以狗的位置為準"
+      right={<BarButton onClick={() => setSkipAsk(true)}>略過</BarButton>}
       primary={
         // Submits the form (the action bar sits outside it), so Enter / Go works too.
-        <Primary type="submit" form="wifi-form" disabled={!flow.ssid}>
+        <Primary type="submit" form="wifi-form" disabled={!ready}>
           讓狗連線
           <ArrowRight />
         </Primary>
       }
-      secondary={<Secondary onClick={() => setSkipAsk(true)}>略過</Secondary>}
     >
       <form
         id="wifi-form"
-        className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!flow.ssid) return;
+          if (!ready) return;
           patch({ wifiError: null });
           go("wait");
         }}
       >
-        <Field label="網路名稱">
-          <input className={inputClass} name="ssid" autoComplete="off" enterKeyHint="next" value={flow.ssid} onChange={(e) => patch({ ssid: e.target.value })} />
-        </Field>
-        <Field label="密碼" error={flow.wifiError ?? undefined}>
-          <input
-            className={inputClass}
-            type="password"
-            name="psk"
-            autoComplete="current-password"
-            enterKeyHint="go"
-            value={flow.psk}
-            aria-invalid={!!flow.wifiError}
-            onChange={(e) => patch({ psk: e.target.value })}
-          />
-        </Field>
+        <div role="radiogroup" aria-label="Wi-Fi 網路" className="space-y-2">
+          {!nets && [0, 1, 2].map((i) => <div key={i} className="bg-card/40 h-[60px] animate-pulse rounded-xl border border-dashed" />)}
+          {nets?.map((n, i) => {
+            const unsupported = n.security === "enterprise";
+            return (
+              <ChoiceCard
+                key={n.ssid}
+                index={i}
+                on={sel?.ssid === n.ssid}
+                disabled={unsupported}
+                onSelect={() => pick(n)}
+                tile={<WifiBars rssi={n.rssi} />}
+                title={n.ssid}
+                badge={n.phone && <span className="text-primary-accent bg-primary/10 shrink-0 rounded px-1 text-[11px] font-medium">手機所在</span>}
+                sub={
+                  <span className="flex items-center gap-1">
+                    {n.security !== "open" && <Lock className="size-3 shrink-0" />}
+                    {n.band} GHz · {SECURITY_LABEL[n.security]} · {n.rssi} dBm{unsupported ? " · 暫不支援" : ""}
+                  </span>
+                }
+              >
+                {n.rssi <= -70 && (
+                  <p className="text-severity-warning flex items-center gap-1.5 text-[12px]">
+                    <CircleAlert className="size-3.5 shrink-0" />
+                    訊號偏弱，狗走遠可能斷線
+                  </p>
+                )}
+                {n.security !== "open" && password}
+              </ChoiceCard>
+            );
+          })}
+          {nets && (
+            <ChoiceCard
+              index={nets.length}
+              on={manual}
+              onSelect={() => {
+                setManual(true);
+                patch({ ssid: "", psk: "", wifiError: null });
+              }}
+              tile={<Plus />}
+              title="其他網路…"
+              sub="隱藏的網路，手動輸入名稱"
+            >
+              <Field label="網路名稱（SSID）">
+                <input className={inputClass} name="ssid" autoComplete="off" autoFocus enterKeyHint="next" value={flow.ssid} onChange={(e) => patch({ ssid: e.target.value })} />
+              </Field>
+              {password}
+            </ChoiceCard>
+          )}
+        </div>
       </form>
+      {nets && (
+        <TextLink onClick={() => { setNets(null); setScanTick((t) => t + 1); }}>
+          <RotateCcw />
+          重新掃描
+        </TextLink>
+      )}
       {flow.wifiFailures >= 2 && <p className="text-muted-foreground text-center text-[12px]">一直連不上？可以先略過，之後在裝置頁設定。</p>}
-      <MockHint>名稱含 fail → 密碼錯 · none → 找不到 · slow → 25 秒</MockHint>
+      <MockHint>Lab-fail → 密碼錯 · Warehouse-slow → 25 秒 · 其他網路輸入含 none → 找不到</MockHint>
 
       <Modal open={skipAsk} onClose={() => setSkipAsk(false)}>
         <p className="text-[15px] font-semibold">先不設 Wi-Fi？</p>

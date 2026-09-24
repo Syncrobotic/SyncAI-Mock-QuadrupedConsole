@@ -13,6 +13,8 @@ Switch scenarios with `?scenario=` (`default` `weak_signal` `low_battery` `estop
 
 Licence key (required, entered before Wi-Fi; decides which features the dog runs): `SYNC-…` pro (everything), `BASE-…` standard (no AI), `CTRL-…` control only (teleop + map); any `0000` group → already bound, `EXPD-…` → expired. Wi-Fi SSIDs containing `fail` / `none` / `slow` → wrong password / network not found / connects after 25 s.
 
+**Design system:** [`docs/design-system.md`](docs/design-system.md) — layout, safe areas, sizes, onboarding skeleton, motion, colour/contrast and the verification matrix.
+
 ## Structure (follows spec §12)
 
 | Path | Contents |

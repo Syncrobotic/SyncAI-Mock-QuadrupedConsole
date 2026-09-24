@@ -22,6 +22,20 @@
   --safe-left: env(safe-area-inset-left, 0px);
 }
 
+/* ── Light theme: text-strength status colours ─────────────────────────────
+   The shared tokens' light values for ok / warning / accent are tuned as fills; used as
+   small text on their own 10–15% tint they land at 3.8–3.9:1 (audit, 2026-09-24). The
+   console uses them as text a lot (pills, badges, links), so it darkens them to ≥ 4.5:1.
+   Deviation from the shared tokens — recorded in docs/design-system.md; to go upstream. */
+:root:not(.dark) {
+  --status-ok: oklch(0.46 0.13 150);
+  --severity-warning: oklch(0.48 0.11 70);
+  --primary-accent: oklch(0.42 0.15 285);
+  --status-error: oklch(0.5 0.2 25);
+  --status-busy: oklch(0.47 0.13 250);
+  --severity-info: oklch(0.47 0.12 240);
+}
+
 /* ── Desktop review frame: simulated devices ─────────────────────────────
    Sizes in CSS px. Insets follow the platform: iOS status bar + Dynamic Island on top and
    the home indicator below (landscape: the island side and both sides are inset); Android

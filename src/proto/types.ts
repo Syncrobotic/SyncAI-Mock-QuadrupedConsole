@@ -54,6 +54,17 @@ export type Enrollment =
 
 export type WifiStatus = "connecting" | "connected" | "auth_failed" | "not_found";
 
+/** A network the dog can see, reported over BLE so the phone can offer a list instead of a text field. */
+export interface WifiNetwork {
+  ssid: string;
+  /** dBm, as the dog hears it — what matters is the signal at the dog, not at the phone. */
+  rssi: number;
+  band: "2.4" | "5" | "6";
+  security: "open" | "wpa2" | "wpa3" | "enterprise";
+  /** The network this phone is on (the phone tells the app; the dog does not know). */
+  phone?: boolean;
+}
+
 export interface Endpoint {
   ip: string;
   port: number;

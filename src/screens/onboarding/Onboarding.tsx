@@ -78,17 +78,21 @@ export function Onboarding() {
       </div>
 
       {step !== "splash" && (
-        <header className="relative box-content flex h-12 shrink-0 items-center gap-2 px-3 pt-[var(--safe-top)]">
-          {back[step] ? (
-            <button onClick={() => setStep(back[step]!)} className="hover:bg-accent grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
-              <ChevronLeft className="size-5" />
-            </button>
-          ) : (
-            <span className="size-8 shrink-0" />
-          )}
-          <div className="min-w-0 flex-1 pr-8">
+        // Top bar: [48px slot] [segmented progress] [48px slot]. The side slots belong to the
+        // step (back, cancel, skip — see Frame's left/right); the progress never moves.
+        <header className="relative box-content flex h-12 shrink-0 items-center gap-2 pt-[var(--safe-top)] pr-[calc(0.75rem+var(--safe-right))] pl-[calc(0.75rem+var(--safe-left))]">
+          {/* Equal side slots keep the progress centred; a step's own action (cancel, skip) fills one. */}
+          <div className="flex w-12 shrink-0 items-center">
+            {back[step] && (
+              <button onClick={() => setStep(back[step]!)} className="hover:bg-accent grid size-8 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
+                <ChevronLeft className="size-5" />
+              </button>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
             <Stepper phase={PHASE_OF[step]} />
           </div>
+          <div className="w-12 shrink-0" />
         </header>
       )}
 

@@ -18,7 +18,7 @@ import {
   type RpcRes,
 } from "../DogLink";
 import type { ScenarioId } from "./scenarios";
-import type { Endpoint, PairSession, Role, Scope, WifiStatus } from "@/proto/types";
+import type { Endpoint, PairSession, Role, Scope, WifiNetwork, WifiStatus } from "@/proto/types";
 import { ROLE_SCOPES } from "@/proto/types";
 
 const ENDPOINT: Endpoint = { ip: "192.168.50.23", port: 8443, fingerprint: "SHA256:7f3a…c21e" };
@@ -116,6 +116,19 @@ function createBle(world: MockWorld): BleChannel {
     async activateLicense(key) {
       await sleep(900);
       return world.activateLicense(key);
+    },
+
+    async scanWifi() {
+      await sleep(1100);
+      // Names carry the mock's failure hooks: …fail → wrong password, …slow → 25 s.
+      return [
+        { ssid: "SyncAI-Office", rssi: -48, band: "5", security: "wpa2", phone: true },
+        { ssid: "SyncAI-Office-2.4G", rssi: -52, band: "2.4", security: "wpa2" },
+        { ssid: "Lab-fail", rssi: -61, band: "5", security: "wpa3" },
+        { ssid: "Warehouse-slow", rssi: -70, band: "2.4", security: "wpa2" },
+        { ssid: "SyncAI-Guest", rssi: -66, band: "2.4", security: "open" },
+        { ssid: "Corp-802.1X", rssi: -74, band: "5", security: "enterprise" },
+      ] satisfies WifiNetwork[];
     },
 
     async *provisionWifi(ssid): AsyncGenerator<WifiStatus> {

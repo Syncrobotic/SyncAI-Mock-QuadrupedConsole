@@ -124,7 +124,7 @@ async (page) => {
       const u = (a) => [...new Set(a)];
       return { touch: u(touch), contrast: u(contrast), tiny: u(tiny), noname: u(noname), nolabel: u(nolabel) };
     });
-    out.push({ label, ...r });
+    out.push({ label: `${theme} · ${label}`, ...r });
   };
 
   const wait = (ms) => page.waitForTimeout(ms);
@@ -132,13 +132,17 @@ async (page) => {
     await page.getByRole("button", { name, ...opts }).first().click();
     await wait(600);
   };
+  // Both themes: every screen is checked in dark and in light.
+  let theme = "dark";
+  for (theme of ["dark", "light"]) {
   await page.setViewportSize({ width: 390, height: 844 });
 
   // ---- Onboarding, every step --------------------------------------------------
   await page.goto("http://localhost:3200/");
-  await page.evaluate(() => {
+  await page.evaluate((t) => {
     localStorage.clear();
-  });
+    localStorage.setItem("theme", t);
+  }, theme);
   await page.goto("http://localhost:3200/");
   await wait(1500);
   const shot = (n) => page.screenshot({ path: `.playwright-mcp/ux-${n}.png` });
@@ -242,7 +246,9 @@ async (page) => {
   await audit("status details");
   await shot("status");
   } catch (e) {
-    out.push({ label: "ABORTED", error: String(e).slice(0, 200) });
+    out.push({ label: `${theme} · ABORTED`, error: String(e).slice(0, 200) });
   }
-  return out;
+  }
+  // Only screens with findings, to keep the report readable.
+  return out.filter((r) => r.error || ["touch", "contrast", "tiny", "noname", "nolabel"].some((k) => r[k]?.length));
 }
