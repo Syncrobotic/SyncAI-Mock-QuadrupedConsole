@@ -37,6 +37,12 @@ describe("connection state machine", () => {
     expect(canTransition("Unreachable", "Online")).toBe(false);
     expect(canTransition("BleOnly", "Online")).toBe(false);
   });
+
+  it("pairs another dog only after dropping the current one", () => {
+    expect(canTransition("Paired", "Onboarding")).toBe(true);
+    expect(canTransition("Onboarding", "Paired")).toBe(true);
+    expect(canTransition("Online", "Onboarding")).toBe(false);
+  });
 });
 
 describe("RTT bands", () => {

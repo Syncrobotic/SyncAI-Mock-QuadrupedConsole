@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import type { ConnState, RttZone, Tab } from "./logic";
 import type { Credential, ValidationIssue } from "@/link/DogLink";
+import type { Flash } from "@/lib/notify";
 import type {
   DeviceInfo,
   DogEvent,
@@ -104,8 +105,10 @@ export interface State {
   eventsSeenAt: number;
   userSpeedCap: number;
   snapshotViewer: { wp: number; at: number } | null;
-  /** Px from the frame bottom to just above the E-Stop — where toasts go in the Console. */
-  toastBottom: number | null;
+  /** The notification the status island is showing in place of its second line (lib/notify). */
+  flash: Flash | null;
+  /** Pairing another dog from the Console: onboarding starts at the scan and can be cancelled. */
+  addingDog: boolean;
   /** Review panel: render the frame sideways to preview §5 landscape. */
   forceLandscape: boolean;
   /** Review panel: which phone the desktop frame imitates — its cutout, bars and safe areas. */
@@ -163,7 +166,8 @@ export const useStore = create<State>(() => ({
   eventsSeenAt: Date.now(),
   userSpeedCap: 0.8,
   snapshotViewer: null,
-  toastBottom: null,
+  flash: null,
+  addingDog: false,
   forceLandscape: false,
   phoneModel: "iphone16pro",
   mockHints: false,

@@ -24,6 +24,8 @@ import { ROLE_SCOPES } from "@/proto/types";
 
 const ENDPOINT: Endpoint = { ip: "192.168.50.23", port: 8443, fingerprint: "SHA256:7f3a…c21e" };
 const KEY = "qc.mock.keystore";
+/** Every paired dog; KEY stays the active one (older reviews and the audit script set only it). */
+const ALL_KEY = "qc.mock.keystore.all";
 
 /**
  * The mock keystore. On a device this is Keychain / Keystore behind a Tauri
@@ -31,24 +33,41 @@ const KEY = "qc.mock.keystore";
  * public record, which is the most the JS side would ever see anyway.
  */
 function createKeystore(): KeystoreChannel {
+  const read = <T,>(k: string): T | null => {
+    try {
+      const raw = localStorage.getItem(k);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  };
+  const write = (k: string, v: unknown) => {
+    try {
+      if (v === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, JSON.stringify(v));
+    } catch {}
+  };
+  const all = () => {
+    const list = read<Credential[]>(ALL_KEY) ?? [];
+    const active = read<Credential>(KEY);
+    return active && !list.some((c) => c.dogId === active.dogId) ? [...list, active] : list;
+  };
   return {
-    load() {
-      try {
-        const raw = localStorage.getItem(KEY);
-        return raw ? (JSON.parse(raw) as Credential) : null;
-      } catch {
-        return null;
-      }
-    },
+    load: () => read<Credential>(KEY),
+    list: all,
     save(c) {
-      try {
-        localStorage.setItem(KEY, JSON.stringify(c));
-      } catch {}
+      write(ALL_KEY, [...all().filter((x) => x.dogId !== c.dogId), c]);
+      write(KEY, c);
+    },
+    use(dogId) {
+      const c = all().find((x) => x.dogId === dogId) ?? null;
+      if (c) write(KEY, c);
+      return c;
     },
     clear() {
-      try {
-        localStorage.removeItem(KEY);
-      } catch {}
+      const active = read<Credential>(KEY);
+      if (active) write(ALL_KEY, all().filter((x) => x.dogId !== active.dogId));
+      write(KEY, null);
     },
   };
 }
@@ -378,6 +397,7 @@ function createGateway(world: MockWorld, keystore: KeystoreChannel): GatewayChan
       if (world.gatewayState === "down") throw new Error("TLS handshake failed: connection refused");
       const cred = keystore.load();
       if (!cred) throw new Error("本機沒有憑證");
+      world.identify(cred.dogId, cred.dogName, cred.serial);
       world.open(cred.role);
       session = { role: world.myRole, scopes: ROLE_SCOPES[world.myRole] };
       return { dogId: cred.dogId, role: world.myRole, scopes: session.scopes, jwtExpiresAt: Date.now() + 3_600_000 };

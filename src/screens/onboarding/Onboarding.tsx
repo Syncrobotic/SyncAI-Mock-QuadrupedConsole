@@ -6,6 +6,8 @@ import { createContext, useEffect, useState } from "react";
 
 import { useLandscape } from "@/hooks/use-landscape";
 import { getDogLink } from "@/link";
+import { get } from "@/store";
+import { cancelAddDog } from "@/store/controller";
 
 import { StepLicense, StepPair, StepSafety, StepScan, StepSplash, StepWait, StepWifi } from "./steps";
 import { EASE_OUT, Stepper } from "./visuals";
@@ -54,11 +56,13 @@ export interface OnboardingCtx {
   /** False outside onboarding (the Console's licence gate reuses the key step): no top bar. */
   hasTopBar: boolean;
   back: (() => void) | null;
+  /** Pairing another dog from the Console: the scan's top-left is ✕, back to the Console. */
+  exit: (() => void) | null;
   ble: "ok" | "lost" | "failed";
   retryBle: () => void;
 }
 
-export const OnboardingContext = createContext<OnboardingCtx>({ hasTopBar: false, back: null, ble: "ok", retryBle: () => {} });
+export const OnboardingContext = createContext<OnboardingCtx>({ hasTopBar: false, back: null, exit: null, ble: "ok", retryBle: () => {} });
 
 /** Steps that talk to the dog over BLE after pairing — where a dropped link matters. */
 const BLE_STEPS: Step[] = ["pair", "license", "wifi", "wait"];
@@ -70,7 +74,9 @@ export interface StepProps {
 }
 
 export function Onboarding() {
-  const [step, setStepRaw] = useState<Step>("splash");
+  // Another dog, from the Console: the guard has seen the splash; start at the scan.
+  const [adding] = useState(() => get().addingDog);
+  const [step, setStepRaw] = useState<Step>(adding ? "scan" : "splash");
   // Direction of travel, so going back slides the other way.
   const [dir, setDir] = useState(1);
   const setStep = (s: Step) => {
@@ -124,7 +130,8 @@ export function Onboarding() {
 
   const ctx: OnboardingCtx = {
     hasTopBar: step !== "splash",
-    back: back[step] ? () => setStep(back[step]!) : null,
+    back: adding && step === "scan" ? null : back[step] ? () => setStep(back[step]!) : null,
+    exit: adding && step === "scan" ? cancelAddDog : null,
     ble: flow.session && BLE_STEPS.includes(step) ? ble : "ok",
     retryBle: () => setBle("lost"),
   };

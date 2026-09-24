@@ -5,14 +5,14 @@
 
 import { FlaskConical, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { mockWorld } from "@/link";
+import { getDogLink, mockWorld } from "@/link";
 import { SCENARIOS, SCENARIO_IDS } from "@/link/mock/scenarios";
 import { EVENT_TYPES } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
-import type { EventType } from "@/proto/types";
+import { ROLE_LABEL, type EventType } from "@/proto/types";
 import { useStore, type DeviceId } from "@/store";
 
 /** Devices the desktop frame can imitate — cutout, bars and safe areas. */
@@ -48,6 +48,13 @@ export function ReviewPanel() {
     fn();
     force((n) => n + 1);
   };
+  // The timed scenarios fire 30–60 s after connecting: count down so a reviewer knows it is coming.
+  const pending = world?.pendingTimeline() ?? [];
+  useEffect(() => {
+    if (!pending.length) return;
+    const t = setInterval(() => force((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [pending.length]);
 
   return (
     <aside className="bg-plate relative hidden max-h-[844px] w-[300px] shrink-0 flex-col overflow-hidden rounded-xl border border-white/8 text-white shadow-lg lg:flex">
@@ -70,7 +77,7 @@ export function ReviewPanel() {
         <div className="grid grid-cols-3 gap-2">
           <Readout label="連線" value={CONN_LABEL[conn]} sub={conn} />
           <Readout label="狗" value={mode ? MODE_LABEL[mode] : "—"} sub={mode ?? "no telemetry"} />
-          <Readout label="角色" value={role ?? "—"} sub="scopes" />
+          <Readout label="角色" value={role ? ROLE_LABEL[role] : "—"} sub={role ?? "no session"} />
         </div>
 
         <Group title="預覽">
@@ -110,6 +117,12 @@ export function ReviewPanel() {
                     {SCENARIOS[id].label} <span className="font-mono text-[11px] text-white/40">{id}</span>
                   </span>
                   <span className="block text-[11px] text-white/45">{SCENARIOS[id].verifies}</span>
+                  {scenario === id &&
+                    pending.map((p) => (
+                      <span key={p.do} className="mt-0.5 block font-mono text-[11px] text-violet-200 tabular-nums">
+                        {p.inSec} 秒後觸發 · {p.do}
+                      </span>
+                    ))}
                 </span>
               </button>
             ))}
@@ -121,6 +134,7 @@ export function ReviewPanel() {
             <div className="grid grid-cols-2 gap-1.5">
               <Action onClick={act(() => world.fire("estop_remote"))}>遠端 E-Stop</Action>
               <Action onClick={act(() => world.fire("gateway_down"))}>Gateway 掛掉</Action>
+              <Action onClick={act(() => world.restoreGateway())}>恢復 Gateway</Action>
               <Action onClick={act(() => world.fire("fault"))}>FAULT 0x42</Action>
               <Action onClick={act(() => world.fire("revoked"))}>撤銷本機</Action>
               <Action onClick={act(() => world.otherPhoneTakesTeleop())}>他機搶操控</Action>
@@ -148,6 +162,7 @@ export function ReviewPanel() {
               >
                 新手機請求加入
               </Action>
+              <Action onClick={act(addSecondDog)}>已配對第二隻狗</Action>
             </div>
           </Group>
         )}
@@ -208,14 +223,8 @@ export function ReviewPanel() {
               <code className="font-mono text-white/80">Warehouse-slow</code> → 25 秒才連上；
               「其他網路」輸入含 <code className="font-mono text-white/80">none</code> → 找不到
             </li>
-            <li>
-              License 金鑰：<code className="font-mono text-white/80">SYNC-…</code> 專業版、
-              <code className="font-mono text-white/80">BASE-…</code> 標準版（無 AI）、
-              <code className="font-mono text-white/80">CTRL-…</code> 操控版（只有操控＋地圖）、含
-              <code className="font-mono text-white/80">0000</code> 已綁定、
-              <code className="font-mono text-white/80">EXPD-…</code> 過期；
-              預填的是全功能金鑰，試操控版用 <code className="font-mono text-white/80">CTRL-01AB-2026-DEMO</code>
-            </li>
+            <li>License 用掃描：先在「配對模擬 → 授權卡 QR code 內容」選要掃到哪一張卡。手動輸入是空的，打開 MOCK 提示可以點示範金鑰</li>
+            <li>「已配對第二隻狗」後，點主畫面頂部狀態卡 → 機器狗清單可以切換</li>
             <li>任務 tab 開編輯器時，在地圖上長按 0.5 秒放航點</li>
             <li>點地圖任一點顯示與狗的直線距離</li>
           </ul>
@@ -223,6 +232,21 @@ export function ReviewPanel() {
       </div>
     </aside>
   );
+}
+
+/** Dev: pair this phone with dog-b too (without switching), so the status details can switch to it. */
+function addSecondDog() {
+  const ks = getDogLink().keystore;
+  const cur = ks.load();
+  ks.save({
+    dogId: "dog-b",
+    dogName: "SyncAI-Dog 21C8",
+    serial: "SD2026-0822-21C8",
+    role: "operator",
+    endpoint: cur?.endpoint ?? { ip: "192.168.50.31", port: 8443, fingerprint: "SHA256:21c8…9d04" },
+    pairedAt: Date.now(),
+  });
+  if (cur) ks.use(cur.dogId);
 }
 
 function Readout({ label, value, sub }: { label: string; value: string; sub: string }) {

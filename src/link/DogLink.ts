@@ -179,9 +179,19 @@ export interface Credential {
   pairedAt: number;
 }
 
+/**
+ * A phone can be paired with several dogs; one of them is the active one the Console talks to.
+ */
 export interface KeystoreChannel {
+  /** The active dog's credential. */
   load(): Credential | null;
+  /** Every dog this phone is paired with, the active one included. */
+  list(): Credential[];
+  /** Store (or update) a credential and make it the active one. */
   save(credential: Credential): void;
+  /** Make another paired dog the active one. Returns its credential, or null if unknown. */
+  use(dogId: string): Credential | null;
+  /** Forget the active dog (revoked, or 清除本機配對). The others stay paired. */
   clear(): void;
 }
 

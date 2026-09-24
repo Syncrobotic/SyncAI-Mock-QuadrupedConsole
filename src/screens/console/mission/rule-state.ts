@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/lib/notify";
 
 import { EVENT_TYPES } from "@/lib/rules";
 import { get, set } from "@/store";

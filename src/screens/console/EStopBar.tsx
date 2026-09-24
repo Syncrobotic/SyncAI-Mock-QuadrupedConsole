@@ -2,7 +2,7 @@
 
 import { Bluetooth, Loader2, OctagonX, ShieldCheck } from "lucide-react";
 import { useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify";
 
 import { cn, formatClock } from "@/lib/utils";
 import { useStore } from "@/store";

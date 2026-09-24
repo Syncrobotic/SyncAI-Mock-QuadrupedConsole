@@ -8,14 +8,12 @@ import { set, useStore } from "@/store";
 import { retry } from "@/store/controller";
 
 /**
- * The banner tier of §13's error ladder.
+ * The alerts of §13's error ladder, and the chips that float on the map.
  *
- * 🔴 ONE banner at a time. They used to stack: on an SE in BleOnly the header
- * plus banners were 176px of a 253px map — 70% of the map gone, and the view
- * buttons underneath one. Now the highest-priority alert is the banner, the
- * rest are a "+N" pill that opens the status card, and advisories that do not
- * change what you can do right now (licence expiring) never take the map at
- * all — they are a dot on the header and a line in the status card.
+ * Alerts no longer get a strip of their own on the map: the highest-priority
+ * `banner` alert is the status island's second line (with its action), and
+ * the full list — advisories included — is in the island's details. The map
+ * keeps only what is about the map itself (loading, the editor hint).
  */
 
 export interface Alert {
@@ -82,8 +80,8 @@ export function useAlerts(): Alert[] {
   return out;
 }
 
-export function Banners() {
-  const alerts = useAlerts();
+/** What is about the map itself: loading progress and the mission editor's hint. */
+export function MapChips() {
   const mapLoaded = useStore((s) => s.mapLoaded);
   const mapTotal = useStore((s) => s.mapTotal);
   const cloud = useStore((s) => s.layers.cloud);
@@ -93,32 +91,17 @@ export function Banners() {
   const live = conn === "Online" || conn === "Degraded";
   const pct = mapTotal ? Math.round((mapLoaded / mapTotal) * 100) : 0;
 
-  const banners = alerts.filter((a) => a.kind === "banner");
-  const top = banners[0];
-  const more = alerts.length - (top ? 1 : 0);
-
   return (
-    <>
-      {top && <AlertRow alert={top} more={more} />}
-      <div className="flex flex-wrap gap-1.5">
-        {!top && more > 0 && (
-          <button onClick={() => set({ statusOpen: true })} className="pointer-events-auto relative cursor-pointer">
-            <Chip>
-              <span className="bg-severity-warning size-1.5 rounded-full" />
-              {more} 則提醒
-            </Chip>
-          </button>
-        )}
-        {live && cloud && mapTotal > 0 && pct < 100 && (
-          <Chip>
-            <span className="bg-primary-accent size-1.5 animate-pulse rounded-full" />
-            點雲載入 {pct}%
-          </Chip>
-        )}
-        {live && mapTotal === 0 && <Chip>地圖載入中…</Chip>}
-        {tab === "mission" && editor && <Chip>長按地圖放航點 · 拖曳航點移動</Chip>}
-      </div>
-    </>
+    <div className="flex flex-wrap gap-1.5">
+      {live && cloud && mapTotal > 0 && pct < 100 && (
+        <Chip>
+          <span className="bg-primary-accent size-1.5 animate-pulse rounded-full" />
+          點雲載入 {pct}%
+        </Chip>
+      )}
+      {live && mapTotal === 0 && <Chip>地圖載入中…</Chip>}
+      {tab === "mission" && editor && <Chip>長按地圖放航點 · 拖曳航點移動</Chip>}
+    </div>
   );
 }
 
@@ -128,28 +111,15 @@ const TONES = {
   bad: "[&>span:first-child]:text-status-error border-status-error/40",
 };
 
-export function AlertRow({ alert, more = 0, flat }: { alert: Alert; more?: number; flat?: boolean }) {
+/** One alert as a row in the island's details. */
+export function AlertRow({ alert }: { alert: Alert }) {
   return (
-    <div
-      role="status"
-      className={cn(
-        "flex items-center gap-2.5 rounded-xl border px-3 py-2 text-[13px] font-medium",
-        flat ? "bg-background/60" : "bg-surface/90 pointer-events-auto shadow-lg backdrop-blur",
-        TONES[alert.tone]
-      )}
-    >
+    <div role="status" className={cn("bg-background/60 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-[13px] font-medium", TONES[alert.tone])}>
       <span className="shrink-0">{alert.icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate">{alert.text}</span>
-        {/* One line on the map (height is what the map cannot spare); the
-            status card shows it in full. */}
-        {alert.sub && <span className={cn("text-muted-foreground block text-[11px] font-normal", flat ? "line-clamp-2" : "truncate")}>{alert.sub}</span>}
+        {alert.sub && <span className="text-muted-foreground line-clamp-2 block text-[11px] font-normal">{alert.sub}</span>}
       </span>
-      {more > 0 && !flat && (
-        <button onClick={() => set({ statusOpen: true })} className="bg-secondary relative h-7 shrink-0 cursor-pointer rounded-md border px-2 text-[11px] font-semibold after:absolute after:-inset-2 after:content-['']">
-          +{more}
-        </button>
-      )}
       {alert.action && (
         <button
           onClick={alert.action.run}

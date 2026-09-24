@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/lib/notify";
 
 import { currentScenarioId, getDogLink, mockWorld, switchScenario } from "@/link";
 import { RpcError, type Credential, type RpcName, type RpcReq, type RpcRes } from "@/link/DogLink";
@@ -180,7 +180,7 @@ export function beginOnboarding() {
 export function finishOnboarding(cred: Credential) {
   const link = getDogLink();
   link.keystore.save(cred);
-  set({ credential: cred, tab: cred.role === "viewer" ? "device" : "teleop" });
+  set((s) => ({ ...DOG_RESET, linkEpoch: s.linkEpoch + 1, addingDog: false, credential: cred, tab: cred.role === "viewer" ? "device" : "teleop" }));
   if (cred.endpoint) {
     go("Paired");
     void connect();
@@ -188,6 +188,53 @@ export function finishOnboarding(cred: Credential) {
     // Wi-Fi skipped (§4): BLE only, device page and E-Stop.
     go("BleOnly", { tab: "device" });
   }
+}
+
+/** What belongs to the dog the Console was talking to — cleared whenever that dog changes. */
+const DOG_RESET = {
+  session: null,
+  telemetry: null,
+  events: [],
+  missions: [],
+  device: null,
+  phones: [],
+  editor: null,
+  approval: null,
+  restartingUntil: null,
+  mapLoaded: 0,
+  mapTotal: 0,
+  gatewayHealth: { state: "up" },
+  rtt: { level: "good", goodSince: 0 },
+  statusOpen: false,
+} satisfies Partial<ReturnType<typeof get>>;
+
+/** Status details → another paired dog: drop this one's session and connect to that one. */
+export function switchDog(dogId: string) {
+  const link = getDogLink();
+  if (get().credential?.dogId === dogId) return;
+  const cred = link.keystore.use(dogId);
+  if (!cred) return;
+  link.gateway.disconnect();
+  stopCall();
+  set((s) => ({ ...DOG_RESET, linkEpoch: s.linkEpoch + 1, credential: cred }));
+  go("Paired");
+  void connect();
+}
+
+/** Status details → 連接其他機器狗: onboarding from the scan, with a way back (cancelAddDog). */
+export function beginAddDog() {
+  getDogLink().gateway.disconnect();
+  stopCall();
+  set({ addingDog: true, statusOpen: false, session: null });
+  go("Paired");
+  go("Onboarding");
+}
+
+export function cancelAddDog() {
+  set({ addingDog: false });
+  if (!get().credential) return go("Unpaired");
+  go("Paired");
+  void connect();
 }
 
 export function clearLocalPairing() {
@@ -238,6 +285,8 @@ function onEvent(e: DogEvent) {
     void refreshPhones();
     return;
   }
+  // The start screen says it in place; a toast over it would say it twice.
+  if (e.kind === "revoked") return;
   // Only what needs eyes now becomes a toast. Mission progress used to toast
   // every start/finish and, on patrol, stacked over the map all night; it is
   // in the run card and the status card's event list instead.
@@ -256,7 +305,15 @@ export async function refreshMissions() {
 
 export async function refreshDevice() {
   const d = await rpc("device.info", undefined, { quiet: true });
-  if (d) set({ device: d });
+  if (!d) return;
+  set({ device: d });
+  // The keystore names the dog in the status details' dog list: keep it the dog's own name.
+  const c = get().credential;
+  if (c && c.dogName !== d.name) {
+    const next = { ...c, dogName: d.name };
+    getDogLink().keystore.save(next);
+    set({ credential: next });
+  }
 }
 
 export async function refreshPhones() {

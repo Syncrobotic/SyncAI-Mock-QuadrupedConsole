@@ -10,7 +10,7 @@ import { MapView } from "@/map3d/MapView";
 import { NO_SCOPES, SNAP_PCT, set, useStore, type SheetSnap } from "@/store";
 import { tabAccess, type Access, type Area, type Tab } from "@/store/logic";
 
-import { Banners } from "./Banners";
+import { MapChips } from "./Banners";
 import { EStopBar } from "./EStopBar";
 import { FaultOverlay, Overlays } from "./Overlays";
 import { LandscapeConsole } from "./LandscapeConsole";
@@ -88,17 +88,13 @@ export function Console() {
       const r = el.getBoundingClientRect();
       if (e) {
         setZone({ top: e.top - r.top, bottom: e.bottom - r.top, height: r.height });
-        set({ toastBottom: Math.round(r.bottom - e.top + 8) });
       }
     };
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     if (estop.current?.previousElementSibling) ro.observe(estop.current.previousElementSibling);
     measure();
-    return () => {
-      ro.disconnect();
-      set({ toastBottom: null });
-    };
+    return () => ro.disconnect();
   }, [unlicensed, landscape]);
 
   // §7: the teleop tab is locked at 50% and enters follow view; §6: mission defaults to 2.5D top.
@@ -115,16 +111,15 @@ export function Console() {
   // Collapsed is "tab bar + one summary line", sized to that — not 20% of the
   // screen, which left 40–70px of blank sheet the map could have had.
   const COLLAPSED_SHEET = 96;
-  const teleopOpen = Math.round(Math.max(usable * 0.5, Math.min(usable * 0.62, 380)));
+  // Teleop in portrait is posture, gait and the speed limit — no sticks (they are landscape's) —
+  // so its open height is its content, and the map gets the rest.
+  const teleopOpen = 252;
   const heights: [number, number, number] = [
     COLLAPSED_SHEET,
     tab === "teleop" ? teleopOpen : Math.round(usable * SNAP_PCT[1]),
     usable - ESTOP - COLLAPSED_HEADER - 2 * GAP,
   ];
   let sheetH = heights[snap];
-  // Teleop's open height: on a short phone 50% cannot hold the sticks AND the
-  // posture keys (measured: 266px for 360px of content on an SE), and
-  // "recover" is the key you need right after an E-Stop. It takes up to 62%.
 
   // At 90% the map is left with exactly its header's height (heights[2]). The
   // panel is always flex-1, so it follows the sheet frame by frame — while
@@ -194,7 +189,7 @@ export function Console() {
               at 337px inside a 253–332px panel). */}
           <div className={cn("pointer-events-none absolute inset-0 z-20 flex flex-col gap-1.5", collapsed ? "p-1.5" : "p-2")}>
             <DogHeader />
-            {!statusOpen && roomy && <Banners />}
+            {!statusOpen && roomy && <MapChips />}
           </div>
           {!collapsed && (videoMain || !statusOpen) && <CallLayer />}
           {!collapsed && <FaultOverlay />}

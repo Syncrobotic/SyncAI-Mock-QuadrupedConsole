@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify";
 import { Camera, OctagonAlert, RefreshCw, SearchX, Smartphone, Sparkles } from "lucide-react";
 
 import { Modal, Segmented } from "@/components/kit";

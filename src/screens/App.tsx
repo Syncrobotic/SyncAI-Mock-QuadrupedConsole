@@ -18,7 +18,6 @@ import { Onboarding } from "./onboarding/Onboarding";
 export function App() {
   const conn = useStore((s) => s.conn);
   const epoch = useStore((s) => s.linkEpoch);
-  const toastBottom = useStore((s) => s.toastBottom);
   const { theme } = useTheme();
 
   useKeyboardInset();
@@ -37,14 +36,14 @@ export function App() {
       {onboarding ? <Onboarding /> : <Console key={epoch} />}
       {IS_MOCK && <MockOsPrompt />}
       {/* Inside the frame: the frame is a containing block for `fixed`, so
-          toasts land on the phone, not on the desktop around it. */}
+          toasts land on the phone, not on the desktop around it. Only screens
+          without the status island use it — in the Console, notifications are
+          the island's second line (lib/notify). */}
       <Toaster
-        // In the Console, toasts sit just above the E-Stop: the top of the map
-        // is the status header and banners, and a toast there hid both.
-        position={onboarding || toastBottom === null ? "top-center" : "bottom-center"}
+        position="top-center"
         theme={(theme as "dark" | "light") ?? "dark"}
         // Below the status bar / cutout at the top.
-        offset={onboarding || toastBottom === null ? "calc(var(--safe-top) + 12px)" : { bottom: toastBottom }}
+        offset="calc(var(--safe-top) + 12px)"
         visibleToasts={3}
         duration={3000}
         toastOptions={{ className: "!text-[13px]" }}

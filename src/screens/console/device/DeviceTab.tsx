@@ -2,7 +2,7 @@
 
 import { Bluetooth, ChevronRight, Download, Plus, FlaskConical, KeyRound, Pencil, Power, RefreshCw, ScrollText, Smartphone, Upload, Wifi } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify";
 
 import { KeyInput } from "@/components/KeyInput";
 import { Card, Field, Modal, Pill, Row, SectionTitle, Segmented, Select, Slider, inputClass, type Tone } from "@/components/kit";

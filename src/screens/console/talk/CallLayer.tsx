@@ -2,7 +2,7 @@
 
 import { Camera, Ellipsis, Loader2, Lock, Megaphone, Mic, MicOff, PhoneOff, SwitchCamera, Thermometer, Video as VideoIcon, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify";
 
 import { Modal, Slider } from "@/components/kit";
 import { IS_MOCK } from "@/lib/env";

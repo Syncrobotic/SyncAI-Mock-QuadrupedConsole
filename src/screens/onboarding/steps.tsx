@@ -95,6 +95,11 @@ function Frame({
   // Default top-left action is the shell's back; a step's own left (cancel) wins.
   const leftSlot =
     left ||
+    (shell.exit && (
+      <BarButton label="取消" onClick={shell.exit}>
+        <X />
+      </BarButton>
+    )) ||
     (shell.back && (
       <BarButton label="上一步" onClick={shell.back}>
         <ChevronLeft />

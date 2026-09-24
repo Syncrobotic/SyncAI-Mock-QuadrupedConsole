@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { MapView } from "@/map3d/MapView";
 import { set, useStore } from "@/store";
 
-import { Banners } from "./Banners";
+import { MapChips } from "./Banners";
 import { EStopBar } from "./EStopBar";
 import { FaultOverlay, Overlays } from "./Overlays";
 import { DogHeader } from "./StatusBar";
@@ -57,8 +57,8 @@ export function LandscapeConsole() {
 
           <div className="pointer-events-none absolute inset-x-2 top-2 z-30 flex items-start gap-2">
             <div className="flex w-[300px] shrink-0 flex-col gap-1.5">
-              <DogHeader />
-              <Banners />
+              <DogHeader landscape />
+              <MapChips />
             </div>
             <div className="pointer-events-auto mx-auto w-[240px] shrink-0">
               <EStopBar />

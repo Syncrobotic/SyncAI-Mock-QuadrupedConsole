@@ -209,6 +209,19 @@ export class MockWorld {
     this._device = { ...this._device, ...patch };
   }
 
+  /**
+   * One world stands in for whichever dog the phone connects to: switching dogs in the
+   * Console re-labels it (name, serial) and remembers each dog's name across switches.
+   */
+  private dogId = "dog-a";
+  private dogNames: Record<string, string> = {};
+  identify(dogId: string, fallbackName: string, serial: string) {
+    if (dogId === this.dogId) return;
+    this.dogNames[this.dogId] = this._device.name;
+    this.dogId = dogId;
+    this.patchDevice({ name: this.dogNames[dogId] ?? fallbackName, serial });
+  }
+
   hasFeature(f: LicenseInfo["features"][number]["feature"]) {
     return !!this.device.license.find((x) => x.feature === f)?.granted;
   }
@@ -223,6 +236,9 @@ export class MockWorld {
   grantAllFeatures() {
     this.license = fullLicense(Date.now());
     saveLicense(this.license);
+    // The licence gate may be asking for the camera to scan a card; the shortcut made that
+    // moot. A real OS prompt would wait for an answer — in review it only gets in the way.
+    this.osPrompt.emit(null);
     this.emitEvent("system", "info", "License 已切換為專業版（全功能）");
   }
 
@@ -623,6 +639,22 @@ export class MockWorld {
     // The crash that caused the scenario does not recur after a restart.
     this.scenario.timeline.forEach((s, i) => s.do === "gateway_down" && this.firedTimeline.add(i));
     this.health.emit({ state: "up" });
+  }
+
+  /** Dev: the gateway comes back by itself (review panel 恢復 Gateway). */
+  restoreGateway() {
+    if (this.gatewayState === "up") return;
+    this.gatewayState = "up";
+    this.scenario.timeline.forEach((s, i) => s.do === "gateway_down" && this.firedTimeline.add(i));
+    this.health.emit({ state: "up" });
+  }
+
+  /** Dev: what the scenario's timeline will still do, and in how many seconds (review panel). */
+  pendingTimeline(now = Date.now()): { do: string; inSec: number }[] {
+    if (!this.wsOpen) return [];
+    return this.scenario.timeline.flatMap((step, i) =>
+      this.firedTimeline.has(i) ? [] : [{ do: step.do, inSec: Math.max(0, Math.ceil(step.at - (now - this.connectedAt) / 1000)) }]
+    );
   }
 
   pairingUntil: number | null = null;

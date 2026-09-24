@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/lib/notify";
 
 import { snapToFree } from "@/lib/geometry";
 import { get, set } from "@/store";

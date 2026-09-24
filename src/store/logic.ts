@@ -12,7 +12,7 @@ export type ConnState = "Unpaired" | "Onboarding" | "Paired" | "Connecting" | "O
 const TRANSITIONS: Record<ConnState, readonly ConnState[]> = {
   Unpaired: ["Onboarding"],
   Onboarding: ["Paired", "Unpaired", "BleOnly"],
-  Paired: ["Connecting", "Unpaired"],
+  Paired: ["Connecting", "Unpaired", "Onboarding"],
   Connecting: ["Online", "BleOnly", "Unreachable", "Paired", "Unpaired"],
   Online: ["Degraded", "Unpaired", "Paired", "BleOnly"],
   Degraded: ["Online", "BleOnly", "Paired", "Unpaired"],
@@ -24,7 +24,9 @@ const TRANSITIONS: Record<ConnState, readonly ConnState[]> = {
  * Beyond the spec diagram: every state may go to `Paired` (app backgrounded,
  * §13 前景/背景) and to `Unpaired` (local pairing cleared, §10 本機), and
  * `Online → BleOnly` covers a WS that drops with no Degraded phase in between.
- * `Onboarding → BleOnly` is the "skip Wi-Fi" exit (§4).
+ * `Onboarding → BleOnly` is the "skip Wi-Fi" exit (§4). `Paired → Onboarding` is pairing
+ * another dog from the Console (the current one is disconnected first); cancelling it goes
+ * back through `Onboarding → Paired`.
  */
 export function canTransition(from: ConnState, to: ConnState) {
   return from === to || TRANSITIONS[from].includes(to);
