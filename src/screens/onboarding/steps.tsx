@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, m } from "framer-motion";
-import { ArrowRight, BadgeCheck, Check, ChevronLeft, ChevronRight, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, Plus, RotateCcw, ScanLine, Wifi, WifiHigh, WifiLow, WifiZero, X } from "lucide-react";
+import { ArrowRight, BadgeCheck, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, Plus, RotateCcw, ScanLine, Wifi, WifiHigh, WifiLow, WifiZero, X } from "lucide-react";
 import { isValidElement, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -29,6 +29,9 @@ import { CardScan, EASE_OUT, Link, NetLink, Radar, popIn, rise, type ScanState }
  */
 
 // ── Skeleton ────────────────────────────────────────────────────────────────
+
+const PAD = "pr-[calc(1.25rem+var(--safe-right))] pl-[calc(1.25rem+var(--safe-left))]";
+const LAYOUT = { duration: 0.45, ease: EASE_OUT } as const;
 
 /** Stacks the old and the new text in one grid cell and cross-fades them. */
 function Swap({ k, children, className, as = "p" }: { k: string; children: React.ReactNode; className?: string; as?: "h1" | "p" }) {
@@ -61,7 +64,15 @@ function Frame({
   left,
   right,
   live,
+  mode = "hero",
 }: {
+  /**
+   * hero — the visual IS the content (pairing, card scan, results, waiting): a large visual,
+   *        the group centred.
+   * list — a list is the content (dogs, networks): the visual shrinks to an 88 px band that
+   *        stays pinned with the title; only the list scrolls. Switching animates (layout).
+   */
+  mode?: "hero" | "list";
   visual: React.ReactNode;
   title: string;
   sub?: React.ReactNode;
@@ -78,6 +89,7 @@ function Frame({
   live?: boolean;
 }) {
   const shell = useContext(OnboardingContext);
+  const list = mode === "list";
   // Default top-left action is the shell's back; a step's own left (cancel) wins.
   const leftSlot =
     left ||
@@ -116,24 +128,45 @@ function Frame({
           </div>
         )
       )}
-      <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-[calc(1.25rem+var(--safe-right))] pl-[calc(1.25rem+var(--safe-left))]">
-        {/* The group — visual, title, content — sits in the middle of the space between the top
-            bar and the action bar. */}
-        <div className="flex min-h-full flex-col justify-center py-4">
-          <div className="flex h-[clamp(130px,24vh,190px)] shrink-0 items-center justify-center">{visual}</div>
-          <div className="mt-3 text-center" aria-live={live ? "polite" : undefined}>
-            {/* Text that changes inside a step cross-fades in place; nothing animates on
-                entry — the step transition already did (one layer, never two). */}
-            <Swap k={title} className="text-[20px] leading-tight font-semibold tracking-tight" as="h1">
-              {title}
-            </Swap>
-            {sub && (
-              <Swap k={textOf(sub)} className="text-muted-foreground mt-1.5 text-[13px]">
-                {sub}
+      <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+        <div className={cn("flex min-h-full flex-col", !list && "justify-center py-4")}>
+          {/* Visual + title: centred in hero, a pinned header in list. One element across the
+              switch, so framer's layout animation carries it (the radar shrinks, not jumps). */}
+          <m.div
+            layout
+            transition={LAYOUT}
+            className={cn(PAD, "z-10", list && "bg-background/90 sticky top-0 pb-3 backdrop-blur")}
+          >
+            <m.div
+              layout
+              transition={LAYOUT}
+              className={cn(
+                "flex shrink-0 items-center justify-center",
+                list
+                  ? "h-[88px] pt-1 [--band-h:80px] [--link-w:300px] [--node-sm:40px] [--node:44px] [--plate:3.5rem]"
+                  : "h-[clamp(170px,31vh,250px)] [--band-h:clamp(170px,31vh,250px)] [--link-w:400px] [--node-sm:clamp(52px,15vw,66px)] [--node:clamp(64px,19vw,80px)] [--plate:6rem]"
+              )}
+            >
+              {visual}
+            </m.div>
+            <m.div layout="position" transition={LAYOUT} className={cn("text-center", list ? "mt-2" : "mt-3")} aria-live={live ? "polite" : undefined}>
+              {/* Text that changes inside a step cross-fades in place; nothing animates on
+                  entry — the step transition already did (one layer, never two). */}
+              <Swap k={title} className="text-[20px] leading-tight font-semibold tracking-tight" as="h1">
+                {title}
               </Swap>
-            )}
-          </div>
-          {children && <div className="mx-auto mt-5 w-full max-w-[360px] space-y-2.5">{children}</div>}
+              {sub && (
+                <Swap k={textOf(sub)} className="text-muted-foreground mt-1.5 text-[13px]">
+                  {sub}
+                </Swap>
+              )}
+            </m.div>
+          </m.div>
+          {children && (
+            <m.div layout="position" transition={LAYOUT} className={cn(PAD, "pb-4", list ? "mt-1" : "mt-5")}>
+              <div className="mx-auto w-full max-w-[360px] space-y-2.5">{children}</div>
+            </m.div>
+          )}
         </div>
       </div>
       <ActionBar above={shell.ble === "ok" ? above : undefined}>{action}</ActionBar>
@@ -283,11 +316,11 @@ function BarButton({ children, onClick, label }: { children: React.ReactNode; on
 /** A large icon on a lit plate — the visual for steps that have no motion of their own. */
 function Plate({ children, tone = "brand" }: { children: React.ReactNode; tone?: "brand" | "ok" | "muted" }) {
   return (
-    <m.span className="relative grid size-20 place-items-center" {...popIn}>
+    <m.span className="relative grid size-[var(--plate,5rem)] place-items-center" {...popIn}>
       {tone !== "muted" && <span className={cn("absolute inset-0 rounded-3xl blur-2xl", tone === "ok" ? "bg-emerald-500/20" : "bg-violet-500/20")} />}
       <span
         className={cn(
-          "bg-card relative grid size-20 place-items-center rounded-3xl border shadow-lg [&_svg]:size-9",
+          "bg-card relative grid size-full place-items-center rounded-3xl border shadow-lg [&_svg]:size-[45%]",
           tone === "brand" && "text-primary-accent ring-1 ring-violet-400/20",
           tone === "ok" && "text-status-ok ring-1 ring-emerald-400/25",
           tone === "muted" && "text-muted-foreground"
@@ -414,6 +447,7 @@ export function StepScan({ patch, go }: StepProps) {
 
   return (
     <Frame
+      mode={dogs.length ? "list" : "hero"}
       visual={<Radar dogs={dogs} />}
       title={dogs.length ? "選擇你的狗" : "正在找附近的狗"}
       sub="序號末四碼印在狗的背上"
@@ -971,6 +1005,14 @@ export function StepWifi({ flow, patch, go }: StepProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nets, phoneSsid]);
 
+  // The strongest four (and whatever is chosen); the rest — weaker, unsupported, and 其他網路 —
+  // behind one 更多網路 row.
+  const [more, setMore] = useState(false);
+  const LIMIT = 4;
+  const ordered = nets && [...nets].sort((a, b) => Number(a.security === "enterprise") - Number(b.security === "enterprise") || b.rssi - a.rssi);
+  const shown = ordered && (more || ordered.length <= LIMIT ? ordered : ordered.filter((n, i) => i < LIMIT || n.ssid === flow.ssid));
+  const hidden = ordered && shown ? ordered.length - shown.length : 0;
+
   const sel = manual ? null : (nets?.find((n) => n.ssid === flow.ssid) ?? null);
   const needsPsk = manual || (sel ? sel.security !== "open" : false);
   const ready = !!flow.ssid && (!needsPsk || flow.psk.length >= 8) && sel?.security !== "enterprise";
@@ -1000,6 +1042,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
 
   return (
     <Frame
+      mode="list"
       visual={<NetLink phase="pick" sameNet={sameNet} />}
       title="選擇 Wi-Fi"
       sub={sameNet === false ? "手機不在這個網路，之後手機也要連過去" : "狗收得到的網路，訊號以狗的位置為準"}
@@ -1023,7 +1066,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
       >
         <div role="radiogroup" aria-label="Wi-Fi 網路" className="space-y-2">
           {!nets && [0, 1, 2].map((i) => <div key={i} className="bg-card/40 h-[60px] animate-pulse rounded-xl border border-dashed" />)}
-          {nets?.map((n, i) => {
+          {shown?.map((n, i) => {
             const unsupported = n.security === "enterprise";
             return (
               <ChoiceCard
@@ -1052,9 +1095,20 @@ export function StepWifi({ flow, patch, go }: StepProps) {
               </ChoiceCard>
             );
           })}
-          {nets && (
+          {hidden > 0 && (
+            <m.button
+              type="button"
+              onClick={() => setMore(true)}
+              className="text-muted-foreground hover:text-foreground hover:border-primary/40 flex h-12 w-full cursor-pointer items-center justify-center gap-1 rounded-xl border border-dashed text-[13px] font-medium transition-colors"
+              {...rise(LIMIT)}
+            >
+              更多網路 ({hidden})
+              <ChevronDown className="size-4" />
+            </m.button>
+          )}
+          {nets && hidden === 0 && (
             <ChoiceCard
-              index={nets.length}
+              index={shown?.length ?? 0}
               on={manual}
               onSelect={() => {
                 setManual(true);
@@ -1201,7 +1255,7 @@ export function StepSafety({ flow }: StepProps) {
     <Frame
       visual={
         <m.div
-          className="from-estop to-estop-pressed flex h-14 w-full max-w-[280px] items-center justify-center gap-2 rounded-2xl bg-linear-to-b text-[15px] font-black tracking-[0.2em] text-white shadow-[0_8px_30px_-6px_var(--estop)] ring-1 ring-white/15"
+          className="from-estop to-estop-pressed flex h-16 w-full max-w-[300px] items-center justify-center gap-2 rounded-2xl bg-linear-to-b text-[15px] font-black tracking-[0.2em] text-white shadow-[0_8px_30px_-6px_var(--estop)] ring-1 ring-white/15"
           {...popIn}
           aria-hidden
         >

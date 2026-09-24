@@ -49,7 +49,7 @@ export function Link({ phase, progress = 0 }: { phase: LinkPhase; progress?: num
   const solid = done || phase === "key";
 
   return (
-    <div className="flex w-full max-w-[340px] items-center px-6" aria-hidden>
+    <div className="flex w-full max-w-[var(--link-w,340px)] items-center px-6" aria-hidden>
       <Node pulse={moving || phase === "key"} tone={tone}>
         {router ? <Router className="size-[42%]" /> : <Smartphone className="size-[42%]" />}
       </Node>
@@ -125,7 +125,7 @@ export function NetLink({ phase, sameNet, progress = 0 }: { phase: NetPhase; sam
   const phoneTone: Tone = sameNet === false ? "warn" : online ? "ok" : "brand";
   const dogTone: Tone = phase === "failed" ? "bad" : online ? "ok" : "brand";
   return (
-    <div className="flex w-full max-w-[360px] items-center px-5" aria-hidden>
+    <div className="flex w-full max-w-[var(--link-w,360px)] items-center px-5" aria-hidden>
       <Node pulse={false} tone={phoneTone} small>
         <Smartphone className="size-[42%]" />
       </Node>
@@ -182,7 +182,7 @@ function Wire({ solid, tone, moving, check, dashed = true }: { solid: boolean; t
 
 function Node({ children, pulse, tone, progress, small }: { children: React.ReactNode; pulse: boolean; tone: Tone; progress?: number; small?: boolean }) {
   return (
-    <div className={cn("relative grid shrink-0 place-items-center", small ? "size-[clamp(46px,13vw,56px)]" : "size-[clamp(52px,16vw,64px)]")}>
+    <div className={cn("relative grid shrink-0 place-items-center", small ? "size-[var(--node-sm,clamp(46px,13vw,56px))]" : "size-[var(--node,clamp(52px,16vw,64px))]")}>
       {pulse && (
         <m.span
           className={cn("absolute inset-0 rounded-full border-2", RING[tone])}
@@ -225,7 +225,12 @@ export type ScanState = "scanning" | "found" | "failed";
 export function CardScan({ state }: { state: ScanState }) {
   const tone = state === "found" ? "border-status-ok" : state === "failed" ? "border-status-error" : "border-white";
   return (
-    <div className="relative aspect-[1.586] h-full max-h-full overflow-hidden rounded-2xl bg-black shadow-xl" aria-hidden>
+    // Sized from the band's height, capped by the width, so the ID-1 ratio never distorts.
+    <div
+      className="relative aspect-[1.586] overflow-hidden rounded-2xl bg-black shadow-xl"
+      style={{ width: "min(100%, calc(var(--band-h, 190px) * 1.586))" }}
+      aria-hidden
+    >
       <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, #2b2b36, #060608 75%)" }} />
       {/* the card in view */}
       <div className="absolute inset-[16%] grid place-items-center rounded-lg border border-white/10 bg-white/[0.04]">
@@ -281,7 +286,7 @@ function radiusOf(rssi: number) {
 
 export function Radar({ dogs }: { dogs: DogAdvert[] }) {
   return (
-    <div className="relative aspect-square h-full max-h-full" aria-hidden>
+    <m.div layout className="relative aspect-square h-full max-h-full" aria-hidden transition={{ duration: 0.45, ease: EASE_OUT }}>
       {[1, 0.66, 0.33].map((r) => (
         <span key={r} className="border-primary-accent/20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border" style={{ width: `${r * 100}%`, height: `${r * 100}%` }} />
       ))}
@@ -289,8 +294,9 @@ export function Radar({ dogs }: { dogs: DogAdvert[] }) {
         className="absolute inset-0 animate-[spin_2.6s_linear_infinite] rounded-full"
         style={{ background: "conic-gradient(from 0deg, transparent 0deg, transparent 290deg, color-mix(in oklab, var(--primary-accent) 40%, transparent) 360deg)" }}
       />
-      <span className="bg-primary text-primary-foreground absolute top-1/2 left-1/2 grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full shadow-lg ring-4 ring-violet-500/20">
-        <Smartphone className="size-4" />
+      {/* Everything inside scales with the radar, so the small (list-mode) radar stays airy. */}
+      <span className="bg-primary text-primary-foreground absolute top-1/2 left-1/2 grid size-[18%] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full shadow-lg ring-[3px] ring-violet-500/20">
+        <Smartphone className="size-[55%]" />
       </span>
       <AnimatePresence>
         {dogs.map((d) => {
@@ -300,7 +306,7 @@ export function Radar({ dogs }: { dogs: DogAdvert[] }) {
             <m.span
               key={d.id}
               className={cn(
-                "absolute grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border shadow",
+                "absolute grid size-[13%] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border shadow",
                 d.hasOwner ? "bg-card text-foreground" : "bg-primary text-primary-foreground border-primary"
               )}
               style={{ left: `${50 + Math.cos(a) * r}%`, top: `${50 + Math.sin(a) * r}%` }}
@@ -309,12 +315,12 @@ export function Radar({ dogs }: { dogs: DogAdvert[] }) {
               exit={{ scale: 0, opacity: 0 }}
               transition={{ type: "spring", stiffness: 380, damping: 20 }}
             >
-              <DogGlyph className="size-3.5" />
+              <DogGlyph className="size-[62%]" />
             </m.span>
           );
         })}
       </AnimatePresence>
-    </div>
+    </m.div>
   );
 }
 
