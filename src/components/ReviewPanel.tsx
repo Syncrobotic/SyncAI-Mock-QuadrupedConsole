@@ -336,7 +336,7 @@ function DetectPanel() {
       <Action className="mt-1.5 w-full" onClick={() => void rpc("dev.detect", { type, zoneId: zone, confidence: conf, durationSec: dur })}>
         送出偵測
       </Action>
-      <p className="mt-1 text-[11px] leading-relaxed text-white/40">範例：「走廊人員查看」要南/北走廊、東側大廳，信心 ≥ 80%、持續 3 秒，會先詢問；「限制區入侵」選資料室或核心區會直接出動（P0）。</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-white/40">範例：「偵測到人員」選南／北走廊或東側大廳、信心 ≥ 80%、持續 3 秒，會先詢問要不要出動；「限制區入侵」選資料室或核心區，會直接出動（緊急）。</p>
     </Group>
   );
 }

@@ -985,8 +985,13 @@ export function LicenseEntry({
       right={
         <BarButton
           label="掃描授權卡"
-          onClick={() => {
-            if (camBlocked) return setAskSettings(true);
+          onClick={async () => {
+            if (camBlocked) {
+              // It may have been turned back on in Settings since: look again before sending
+              // the guard there (a remembered "denied" kept the scan key dead for good).
+              if (!(await getDogLink().phone.camera())) return setAskSettings(true);
+              setCamBlocked(false);
+            }
             setError(null);
             setScan("asking");
             setMode("scan");
