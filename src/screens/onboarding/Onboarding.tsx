@@ -4,32 +4,26 @@ import { AnimatePresence, m } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { useState } from "react";
 
-import { StepConnect, StepEnroll, StepLicense, StepSafety, StepScan, StepWait, StepWelcome, StepWifi } from "./steps";
-import { Stepper } from "./visuals";
+import { StepLicense, StepPair, StepSafety, StepScan, StepSplash, StepWait, StepWifi } from "./steps";
+import { EASE_OUT, Stepper } from "./visuals";
 
 import type { DogAdvert, Endpoint, PairSession, Role } from "@/proto/types";
 
 /**
- * §4 first-connection onboarding: eight screens, each with an explicit
- * failure branch and a way back. The only full-screen flow in the app besides
- * a landscape call (§5).
+ * §4 first-connection onboarding. It opens on a splash — nothing starts until the guard
+ * presses 開始配對 — then four stages the guard can see (配對 · 授權 · 網路 · 安全). The
+ * automatic screens belong to the stage they serve: BLE connect and enrolment are one
+ * 「配對」 screen, Wi-Fi provisioning and the wait are the 「網路」 stage.
+ *
+ * No LED pairing code (this dog has none); the licence key sits before Wi-Fi because it
+ * decides what the dog may do and has to go over BLE — the dog may have no network yet.
  */
 
-export type Step = "welcome" | "scan" | "connect" | "enroll" | "license" | "wifi" | "wait" | "safety";
+export type Step = "splash" | "scan" | "pair" | "license" | "wifi" | "wait" | "safety";
 
-/**
- * §4's screens, minus the LED pairing code (not used on this dog) and plus
- * the licence key, entered before Wi-Fi because
- * it decides what the dog is allowed to do, and it has to go over BLE — the
- * dog may not have a network yet.
- */
-export const STEPS: Step[] = ["welcome", "scan", "connect", "enroll", "license", "wifi", "wait", "safety"];
+export const STEPS: Step[] = ["splash", "scan", "pair", "license", "wifi", "wait", "safety"];
 
-/**
- * What the guard experiences is four stages, not eight screens: the automatic
- * screens (connect, enroll, wait) belong to the stage they serve.
- */
-const PHASE_OF: Record<Step, number> = { welcome: 0, scan: 0, connect: 0, enroll: 0, license: 1, wifi: 2, wait: 2, safety: 3 };
+const PHASE_OF: Record<Exclude<Step, "splash">, number> = { scan: 0, pair: 0, license: 1, wifi: 2, wait: 2, safety: 3 };
 
 export interface Flow {
   dog: DogAdvert | null;
@@ -49,7 +43,7 @@ export interface StepProps {
 }
 
 export function Onboarding() {
-  const [step, setStepRaw] = useState<Step>("welcome");
+  const [step, setStepRaw] = useState<Step>("splash");
   // Direction of travel, so going back slides the other way.
   const [dir, setDir] = useState(1);
   const setStep = (s: Step) => {
@@ -70,7 +64,7 @@ export function Onboarding() {
   const props: StepProps = { flow, patch, go: setStep };
 
   // Back is offered only where going back is safe and meaningful.
-  const back: Partial<Record<Step, Step>> = { scan: "welcome" };
+  const back: Partial<Record<Step, Step>> = { scan: "splash" };
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
@@ -79,29 +73,26 @@ export function Onboarding() {
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="bg-background absolute inset-0" />
         <div className="bg-grid-soft absolute inset-0" />
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 70% 38% at 50% 18%, rgba(124,111,208,0.16), transparent 70%)" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 40% at 50% 26%, rgba(124,111,208,0.16), transparent 70%)" }} />
         <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-violet-500/40 to-transparent" />
       </div>
 
-      {step !== "welcome" && (
-        <header className="relative shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1">
-          <div className="flex items-start">
-            {back[step] ? (
-              <button onClick={() => setStep(back[step]!)} className="hover:bg-accent -ml-1.5 grid size-9 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
-                <ChevronLeft className="size-5" />
-              </button>
-            ) : (
-              <span className="size-9" />
-            )}
-            <div className="flex-1 pt-1">
-              <Stepper phase={PHASE_OF[step]} />
-            </div>
-            <span className="size-9" />
+      {step !== "splash" && (
+        <header className="relative flex h-12 shrink-0 items-center gap-2 px-3 pt-[env(safe-area-inset-top)]">
+          {back[step] ? (
+            <button onClick={() => setStep(back[step]!)} className="hover:bg-accent grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
+              <ChevronLeft className="size-5" />
+            </button>
+          ) : (
+            <span className="size-8 shrink-0" />
+          )}
+          <div className="min-w-0 flex-1 pr-8">
+            <Stepper phase={PHASE_OF[step]} />
           </div>
         </header>
       )}
-      {/* Each step owns its scroll: content scrolls, the action bar does not.
-          Steps slide in the direction of travel — enter ease-out, exit ease-in. */}
+
+      {/* One transition layer only: the step slides in the direction of travel. */}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <AnimatePresence mode="wait" initial={false} custom={dir}>
           <m.div
@@ -109,18 +100,17 @@ export function Onboarding() {
             custom={dir}
             className="flex min-h-0 flex-1 flex-col"
             variants={{
-              enter: (d: number) => ({ opacity: 0, x: d * 28 }),
-              center: { opacity: 1, x: 0, transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] } },
-              exit: (d: number) => ({ opacity: 0, x: d * -28, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] } }),
+              enter: (d: number) => ({ opacity: 0, x: d * 24 }),
+              center: { opacity: 1, x: 0, transition: { duration: 0.24, ease: EASE_OUT } },
+              exit: (d: number) => ({ opacity: 0, x: d * -24, transition: { duration: 0.14, ease: [0.4, 0, 1, 1] } }),
             }}
             initial="enter"
             animate="center"
             exit="exit"
           >
-            {step === "welcome" && <StepWelcome {...props} />}
+            {step === "splash" && <StepSplash {...props} />}
             {step === "scan" && <StepScan {...props} />}
-            {step === "connect" && <StepConnect {...props} />}
-            {step === "enroll" && <StepEnroll {...props} />}
+            {step === "pair" && <StepPair {...props} />}
             {step === "license" && <StepLicense {...props} />}
             {step === "wifi" && <StepWifi {...props} />}
             {step === "wait" && <StepWait {...props} />}
