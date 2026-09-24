@@ -215,7 +215,7 @@ function Node({ children, pulse, tone, progress, small }: { children: React.Reac
 
 // ── Licence card scanner (the camera, in the visual band) ─────────────────
 
-export type ScanState = "scanning" | "found" | "failed";
+export type ScanState = "idle" | "scanning" | "found" | "failed";
 
 /**
  * The camera view for the licence card: a card-shaped (ID-1) window with corner marks and a
@@ -223,7 +223,7 @@ export type ScanState = "scanning" | "found" | "failed";
  * Mock: a dark field with a card silhouette; real: the camera stream goes behind the frame.
  */
 export function CardScan({ state }: { state: ScanState }) {
-  const tone = state === "found" ? "border-status-ok" : state === "failed" ? "border-status-error" : "border-white";
+  const tone = state === "found" ? "border-status-ok" : state === "failed" ? "border-status-error" : state === "idle" ? "border-white/40" : "border-white";
   return (
     // Sized from the band's height, capped by the width, so the ID-1 ratio never distorts.
     <div

@@ -10,7 +10,7 @@ import { getDogLink } from "@/link";
 import { StepLicense, StepPair, StepSafety, StepScan, StepSplash, StepWait, StepWifi } from "./steps";
 import { EASE_OUT, Stepper } from "./visuals";
 
-import type { DogAdvert, Endpoint, PairSession, Role } from "@/proto/types";
+import type { DogAdvert, Endpoint, LicenseInfo, PairSession, Role } from "@/proto/types";
 
 /**
  * §4 first-connection onboarding. It opens on a splash — nothing starts until the guard
@@ -41,6 +41,8 @@ export interface Flow {
   endpoint: Endpoint | null;
   /** Is the chosen Wi-Fi the phone's own network? null when typed by hand (unknown). */
   sameNet: boolean | null;
+  /** Read in the background as pairing completes, so the licence step opens on its final state. */
+  license: LicenseInfo | null;
 }
 
 /**
@@ -86,6 +88,7 @@ export function Onboarding() {
     wifiError: null,
     endpoint: null,
     sameNet: null,
+    license: null,
   });
   const patch = (p: Partial<Flow>) => setFlow((f) => ({ ...f, ...p }));
   const props: StepProps = { flow, patch, go: setStep };

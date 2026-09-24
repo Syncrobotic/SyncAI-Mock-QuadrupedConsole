@@ -33,23 +33,25 @@ import { CardScan, EASE_OUT, Link, NetLink, Radar, popIn, rise, type ScanState }
 const PAD = "pr-[calc(1.25rem+var(--safe-right))] pl-[calc(1.25rem+var(--safe-left))]";
 const LAYOUT = { duration: 0.45, ease: EASE_OUT } as const;
 
-/** Stacks the old and the new text in one grid cell and cross-fades them. */
+/**
+ * Swaps text in place: the old line fades out, then the new one fades in. Sequential, not a
+ * cross-fade — two overlapping lines of different text read as garble for a moment.
+ */
 function Swap({ k, children, className, as = "p" }: { k: string; children: React.ReactNode; className?: string; as?: "h1" | "p" }) {
   const Tag = as === "h1" ? m.h1 : m.p;
+  // The wrapper holds one line of height, so the gap between out and in never shifts the layout.
   return (
-    <div className="grid">
-      <AnimatePresence initial={false}>
-        <Tag
-          key={k}
-          className={cn("[grid-area:1/1]", className)}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.22, ease: EASE_OUT }}
-        >
-          {children}
-        </Tag>
-      </AnimatePresence>
+    <div className={cn("min-h-[1lh]", className)}>
+    <AnimatePresence mode="wait" initial={false}>
+      <Tag
+        key={k}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0, transition: { duration: 0.18, ease: EASE_OUT } }}
+        exit={{ opacity: 0, y: -4, transition: { duration: 0.1, ease: [0.4, 0, 1, 1] } }}
+      >
+        {children}
+      </Tag>
+    </AnimatePresence>
     </div>
   );
 }
@@ -429,7 +431,8 @@ export function StepSplash({ go }: StepProps) {
             onClick={() => {
               setAsking(false);
               beginOnboarding();
-              go("scan");
+              // Let the sheet finish closing first — two exits at once left both on screen.
+              setTimeout(() => go("scan"), 170);
             }}
           >
             好
@@ -484,19 +487,25 @@ export function StepScan({ patch, go }: StepProps) {
       mode={dogs.length ? "list" : "hero"}
       visual={<Radar dogs={dogs} />}
       title={dogs.length ? "選擇你的狗" : "正在找附近的狗"}
-      sub="序號末四碼印在狗的背上"
+      // Searching: the radar is the only "working" signal — no skeleton row, no hint about
+      // serials there is nothing to compare with yet. Both arrive with the first dog.
+      sub={dogs.length ? "序號末四碼印在狗的背上" : undefined}
       live
       primary={
-        <Primary
-          disabled={!picked}
-          onClick={() => {
-            patch({ dog: picked });
-            go("pair");
-          }}
-        >
-          {picked ? `連接 ${picked.serial.slice(-4)}` : "選擇一隻狗"}
-          {picked && <ArrowRight />}
-        </Primary>
+        dogs.length === 0 ? (
+          <Primary loading>搜尋中…</Primary>
+        ) : (
+          <Primary
+            disabled={!picked}
+            onClick={() => {
+              patch({ dog: picked });
+              go("pair");
+            }}
+          >
+            {picked ? `連接 ${picked.serial.slice(-4)}` : "選擇一隻狗"}
+            {picked && <ArrowRight />}
+          </Primary>
+        )
       }
     >
       <div role="radiogroup" aria-label="附近的狗" className="space-y-2" onPointerDown={touched} onKeyDown={touched}>
@@ -512,7 +521,6 @@ export function StepScan({ patch, go }: StepProps) {
             subTone={d.hasOwner ? "muted" : "accent"}
           />
         ))}
-        {dogs.length === 0 && <div className="bg-card/40 h-[60px] animate-pulse rounded-xl border border-dashed" />}
       </div>
       <AnimatePresence>
         {idle && (
@@ -556,6 +564,10 @@ export function StepPair({ flow, patch, go }: StepProps) {
       patch({ role: e.role });
       setPhase("granted");
       navigator.vibrate?.(20);
+      // Read the licence now, while the guard reads 配對完成, so the next step opens final.
+      void getDogLink()
+        .ble.readLicense()
+        .then((license) => patch({ license }));
     } else if (e.kind === "needs_approval") setPhase("approval");
   };
 
@@ -667,7 +679,7 @@ export function StepPair({ flow, patch, go }: StepProps) {
  * Wi-Fi, because the dog may have no network yet. Only the Owner binds one.
  */
 export function StepLicense({ flow, go }: StepProps) {
-  const [license, setLicense] = useState<LicenseInfo | null>(null);
+  const [license, setLicense] = useState<LicenseInfo | null>(flow.license);
   const [changing, setChanging] = useState(false);
   const [features, setFeatures] = useState(false);
   const [asked, setAsked] = useState<"no" | "sending" | "sent">("no");
@@ -684,6 +696,7 @@ export function StepLicense({ flow, go }: StepProps) {
   const owner = flow.role === "owner";
 
   useEffect(() => {
+    if (flow.license) return; // prefetched while pairing finished
     let alive = true;
     void getDogLink()
       .ble.readLicense()
@@ -691,6 +704,7 @@ export function StepLicense({ flow, go }: StepProps) {
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!license)
@@ -913,7 +927,7 @@ export function LicenseEntry({
   if (mode === "scan")
     return (
       <Frame
-        visual={<CardScan state={scan === "asking" ? "scanning" : scan} />}
+        visual={<CardScan state={scan === "asking" ? "idle" : scan} />}
         title={changing ? "更換 License" : "掃描授權卡"}
         live
         left={cancel}
@@ -940,7 +954,7 @@ export function LicenseEntry({
               重新掃描
             </Primary>
           ) : (
-            <Primary loading>{scan === "found" || busy ? "啟用中…" : "掃描中…"}</Primary>
+            <Primary loading>{scan === "found" || busy ? "啟用中…" : scan === "asking" ? "開啟相機…" : "掃描中…"}</Primary>
           )
         }
       >
@@ -1083,6 +1097,11 @@ export function StepWifi({ flow, patch, go }: StepProps) {
   const ordered = nets && [...nets].sort((a, b) => Number(a.security === "enterprise") - Number(b.security === "enterprise") || b.rssi - a.rssi);
   const shown = ordered && (more || ordered.length <= LIMIT ? ordered : ordered.filter((n, i) => i < LIMIT || n.ssid === flow.ssid));
   const hidden = ordered && shown ? ordered.length - shown.length : 0;
+  // Hold the list until both the dog's scan and the phone's own SSID are in (or known to be
+  // unavailable): rendering early showed it unselected, then selected + expanded — a jump.
+  // Also wait for the phone's network to be preselected, so the first frame is the final one.
+  const willPreselect = !!nets && !!phoneSsid && !userPicked && !manual && !flow.ssid && nets.some((n) => n.ssid === phoneSsid);
+  const ready0 = !!nets && phoneSsid !== undefined && !willPreselect;
 
   const sel = manual ? null : (nets?.find((n) => n.ssid === flow.ssid) ?? null);
   const needsPsk = manual || (sel ? sel.security !== "open" : false);
@@ -1137,8 +1156,8 @@ export function StepWifi({ flow, patch, go }: StepProps) {
         }}
       >
         <div role="radiogroup" aria-label="Wi-Fi 網路" className="space-y-2">
-          {!nets && [0, 1, 2].map((i) => <div key={i} className="bg-card/40 h-[60px] animate-pulse rounded-xl border border-dashed" />)}
-          {shown?.map((n, i) => {
+          {!ready0 && [0, 1, 2].map((i) => <div key={i} className="bg-card/40 h-[60px] animate-pulse rounded-xl border border-dashed" />)}
+          {ready0 && shown?.map((n, i) => {
             const unsupported = n.security === "enterprise";
             return (
               <ChoiceCard
@@ -1167,7 +1186,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
               </ChoiceCard>
             );
           })}
-          {hidden > 0 && (
+          {ready0 && hidden > 0 && (
             <m.button
               type="button"
               onClick={() => setMore(true)}
@@ -1178,7 +1197,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
               <ChevronDown className="size-4" />
             </m.button>
           )}
-          {nets && hidden === 0 && (
+          {ready0 && hidden === 0 && (
             <ChoiceCard
               index={shown?.length ?? 0}
               on={manual}
@@ -1199,7 +1218,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
           )}
         </div>
       </form>
-      {nets && (
+      {ready0 && (
         <TextLink onClick={() => { setNets(null); setScanTick((t) => t + 1); }}>
           <RotateCcw />
           重新掃描
