@@ -188,6 +188,13 @@ export interface PhoneChannel {
    * call may show the system prompt. Denied → null, and the app just doesn't use it.
    */
   wifiSsid(): Promise<string | null>;
+  /** Camera access for scanning the licence card; the first call may show the system prompt. */
+  camera(): Promise<boolean>;
+  /**
+   * Scan the licence card's QR code and resolve with the key it holds (or null if cancelled).
+   * Real: getUserMedia + BarcodeDetector. Resolves once; call again to rescan.
+   */
+  scanLicenseCard(signal: AbortSignal): Promise<string | null>;
 }
 
 export interface DogLink {

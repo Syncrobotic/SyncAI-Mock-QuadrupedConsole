@@ -66,6 +66,10 @@ export interface MockDevSettings {
   bleFlaky: boolean;
   /** Location permission for reading the phone's SSID: not asked yet / allowed / refused. */
   locationPermission: "ask" | "granted" | "denied";
+  /** Camera permission for scanning the licence card. */
+  cameraPermission: "ask" | "granted" | "denied";
+  /** What the licence card's QR code holds (review panel picks it). */
+  cardKey: string;
 }
 
 /** A stand-in for an OS permission prompt, answered by <MockOsPrompt>. */
@@ -78,7 +82,13 @@ export interface MockOsPrompt {
 
 export class MockWorld {
   readonly scenario;
-  readonly dev: MockDevSettings = { ownerOnline: true, bleFlaky: false, locationPermission: "ask" };
+  readonly dev: MockDevSettings = {
+    ownerOnline: true,
+    bleFlaky: false,
+    locationPermission: "ask",
+    cameraPermission: "ask",
+    cardKey: "SYNC-PRO1-2026-DEMO",
+  };
 
   // ── BLE link during onboarding (review panel can drop it) ───────────────────
   readonly bleLink = new Emitter<"up" | "down">(true);

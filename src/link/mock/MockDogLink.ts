@@ -416,6 +416,27 @@ function createPhone(world: MockWorld): PhoneChannel {
       }
       return d.locationPermission === "granted" ? SSID : null;
     },
+
+    async camera() {
+      const d = world.dev;
+      if (d.cameraPermission === "ask") {
+        const ok = await new Promise<boolean>((answer) => world.osPrompt.emit({ title: "「SyncAI」想要使用相機", body: "用來掃描授權卡。", answer }));
+        world.osPrompt.emit(null);
+        d.cameraPermission = ok ? "granted" : "denied";
+      }
+      return d.cameraPermission === "granted";
+    },
+
+    scanLicenseCard(signal) {
+      // No camera in the mock: the card is "in view" and read after a moment.
+      return new Promise((resolve) => {
+        const t = setTimeout(() => resolve(world.dev.cardKey), 2200);
+        signal.addEventListener("abort", () => {
+          clearTimeout(t);
+          resolve(null);
+        });
+      });
+    },
   };
 }
 

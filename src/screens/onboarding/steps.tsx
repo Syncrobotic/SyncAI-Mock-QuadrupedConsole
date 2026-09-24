@@ -11,7 +11,6 @@ import { MockHint } from "@/components/MockHint";
 import { Field, Modal, inputClass } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { getDogLink } from "@/link";
-import { IS_MOCK } from "@/lib/env";
 import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_LABEL, formatKey, isCompleteKey, normaliseKey } from "@/lib/license";
 import { cn, sleep } from "@/lib/utils";
 import { ROLE_LABEL, type DogAdvert, type Enrollment, type LicenseActivation, type LicenseInfo, type WifiNetwork, type WifiStatus } from "@/proto/types";
@@ -19,7 +18,7 @@ import { useStore } from "@/store";
 import { beginOnboarding, finishOnboarding } from "@/store/controller";
 
 import { OnboardingContext, type StepProps } from "./Onboarding";
-import { EASE_OUT, Link, NetLink, Radar, popIn, rise } from "./visuals";
+import { CardScan, EASE_OUT, Link, NetLink, Radar, popIn, rise, type ScanState } from "./visuals";
 
 /*
  * Every step is the same skeleton, top to bottom:
@@ -731,7 +730,14 @@ export function StepLicense({ flow, go }: StepProps) {
   );
 }
 
-/** Key entry. Shared by onboarding and the Console's licence gate. */
+/**
+ * Licence activation. Shared by onboarding and the Console's licence gate.
+ *
+ * Scan first: the step opens on the camera — the card's QR code holds the key, and a read
+ * activates straight away (no second tap). Typing the 16 characters is the fallback, a text
+ * link above the button; the scan icon (top right) comes back. No camera (refused, none) →
+ * manual, silently.
+ */
 export function LicenseEntry({
   changing,
   onCancel,
@@ -743,30 +749,121 @@ export function LicenseEntry({
   onActivated: (l: LicenseInfo) => void;
   activate?: (key: string) => Promise<LicenseActivation | null>;
 }) {
-  // Mock builds start with the full-feature key filled in so every flow can be reviewed.
-  const [key, setKey] = useState(IS_MOCK ? "SYNCPRO12026DEMO" : "");
+  const [mode, setMode] = useState<"scan" | "manual">("scan");
+  const [scan, setScan] = useState<ScanState | "asking">("asking");
+  const [scanTick, setScanTick] = useState(0);
+  // Manual entry starts empty (a mock review can prefill from the review panel's card key).
+  const [key, setKey] = useState("");
   const [error, setError] = useState<{ text: string; boxes: number[] } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [scanning, setScanning] = useState(false);
 
-  const submit = async () => {
+  const submit = async (k: string) => {
     setBusy(true);
     setError(null);
-    const r = await activate(key);
+    const r = await activate(k);
     setBusy(false);
-    if (!r) return;
+    if (!r) return false;
     if (r.ok) {
       navigator.vibrate?.(20);
       onActivated(r.license);
-      return;
+      return true;
     }
     // Point at the box that is wrong, not the whole key: the edition prefix (box 1) for an
     // unknown or expired key, a 0000 block for one bound elsewhere.
-    const parts = key.includes("-") ? key.split("-") : (normaliseKey(key).match(/.{1,4}/g) ?? []);
+    const parts = k.includes("-") ? k.split("-") : (normaliseKey(k).match(/.{1,4}/g) ?? []);
     const boxes =
       r.reason === "bound" ? parts.flatMap((p, i) => (p === "0000" ? [i] : [])) : r.reason === "format" ? [0, 1, 2, 3] : [0];
     setError({ text: ACTIVATION_ERROR[r.reason], boxes });
+    return false;
   };
+
+  // Scan mode: ask for the camera (first time), then read one card.
+  useEffect(() => {
+    if (mode !== "scan") return;
+    const ctl = new AbortController();
+    (async () => {
+      const phone = getDogLink().phone;
+      if (!(await phone.camera())) {
+        if (!ctl.signal.aborted) setMode("manual");
+        return;
+      }
+      if (ctl.signal.aborted) return;
+      setScan("scanning");
+      const k = await phone.scanLicenseCard(ctl.signal);
+      if (!k || ctl.signal.aborted) return;
+      navigator.vibrate?.(15);
+      setScan("found");
+      setKey(k);
+      await sleep(500);
+      if (ctl.signal.aborted) return;
+      const ok = await submit(k);
+      if (!ok && !ctl.signal.aborted) setScan("failed");
+    })();
+    return () => ctl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, scanTick]);
+
+  const cancel = changing && (
+    <BarButton label="取消更換" onClick={() => onCancel?.()}>
+      <X />
+    </BarButton>
+  );
+
+  const errorLine = (
+    <AnimatePresence initial={false}>
+      {error && (
+        <m.p
+          key={error.text}
+          role="alert"
+          className="text-status-error text-center text-[13px]"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.2, ease: EASE_OUT }}
+        >
+          {error.text}
+        </m.p>
+      )}
+    </AnimatePresence>
+  );
+
+  if (mode === "scan")
+    return (
+      <Frame
+        visual={<CardScan state={scan === "asking" ? "scanning" : scan} />}
+        title={changing ? "更換 License" : "掃描授權卡"}
+        live
+        left={cancel}
+        above={
+          <TextLink
+            onClick={() => {
+              setError(null);
+              setMode("manual");
+            }}
+          >
+            手動輸入金鑰
+          </TextLink>
+        }
+        primary={
+          scan === "failed" ? (
+            <Primary
+              onClick={() => {
+                setError(null);
+                setScan("scanning");
+                setScanTick((t) => t + 1);
+              }}
+            >
+              <RotateCcw />
+              重新掃描
+            </Primary>
+          ) : (
+            <Primary loading>{scan === "found" || busy ? "啟用中…" : "掃描中…"}</Primary>
+          )
+        }
+      >
+        {errorLine}
+      </Frame>
+    );
 
   return (
     <Frame
@@ -776,21 +873,22 @@ export function LicenseEntry({
         </Plate>
       }
       title={changing ? "更換 License 金鑰" : "輸入 License 金鑰"}
-      sub="印在隨機附的授權卡上"
+      sub="印在授權卡上"
       primary={
-        <Primary disabled={!isCompleteKey(key)} loading={busy} onClick={() => void submit()}>
+        <Primary disabled={!isCompleteKey(key)} loading={busy} onClick={() => void submit(key)}>
           啟用
         </Primary>
       }
-      left={
-        changing && (
-          <BarButton label="取消更換" onClick={() => onCancel?.()}>
-            <X />
-          </BarButton>
-        )
-      }
+      left={cancel}
       right={
-        <BarButton label="掃描授權卡" onClick={() => setScanning(true)}>
+        <BarButton
+          label="掃描授權卡"
+          onClick={() => {
+            setError(null);
+            setScan("asking");
+            setMode("scan");
+          }}
+        >
           <ScanLine />
         </BarButton>
       }
@@ -805,100 +903,14 @@ export function LicenseEntry({
         disabled={busy}
         autoFocus
       />
-      <AnimatePresence initial={false}>
-        {error && (
-          <m.p
-            key={error.text}
-            role="alert"
-            className="text-status-error text-center text-[13px]"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: EASE_OUT }}
-          >
-            {error.text}
-          </m.p>
-        )}
-      </AnimatePresence>
+      {errorLine}
       <MockHint>
         <code className="font-mono">SYNC</code> 專業 · <code className="font-mono">BASE</code> 無 AI · <code className="font-mono">CTRL</code> 只操控 · 試{" "}
         <button className="cursor-pointer font-mono underline underline-offset-2" onClick={() => setKey("CTRL01AB2026DEMO")}>
           {formatKey("CTRL01AB2026DEMO")}
         </button>
       </MockHint>
-
-      <CardScanner
-        open={scanning}
-        onClose={() => setScanning(false)}
-        onKey={(k) => {
-          setScanning(false);
-          setKey(k);
-          setError(null);
-        }}
-      />
     </Frame>
-  );
-}
-
-/**
- * Full-screen camera over the licence card: a card-shaped viewfinder and a moving scan line,
- * no text. It reads the key printed on the card (QR / text) and fills the boxes.
- * Mock: no camera — a dark field, and the key "found" after 1.8 s.
- * Real: getUserMedia + BarcodeDetector (OCR fallback); the OS asks for the camera the first time.
- */
-function CardScanner({ open, onClose, onKey }: { open: boolean; onClose: () => void; onKey: (key: string) => void }) {
-  useEffect(() => {
-    if (!open) return;
-    const t = setTimeout(() => {
-      navigator.vibrate?.(20);
-      onKey("SYNC-PRO1-2026-DEMO");
-    }, 1800);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  return (
-    <AnimatePresence>
-      {open && (
-        <m.div
-          role="dialog"
-          aria-modal
-          aria-label="掃描授權卡"
-          className="fixed inset-0 z-[80] bg-black"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, #2a2a33, #050507 70%)" }} />
-          <button
-            onClick={onClose}
-            aria-label="關閉"
-            className="absolute top-[calc(var(--safe-top)+0.5rem)] left-[calc(var(--safe-left)+0.75rem)] z-10 grid size-10 cursor-pointer place-items-center rounded-full bg-white/10 text-white backdrop-blur"
-          >
-            <X className="size-5" />
-          </button>
-          {/* Card-shaped viewfinder (ID-1 ratio) with corner marks and a scan line. */}
-          <div className="absolute top-1/2 left-1/2 aspect-[1.586] w-[78%] max-w-[340px] -translate-x-1/2 -translate-y-1/2">
-            <div className="absolute inset-0 rounded-2xl shadow-[0_0_0_100vmax_rgba(0,0,0,0.55)]" />
-            {[
-              "top-0 left-0 border-t-4 border-l-4 rounded-tl-2xl",
-              "top-0 right-0 border-t-4 border-r-4 rounded-tr-2xl",
-              "bottom-0 left-0 border-b-4 border-l-4 rounded-bl-2xl",
-              "bottom-0 right-0 border-b-4 border-r-4 rounded-br-2xl",
-            ].map((c) => (
-              <span key={c} className={cn("absolute size-8 border-white", c)} />
-            ))}
-            <m.span
-              className="bg-primary-accent absolute inset-x-4 h-0.5 rounded-full shadow-[0_0_12px_var(--primary-accent)]"
-              initial={{ top: "12%" }}
-              animate={{ top: ["12%", "88%", "12%"] }}
-              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-            />
-          </div>
-        </m.div>
-      )}
-    </AnimatePresence>
   );
 }
 

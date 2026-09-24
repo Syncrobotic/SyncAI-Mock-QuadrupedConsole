@@ -164,6 +164,33 @@ export function ReviewPanel() {
               <Action onClick={act(() => world.restoreBle())}>恢復藍牙</Action>
               <Action onClick={act(() => (world.dev.locationPermission = "ask"))}>重設位置權限</Action>
               <Action onClick={act(() => (world.dev.locationPermission = "denied"))}>拒絕位置權限</Action>
+              <Action onClick={act(() => (world.dev.cameraPermission = "ask"))}>重設相機權限</Action>
+              <Action onClick={act(() => (world.dev.cameraPermission = "denied"))}>拒絕相機權限</Action>
+            </div>
+            <p className="mt-3 mb-1.5 text-[11px] text-white/45">授權卡 QR code 內容</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(
+                [
+                  ["SYNC-PRO1-2026-DEMO", "專業版"],
+                  ["BASE-STD1-2026-DEMO", "標準版"],
+                  ["CTRL-01AB-2026-DEMO", "操控版"],
+                  ["EXPD-OLD1-2024-DEMO", "已過期"],
+                  ["SYNC-0000-2026-DEMO", "已綁定"],
+                  ["ZZZZ-1234-5678-9ABC", "無效"],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  onClick={act(() => (world.dev.cardKey = k))}
+                  aria-pressed={world.dev.cardKey === k}
+                  className={cn(
+                    "h-8 cursor-pointer rounded-md text-[11px] transition-colors",
+                    world.dev.cardKey === k ? "bg-violet-500/25 text-white ring-1 ring-violet-400/50" : "bg-white/5 text-white/60 hover:bg-white/10"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <Action onClick={act(() => clearLocalPairing())} className="mt-2 w-full">
               清除本機配對 → 重走 Onboarding

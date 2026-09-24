@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, m } from "framer-motion";
-import { Check, Hourglass, KeyRound, Router, Smartphone } from "lucide-react";
+import { Check, Hourglass, KeyRound, QrCode, Router, Smartphone } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -209,6 +209,58 @@ function Node({ children, pulse, tone, progress, small }: { children: React.Reac
           />
         </svg>
       )}
+    </div>
+  );
+}
+
+// ── Licence card scanner (the camera, in the visual band) ─────────────────
+
+export type ScanState = "scanning" | "found" | "failed";
+
+/**
+ * The camera view for the licence card: a card-shaped (ID-1) window with corner marks and a
+ * moving scan line — no text. Found: the corners turn green and a check pops; failed: red.
+ * Mock: a dark field with a card silhouette; real: the camera stream goes behind the frame.
+ */
+export function CardScan({ state }: { state: ScanState }) {
+  const tone = state === "found" ? "border-status-ok" : state === "failed" ? "border-status-error" : "border-white";
+  return (
+    <div className="relative aspect-[1.586] h-full max-h-full overflow-hidden rounded-2xl bg-black shadow-xl" aria-hidden>
+      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, #2b2b36, #060608 75%)" }} />
+      {/* the card in view */}
+      <div className="absolute inset-[16%] grid place-items-center rounded-lg border border-white/10 bg-white/[0.04]">
+        <QrCode className="size-[38%] text-white/25" />
+      </div>
+      {[
+        "top-3 left-3 border-t-[3px] border-l-[3px] rounded-tl-xl",
+        "top-3 right-3 border-t-[3px] border-r-[3px] rounded-tr-xl",
+        "bottom-3 left-3 border-b-[3px] border-l-[3px] rounded-bl-xl",
+        "bottom-3 right-3 border-b-[3px] border-r-[3px] rounded-br-xl",
+      ].map((c) => (
+        <span key={c} className={cn("absolute size-7 transition-colors duration-300", tone, c)} />
+      ))}
+      {state === "scanning" && (
+        <m.span
+          className="bg-primary-accent absolute inset-x-6 h-0.5 rounded-full shadow-[0_0_12px_var(--primary-accent)]"
+          initial={{ top: "18%" }}
+          animate={{ top: ["18%", "82%", "18%"] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+      <AnimatePresence>
+        {state === "found" && (
+          <m.span
+            key="ok"
+            className="bg-status-ok absolute top-1/2 left-1/2 grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-white shadow-lg"
+            initial={{ scale: 0.3, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: "spring", stiffness: 420, damping: 20 }}
+          >
+            <Check className="size-6" strokeWidth={3} />
+          </m.span>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
