@@ -39,7 +39,8 @@ export function App() {
         // is the status header and banners, and a toast there hid both.
         position={onboarding || toastBottom === null ? "top-center" : "bottom-center"}
         theme={(theme as "dark" | "light") ?? "dark"}
-        offset={onboarding || toastBottom === null ? 56 : { bottom: toastBottom }}
+        // Below the status bar / cutout at the top.
+        offset={onboarding || toastBottom === null ? "calc(var(--safe-top) + 12px)" : { bottom: toastBottom }}
         visibleToasts={3}
         duration={3000}
         toastOptions={{ className: "!text-[13px]" }}

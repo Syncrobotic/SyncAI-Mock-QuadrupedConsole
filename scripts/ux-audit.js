@@ -158,7 +158,13 @@ async (page) => {
       await pw.fill("password123");
       await wait(300);
     }
-    const bar = page.locator("[data-actionbar] button:enabled");
+    // The primary action is the action bar's direct child; the secondary slot is below it.
+    const bar = page.locator("[data-actionbar] > button:enabled");
+    const radio = page.locator('[role="radio"]:visible');
+    if (!(await bar.count()) && (await radio.count())) {
+      await radio.first().click();
+      await wait(300);
+    }
     const dialog = page.locator('[role="dialog"] button:enabled');
     const allow = page.locator('[role="dialog"] button:enabled').filter({ hasText: /^(允許|好|繼續|確定)/ });
     if (await allow.count()) await allow.first().click();

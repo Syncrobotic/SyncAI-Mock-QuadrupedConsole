@@ -78,7 +78,7 @@ export function Onboarding() {
       </div>
 
       {step !== "splash" && (
-        <header className="relative flex h-12 shrink-0 items-center gap-2 px-3 pt-[env(safe-area-inset-top)]">
+        <header className="relative box-content flex h-12 shrink-0 items-center gap-2 px-3 pt-[var(--safe-top)]">
           {back[step] ? (
             <button onClick={() => setStep(back[step]!)} className="hover:bg-accent grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
               <ChevronLeft className="size-5" />

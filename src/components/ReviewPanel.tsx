@@ -13,7 +13,16 @@ import { EVENT_TYPES } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
 import type { EventType } from "@/proto/types";
-import { useStore } from "@/store";
+import { useStore, type DeviceId } from "@/store";
+
+/** Devices the desktop frame can imitate — cutout, bars and safe areas. */
+const DEVICES: [DeviceId, string][] = [
+  ["iphone16pro", "iPhone 16 Pro"],
+  ["iphonese", "iPhone SE"],
+  ["pixel9", "Pixel 9"],
+  ["galaxys24", "Galaxy S24"],
+  ["none", "無"],
+];
 import { changeScenario, clearLocalPairing, refreshDevice, refreshPhones, rpc } from "@/store/controller";
 import { CONN_LABEL, MODE_LABEL } from "@/store/logic";
 
@@ -30,6 +39,7 @@ export function ReviewPanel() {
   const [, force] = useState(0);
   const scenario = useStore((s) => s.scenario);
   const landscape = useStore((s) => s.forceLandscape);
+  const device = useStore((s) => s.phoneModel);
   const world = mockWorld();
   const { theme, setTheme } = useTheme();
 
@@ -63,6 +73,21 @@ export function ReviewPanel() {
         </div>
 
         <Group title="預覽">
+          <div className="mb-2 grid grid-cols-5 gap-1">
+            {DEVICES.map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => useStore.setState({ phoneModel: id })}
+                aria-pressed={device === id}
+                className={cn(
+                  "h-9 cursor-pointer rounded-md px-1 text-[11px] leading-tight transition-colors",
+                  device === id ? "bg-violet-500/25 text-white ring-1 ring-violet-400/50" : "bg-white/5 text-white/60 hover:bg-white/10"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <Toggle label="橫式（操控）" on={landscape} onChange={() => useStore.setState({ forceLandscape: !landscape })} />
         </Group>
 

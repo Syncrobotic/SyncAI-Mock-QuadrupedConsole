@@ -123,7 +123,9 @@ export function Console() {
   const mapH = usable - ESTOP - sheetH - 2 * GAP;
 
   // Safe areas: notch / Dynamic Island on top, home indicator at the bottom.
-  const shell = "bg-surface-sunken relative flex h-full flex-col gap-2 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]";
+  // The background runs under the cutout and the home bar; the panels start inside the safe area.
+  const shell =
+    "bg-surface-sunken relative flex h-full flex-col gap-2 pt-[max(0.5rem,var(--safe-top))] pr-[calc(0.5rem+var(--safe-right))] pb-[max(0.5rem,var(--safe-bottom))] pl-[calc(0.5rem+var(--safe-left))]";
 
   if (landscape && !unlicensed) return <LandscapeConsole />;
 

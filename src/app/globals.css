@@ -11,6 +11,42 @@
      thing on screen in sunlight, so it is its own, fully saturated token. */
   --estop: oklch(0.58 0.235 27);
   --estop-pressed: oklch(0.42 0.17 27);
+
+  /* Safe areas — the one source every layout reads. On a phone they are the OS's insets
+     (notch / Dynamic Island / punch-hole, home indicator / gesture or button bar); the
+     desktop review frame overrides them per simulated device (below). A native shell that
+     cannot get env() into the WebView (older Android) can set these four instead. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
+/* ── Desktop review frame: simulated devices ─────────────────────────────
+   Sizes in CSS px. Insets follow the platform: iOS status bar + Dynamic Island on top and
+   the home indicator below (landscape: the island side and both sides are inset); Android
+   status bar with a punch-hole on top and the gesture bar (Pixel) or the three-button bar
+   (Galaxy — on the right in landscape) below. */
+@media (min-width: 640px) {
+  [data-phone] {
+    width: var(--dev-w, 390px);
+    height: var(--dev-h, 844px);
+    max-height: calc(100dvh - 3rem);
+    border-radius: var(--dev-r, 2.75rem);
+  }
+  [data-phone][data-orient="land"] {
+    width: var(--dev-h, 844px);
+    height: var(--dev-w, 390px);
+  }
+  [data-phone][data-device="iphone16pro"] { --dev-w: 402px; --dev-h: 874px; --dev-r: 3.4rem; --safe-top: 62px; --safe-bottom: 34px; --safe-left: 0px; --safe-right: 0px; }
+  [data-phone][data-device="iphone16pro"][data-orient="land"] { --safe-top: 0px; --safe-bottom: 21px; --safe-left: 62px; --safe-right: 62px; }
+  [data-phone][data-device="iphonese"] { --dev-w: 375px; --dev-h: 667px; --dev-r: 1rem; --safe-top: 20px; --safe-bottom: 0px; --safe-left: 0px; --safe-right: 0px; }
+  [data-phone][data-device="iphonese"][data-orient="land"] { --safe-top: 0px; }
+  [data-phone][data-device="pixel9"] { --dev-w: 412px; --dev-h: 915px; --dev-r: 2.9rem; --safe-top: 48px; --safe-bottom: 24px; --safe-left: 0px; --safe-right: 0px; }
+  [data-phone][data-device="pixel9"][data-orient="land"] { --safe-top: 24px; --safe-bottom: 24px; --safe-left: 48px; --safe-right: 0px; }
+  [data-phone][data-device="galaxys24"] { --dev-w: 360px; --dev-h: 780px; --dev-r: 2.4rem; --safe-top: 36px; --safe-bottom: 48px; --safe-left: 0px; --safe-right: 0px; }
+  [data-phone][data-device="galaxys24"][data-orient="land"] { --safe-top: 24px; --safe-bottom: 0px; --safe-left: 36px; --safe-right: 48px; }
+  [data-phone][data-device="none"] { --dev-w: 390px; --dev-h: 844px; --safe-top: 0px; --safe-bottom: 0px; --safe-left: 0px; --safe-right: 0px; }
 }
 
 

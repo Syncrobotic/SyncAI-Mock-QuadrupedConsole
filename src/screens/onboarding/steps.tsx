@@ -1,7 +1,7 @@
 "use client";
 
 import { m } from "framer-motion";
-import { ArrowRight, BadgeCheck, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, RotateCcw } from "lucide-react";
+import { ArrowRight, BadgeCheck, Check, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -36,20 +36,23 @@ function Frame({
   title,
   sub,
   children,
-  footer,
+  primary,
+  secondary,
   live,
 }: {
   visual: React.ReactNode;
   title: string;
   sub?: React.ReactNode;
   children?: React.ReactNode;
-  footer?: React.ReactNode;
+  /** Always present: automatic steps show it disabled with what is happening. */
+  primary: React.ReactNode;
+  secondary?: React.ReactNode;
   /** Automatic steps announce their title changes. */
   live?: boolean;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 pb-4">
+      <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-[calc(1.25rem+var(--safe-right))] pb-4 pl-[calc(1.25rem+var(--safe-left))]">
         <div className="flex h-[clamp(150px,28vh,210px)] items-center justify-center py-3">{visual}</div>
         <div className="text-center" aria-live={live ? "polite" : undefined}>
           <h1 className="text-[20px] leading-tight font-semibold tracking-tight">{title}</h1>
@@ -57,19 +60,25 @@ function Frame({
         </div>
         {children && <div className="mx-auto mt-5 w-full max-w-[360px] space-y-2.5">{children}</div>}
       </div>
-      {footer && <ActionBar>{footer}</ActionBar>}
+      <ActionBar primary={primary} secondary={secondary} />
     </div>
   );
 }
 
 /**
- * The step's actions, pinned to the bottom of the phone (above the home indicator, and
- * above the keyboard when one is up). Only the content above scrolls.
+ * The step's actions, pinned to the bottom of the phone — above the home indicator / gesture
+ * bar / button bar, and above the keyboard when one is up. Two fixed slots: the primary
+ * action is always in the same place, and the secondary slot is reserved even when empty,
+ * so no step moves the primary button up or down.
  */
-function ActionBar({ children }: { children: React.ReactNode }) {
+function ActionBar({ primary, secondary }: { primary: React.ReactNode; secondary?: React.ReactNode }) {
   return (
-    <div data-actionbar className="bg-background/85 shrink-0 space-y-1 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom),var(--kb,0px))] backdrop-blur">
-      {children}
+    <div
+      data-actionbar
+      className="bg-background/85 shrink-0 pt-3 pr-[calc(1.25rem+var(--safe-right))] pb-[max(0.5rem,var(--safe-bottom),var(--kb,0px))] pl-[calc(1.25rem+var(--safe-left))] backdrop-blur"
+    >
+      {primary}
+      <div className="mt-1 flex h-9 items-center justify-center">{secondary}</div>
     </div>
   );
 }
@@ -129,17 +138,21 @@ export function StepSplash({ go }: StepProps) {
         )}
       </div>
 
-      <ActionBar>
-        <Primary onClick={() => setAsking(true)}>
-          {denied ? "再試一次" : "開始配對"}
-          <ArrowRight />
-        </Primary>
-        {denied ? (
-          <Secondary onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>開啟系統設定</Secondary>
-        ) : (
-          <p className="text-muted-foreground pt-2 text-center text-[11px]">© 2026 SyncAI{IS_MOCK ? " · Mock" : ""}</p>
-        )}
-      </ActionBar>
+      <ActionBar
+        primary={
+          <Primary onClick={() => setAsking(true)}>
+            {denied ? "再試一次" : "開始配對"}
+            <ArrowRight />
+          </Primary>
+        }
+        secondary={
+          denied ? (
+            <Secondary onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>開啟系統設定</Secondary>
+          ) : (
+            <p className="text-muted-foreground text-[11px]">© 2026 SyncAI{IS_MOCK ? " · Mock" : ""}</p>
+          )
+        }
+      />
 
       {/* A stand-in for the OS permission sheet, so the deny path is reviewable. */}
       <Modal open={asking} dismissable={false} className="max-w-[280px] p-0 text-center">
@@ -177,6 +190,7 @@ export function StepSplash({ go }: StepProps) {
 
 export function StepScan({ patch, go }: StepProps) {
   const [dogs, setDogs] = useState<DogAdvert[]>([]);
+  const [sel, setSel] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
 
   useEffect(() => {
@@ -196,31 +210,61 @@ export function StepScan({ patch, go }: StepProps) {
     };
   }, []);
 
+  const picked = dogs.find((d) => d.id === sel) ?? null;
+
   return (
-    <Frame visual={<Radar dogs={dogs} />} title={dogs.length ? "選擇你的狗" : "正在找附近的狗"} sub="序號末四碼印在狗的背上" live>
-      {dogs.map((d, i) => (
-        <m.button
-          key={d.id}
+    <Frame
+      visual={<Radar dogs={dogs} />}
+      title={dogs.length ? "選擇你的狗" : "正在找附近的狗"}
+      sub="序號末四碼印在狗的背上"
+      live
+      primary={
+        <Primary
+          disabled={!picked}
           onClick={() => {
-            patch({ dog: d });
+            patch({ dog: picked });
             go("pair");
           }}
-          className="bg-card/70 hover:border-primary/50 focus-visible:ring-primary/40 group flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-left backdrop-blur transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          {...rise(i)}
         >
-          <span className="bg-primary/12 text-primary-accent grid h-9 w-12 shrink-0 place-items-center rounded-lg font-mono text-[13px] font-semibold">{d.serial.slice(-4)}</span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[14px] font-medium">{d.name}</span>
-            <span className={cn("block text-[12px]", d.hasOwner ? "text-muted-foreground" : "text-primary-accent")}>{d.hasOwner ? "需要擁有者核准" : "新機"}</span>
-          </span>
-          <ArrowRight className="text-muted-foreground group-hover:text-primary-accent size-4 shrink-0 transition-colors" />
-        </m.button>
-      ))}
-      {dogs.length === 0 && <div className="bg-card/40 h-[60px] animate-pulse rounded-xl border border-dashed" />}
-      <button onClick={() => setHelp(true)} className="text-muted-foreground hover:text-foreground mx-auto flex cursor-pointer items-center gap-1 py-2 text-[12px]">
-        <CircleHelp className="size-3.5" />
-        找不到狗？
-      </button>
+          {picked ? `連接 ${picked.serial.slice(-4)}` : "選擇一隻狗"}
+          {picked && <ArrowRight />}
+        </Primary>
+      }
+      secondary={
+        <Secondary onClick={() => setHelp(true)}>
+          <CircleHelp />
+          找不到狗？
+        </Secondary>
+      }
+    >
+      <div role="radiogroup" aria-label="附近的狗" className="space-y-2">
+        {dogs.map((d, i) => {
+          const on = d.id === sel;
+          return (
+            <m.button
+              key={d.id}
+              role="radio"
+              aria-checked={on}
+              onClick={() => setSel(d.id)}
+              className={cn(
+                "focus-visible:ring-primary/40 flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-left backdrop-blur transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                on ? "border-primary bg-primary/10" : "bg-card/70 hover:border-primary/40"
+              )}
+              {...rise(i)}
+            >
+              <span className="bg-primary/12 text-primary-accent grid h-9 w-12 shrink-0 place-items-center rounded-lg font-mono text-[13px] font-semibold">{d.serial.slice(-4)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-medium">{d.name}</span>
+                <span className={cn("block text-[12px]", d.hasOwner ? "text-muted-foreground" : "text-primary-accent")}>{d.hasOwner ? "需要擁有者核准" : "新機"}</span>
+              </span>
+              <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border-2 transition-colors", on ? "border-primary bg-primary" : "border-muted-foreground/40")}>
+                {on && <span className="size-2 rounded-full bg-white" />}
+              </span>
+            </m.button>
+          );
+        })}
+        {dogs.length === 0 && <div className="bg-card/40 h-[60px] animate-pulse rounded-xl border border-dashed" />}
+      </div>
 
       <Modal open={help} onClose={() => setHelp(false)}>
         <p className="mb-2 text-[15px] font-semibold">找不到狗？</p>
@@ -330,27 +374,31 @@ export function StepPair({ flow, patch, go }: StepProps) {
       title={title}
       sub={sub}
       live
-      footer={
+      primary={
         phase === "granted" ? (
           <Primary onClick={() => go("license")}>
             繼續
             <ArrowRight />
           </Primary>
         ) : phase === "approval" ? (
-          <>
-            <Primary variant="outline" onClick={() => void asViewer()}>
-              先以檢視者加入
-            </Primary>
-            <Secondary
-              onClick={() => {
-                abort.current?.abort();
-                go("scan");
-              }}
-            >
-              取消
-            </Secondary>
-          </>
-        ) : undefined
+          <Primary variant="outline" onClick={() => void asViewer()}>
+            先以檢視者加入
+          </Primary>
+        ) : (
+          <Primary loading>{phase === "key" ? "登記中…" : "連線中…"}</Primary>
+        )
+      }
+      secondary={
+        phase === "approval" && (
+          <Secondary
+            onClick={() => {
+              abort.current?.abort();
+              go("scan");
+            }}
+          >
+            取消
+          </Secondary>
+        )
       }
     />
   );
@@ -386,6 +434,7 @@ export function StepLicense({ flow, go }: StepProps) {
           </Plate>
         }
         title="讀取 License…"
+        primary={<Primary loading>讀取中…</Primary>}
       />
     );
 
@@ -402,7 +451,7 @@ export function StepLicense({ flow, go }: StepProps) {
         }
         title="這隻狗還沒啟用"
         sub="請擁有者先輸入 License 金鑰"
-        footer={
+        primary={
           <Primary variant="outline" onClick={() => go("scan")}>
             回到掃描
           </Primary>
@@ -430,15 +479,13 @@ export function StepLicense({ flow, go }: StepProps) {
       visual={<EditionPlate license={license} />}
       title="License 已啟用"
       sub={off.length ? `未含：${off.map((f) => FEATURE_LABEL[f.feature]).join("、")}` : `${on.length} 項功能全部開啟`}
-      footer={
-        <>
-          <Primary onClick={() => go("wifi")}>
-            繼續
-            <ArrowRight />
-          </Primary>
-          {owner && <Secondary onClick={() => setChanging(true)}>更換金鑰</Secondary>}
-        </>
+      primary={
+        <Primary onClick={() => go("wifi")}>
+          繼續
+          <ArrowRight />
+        </Primary>
       }
+      secondary={owner && <Secondary onClick={() => setChanging(true)}>更換金鑰</Secondary>}
     />
   );
 }
@@ -504,14 +551,12 @@ export function LicenseEntry({
       }
       title={changing ? "更換 License 金鑰" : "輸入 License 金鑰"}
       sub="印在隨機附的授權卡上"
-      footer={
-        <>
-          <Primary disabled={!isCompleteKey(key)} loading={busy} onClick={() => void submit()}>
-            啟用
-          </Primary>
-          {changing && <Secondary onClick={onCancel}>取消</Secondary>}
-        </>
+      primary={
+        <Primary disabled={!isCompleteKey(key)} loading={busy} onClick={() => void submit()}>
+          啟用
+        </Primary>
       }
+      secondary={changing && <Secondary onClick={onCancel}>取消</Secondary>}
     >
       <KeyInput
         value={key}
@@ -548,16 +593,14 @@ export function StepWifi({ flow, patch, go }: StepProps) {
       visual={<Link phase="router" />}
       title="連上現場 Wi-Fi"
       sub="手機不用切換網路"
-      footer={
-        <>
-          {/* Submits the form (the action bar sits outside it), so Enter / Go works too. */}
-          <Primary type="submit" form="wifi-form" disabled={!flow.ssid}>
-            讓狗連線
-            <ArrowRight />
-          </Primary>
-          <Secondary onClick={() => setSkipAsk(true)}>略過</Secondary>
-        </>
+      primary={
+        // Submits the form (the action bar sits outside it), so Enter / Go works too.
+        <Primary type="submit" form="wifi-form" disabled={!flow.ssid}>
+          讓狗連線
+          <ArrowRight />
+        </Primary>
       }
+      secondary={<Secondary onClick={() => setSkipAsk(true)}>略過</Secondary>}
     >
       <form
         id="wifi-form"
@@ -664,13 +707,20 @@ export function StepWait({ flow, patch, go }: StepProps) {
       title={online ? "狗已上線" : stuck ? "還沒連上" : "狗正在連上 Wi-Fi"}
       sub={online ? (flow.endpoint?.ip ?? "讀取位址…") : stuck ? "訊號太弱，或網路需要網頁登入" : `${flow.ssid} · ${elapsed} 秒`}
       live
-      footer={
+      primary={
         stuck ? (
           <Primary onClick={() => go("wifi")}>
             <RotateCcw />
             換一個網路
           </Primary>
-        ) : undefined
+        ) : online ? (
+          <Primary disabled>
+            <Check />
+            已上線
+          </Primary>
+        ) : (
+          <Primary loading>連線中…</Primary>
+        )
       }
     />
   );
@@ -698,7 +748,7 @@ export function StepSafety({ flow }: StepProps) {
         </m.div>
       }
       title="開始之前"
-      footer={
+      primary={
         <Primary
           onClick={() =>
             finishOnboarding({

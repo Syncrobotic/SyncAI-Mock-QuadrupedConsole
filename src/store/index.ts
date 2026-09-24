@@ -108,7 +108,11 @@ export interface State {
   toastBottom: number | null;
   /** Review panel: render the frame sideways to preview §5 landscape. */
   forceLandscape: boolean;
+  /** Review panel: which phone the desktop frame imitates — its cutout, bars and safe areas. */
+  phoneModel: DeviceId;
 }
+
+export type DeviceId = "iphone16pro" | "iphonese" | "pixel9" | "galaxys24" | "none";
 
 export const useStore = create<State>(() => ({
   linkEpoch: 0,
@@ -159,6 +163,7 @@ export const useStore = create<State>(() => ({
   snapshotViewer: null,
   toastBottom: null,
   forceLandscape: false,
+  phoneModel: "iphone16pro",
 }));
 
 export const set = useStore.setState;

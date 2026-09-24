@@ -31,12 +31,13 @@ export function LandscapeConsole() {
     // No E-Stop zone for dialogs here: the E-Stop is at the top, dialogs centre
     // below it and never reach it at this height.
     <EStopZone.Provider value={null}>
-      <div className="bg-map-ground relative h-full overflow-hidden pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+      {/* The map runs edge to edge, under the cutout and the home bar; every control lives in
+          the inset layer, so nothing lands under the notch on either side. */}
+      <div className="bg-map-ground relative h-full overflow-hidden">
         {supported && (
           <div
-            className={cn(
-              videoMain ? "absolute top-[104px] left-3 z-20 aspect-video w-44 overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15" : "absolute inset-0"
-            )}
+            className={cn(videoMain ? "absolute z-20 aspect-video w-44 overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15" : "absolute inset-0")}
+            style={videoMain ? { top: "calc(var(--safe-top) + 104px)", left: "calc(var(--safe-left) + 12px)" } : undefined}
           >
             <MapView bare />
             {videoMain && (
@@ -45,16 +46,23 @@ export function LandscapeConsole() {
           </div>
         )}
 
-        {supported && <CallLayer landscape />}
-        {supported && <TeleopTab landscape />}
+        {/* Click-through: each control opts back in (pointer-events is inherited). */}
+        <div className="pointer-events-none absolute top-[var(--safe-top)] right-[var(--safe-right)] bottom-[var(--safe-bottom)] left-[var(--safe-left)]">
+          {supported && (
+            <div className="pointer-events-auto contents">
+              <CallLayer landscape />
+            </div>
+          )}
+          {supported && <TeleopTab landscape />}
 
-        <div className="pointer-events-none absolute inset-x-2 top-2 z-30 flex items-start gap-2">
-          <div className="flex w-[320px] shrink-0 flex-col gap-1.5">
-            <DogHeader />
-            <Banners />
-          </div>
-          <div className="pointer-events-auto mx-auto w-[260px] shrink-0">
-            <EStopBar />
+          <div className="pointer-events-none absolute inset-x-2 top-2 z-30 flex items-start gap-2">
+            <div className="flex w-[300px] shrink-0 flex-col gap-1.5">
+              <DogHeader />
+              <Banners />
+            </div>
+            <div className="pointer-events-auto mx-auto w-[240px] shrink-0">
+              <EStopBar />
+            </div>
           </div>
         </div>
 

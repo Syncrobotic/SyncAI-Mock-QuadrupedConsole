@@ -61,7 +61,18 @@ export function Modal({
           transition={{ duration: 0.15 }}
           onClick={() => dismissable && onClose?.()}
         >
-          <div className="absolute inset-x-0 flex items-center justify-center p-3 pb-[max(0.75rem,var(--kb,0px))]" style={band}>
+          {/* Centred inside the safe area: a band edge that is the screen edge keeps clear of the
+              cutout / home bar (and the keyboard); an E-Stop edge needs no extra room. */}
+          <div
+            className="absolute inset-x-0 flex items-center justify-center p-3"
+            style={{
+              ...band,
+              paddingTop: band.top === 0 ? "max(0.75rem, var(--safe-top))" : undefined,
+              paddingBottom: "bottom" in band ? "max(0.75rem, var(--safe-bottom), var(--kb, 0px))" : undefined,
+              paddingLeft: "max(0.75rem, var(--safe-left))",
+              paddingRight: "max(0.75rem, var(--safe-right))",
+            }}
+          >
           <m.div
             role="dialog"
             aria-modal
