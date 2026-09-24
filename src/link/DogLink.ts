@@ -119,6 +119,10 @@ export interface BleChannel {
   readLicense(): Promise<LicenseInfo>;
   /** Owner only: bind a licence key to this dog. Goes over BLE — the dog may have no network yet. */
   activateLicense(key: string): Promise<LicenseActivation>;
+  /** The BLE link to the dog being set up: "down" when it drops mid-onboarding. Replays the last value. */
+  link: Stream<"up" | "down">;
+  /** Try to re-establish the BLE link to `dogId`. Resolves true when it is back. */
+  reconnect(dogId: string): Promise<boolean>;
   /** Networks the dog can hear, strongest first. Over BLE, before the dog has any network. */
   scanWifi(): Promise<WifiNetwork[]>;
   provisionWifi(ssid: string, psk: string): AsyncIterable<WifiStatus>;
@@ -174,9 +178,20 @@ export interface KeystoreChannel {
   clear(): void;
 }
 
+/** What the phone itself knows (not the dog). */
+export interface PhoneChannel {
+  /**
+   * The Wi-Fi SSID this phone is on, or null when unknown. Reading it needs the OS location
+   * permission (iOS: precise location + the Wi-Fi entitlement; Android: location); the first
+   * call may show the system prompt. Denied → null, and the app just doesn't use it.
+   */
+  wifiSsid(): Promise<string | null>;
+}
+
 export interface DogLink {
   keystore: KeystoreChannel;
   ble: BleChannel;
   gateway: GatewayChannel;
   media: MediaChannel;
+  phone: PhoneChannel;
 }

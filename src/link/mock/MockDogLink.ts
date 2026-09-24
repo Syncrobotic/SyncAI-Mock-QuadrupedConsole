@@ -12,6 +12,7 @@ import {
   type DogLink,
   type GatewayChannel,
   type KeystoreChannel,
+  type PhoneChannel,
   type RpcMap,
   type RpcName,
   type RpcReq,
@@ -84,6 +85,7 @@ function createBle(world: MockWorld): BleChannel {
     },
 
     async enroll(session) {
+      await world.bleReady();
       await sleep(900);
       const dog = DOGS.find((d) => d.id === session.dogId)!;
       return dog.hasOwner
@@ -104,25 +106,36 @@ function createBle(world: MockWorld): BleChannel {
     },
 
     async requestViewer() {
+      await world.bleReady();
       await sleep(600);
       return { kind: "granted", role: "viewer", certificate: "cert-viewer" };
     },
 
     async readLicense() {
+      await world.bleReady();
       await sleep(350);
       return structuredClone(world.license);
     },
 
     async activateLicense(key) {
+      await world.bleReady();
       await sleep(900);
       return world.activateLicense(key);
     },
 
+    link: world.bleLink,
+
+    async reconnect() {
+      await sleep(1200);
+      return !world.bleIsDown;
+    },
+
     async scanWifi() {
+      await world.bleReady();
       await sleep(1100);
       // Names carry the mock's failure hooks: …fail → wrong password, …slow → 25 s.
       return [
-        { ssid: "SyncAI-Office", rssi: -48, band: "5", security: "wpa2", phone: true },
+        { ssid: "SyncAI-Office", rssi: -48, band: "5", security: "wpa2" },
         { ssid: "SyncAI-Office-2.4G", rssi: -52, band: "2.4", security: "wpa2" },
         { ssid: "Lab-fail", rssi: -61, band: "5", security: "wpa3" },
         { ssid: "Warehouse-slow", rssi: -70, band: "2.4", security: "wpa2" },
@@ -132,6 +145,7 @@ function createBle(world: MockWorld): BleChannel {
     },
 
     async *provisionWifi(ssid): AsyncGenerator<WifiStatus> {
+      await world.bleReady();
       yield "connecting";
       const s = ssid.toLowerCase();
       if (s.includes("fail")) {
@@ -149,6 +163,7 @@ function createBle(world: MockWorld): BleChannel {
     },
 
     async readEndpoint() {
+      await world.bleReady();
       await sleep(400);
       return ENDPOINT;
     },
@@ -377,6 +392,27 @@ export interface MockDogLink extends DogLink {
   dispose(): void;
 }
 
+/**
+ * The phone's own facts. The SSID needs the OS location permission: the first call raises a
+ * stand-in for the system prompt (answered in <MockOsPrompt>); a refusal is remembered.
+ */
+function createPhone(world: MockWorld): PhoneChannel {
+  const SSID = "SyncAI-Office";
+  return {
+    async wifiSsid() {
+      const d = world.dev;
+      if (d.locationPermission === "ask") {
+        const ok = await new Promise<boolean>((answer) =>
+          world.osPrompt.emit({ title: "「SyncAI」想要使用你的位置", body: "用來讀取手機目前連線的 Wi-Fi 名稱。", answer })
+        );
+        world.osPrompt.emit(null);
+        d.locationPermission = ok ? "granted" : "denied";
+      }
+      return d.locationPermission === "granted" ? SSID : null;
+    },
+  };
+}
+
 export function createMockDogLink(scenario: ScenarioId): MockDogLink {
   const world = new MockWorld(scenario);
   world.start();
@@ -387,6 +423,7 @@ export function createMockDogLink(scenario: ScenarioId): MockDogLink {
     ble: createBle(world),
     gateway: createGateway(world, keystore),
     media: createMockMedia(world),
+    phone: createPhone(world),
     dispose: () => {
       world.close();
       world.stop();

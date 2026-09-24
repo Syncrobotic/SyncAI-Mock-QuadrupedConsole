@@ -156,6 +156,13 @@ export function ReviewPanel() {
           <Group title="配對模擬">
             <Toggle label="擁有者手機在線（第二隻狗核准）" on={world.dev.ownerOnline} onChange={act(() => (world.dev.ownerOnline = !world.dev.ownerOnline))} />
             <Toggle label="BLE 不穩（前兩次連線失敗）" on={world.dev.bleFlaky} onChange={act(() => (world.dev.bleFlaky = !world.dev.bleFlaky))} />
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              <Action onClick={act(() => world.dropBle(10_000))}>藍牙斷線 10 秒</Action>
+              <Action onClick={act(() => world.dropBle())}>藍牙斷線（不恢復）</Action>
+              <Action onClick={act(() => world.restoreBle())}>恢復藍牙</Action>
+              <Action onClick={act(() => (world.dev.locationPermission = "ask"))}>重設位置權限</Action>
+              <Action onClick={act(() => (world.dev.locationPermission = "denied"))}>拒絕位置權限</Action>
+            </div>
             <Action onClick={act(() => clearLocalPairing())} className="mt-2 w-full">
               清除本機配對 → 重走 Onboarding
             </Action>

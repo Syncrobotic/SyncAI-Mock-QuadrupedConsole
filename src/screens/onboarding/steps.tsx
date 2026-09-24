@@ -1,8 +1,8 @@
 "use client";
 
 import { AnimatePresence, m } from "framer-motion";
-import { ArrowRight, BadgeCheck, Check, ChevronRight, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, Plus, RotateCcw, Wifi, WifiHigh, WifiLow, WifiZero, X } from "lucide-react";
-import { isValidElement, useEffect, useRef, useState } from "react";
+import { ArrowRight, BadgeCheck, Check, ChevronLeft, ChevronRight, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, Plus, RotateCcw, ScanLine, Wifi, WifiHigh, WifiLow, WifiZero, X } from "lucide-react";
+import { isValidElement, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { BrandGlyph } from "@/components/brand-mark";
@@ -12,13 +12,13 @@ import { Field, Modal, inputClass } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { getDogLink } from "@/link";
 import { IS_MOCK } from "@/lib/env";
-import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_LABEL, formatKey, isCompleteKey } from "@/lib/license";
+import { ACTIVATION_ERROR, EDITION_LABEL, FEATURE_LABEL, formatKey, isCompleteKey, normaliseKey } from "@/lib/license";
 import { cn, sleep } from "@/lib/utils";
 import { ROLE_LABEL, type DogAdvert, type Enrollment, type LicenseActivation, type LicenseInfo, type WifiNetwork, type WifiStatus } from "@/proto/types";
 import { useStore } from "@/store";
 import { beginOnboarding, finishOnboarding } from "@/store/controller";
 
-import type { StepProps } from "./Onboarding";
+import { OnboardingContext, type StepProps } from "./Onboarding";
 import { EASE_OUT, Link, NetLink, Radar, popIn, rise } from "./visuals";
 
 /*
@@ -78,11 +78,45 @@ function Frame({
   /** Automatic steps announce their title changes. */
   live?: boolean;
 }) {
+  const shell = useContext(OnboardingContext);
+  // Default top-left action is the shell's back; a step's own left (cancel) wins.
+  const leftSlot =
+    left ||
+    (shell.back && (
+      <BarButton label="上一步" onClick={shell.back}>
+        <ChevronLeft />
+      </BarButton>
+    ));
+  // A dropped BLE link takes over the one button: waiting, then 重試 after 15 s.
+  const action =
+    shell.ble === "lost" ? (
+      <Primary loading>重新連線中…</Primary>
+    ) : shell.ble === "failed" ? (
+      <Primary onClick={shell.retryBle}>
+        <RotateCcw />
+        重試
+      </Primary>
+    ) : (
+      primary
+    );
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      {/* Step actions live in the shell's top bar row (48px, directly above this step). */}
-      {left && <div className="absolute -top-12 left-[calc(0.75rem+var(--safe-left))] flex h-12 w-12 items-center justify-start">{left}</div>}
-      {right && <div className="absolute -top-12 right-[calc(0.75rem+var(--safe-right))] flex h-12 w-12 items-center justify-end">{right}</div>}
+      {/* Step actions live in the shell's top bar row (48px, directly above this step); with
+          no top bar (the Console's licence gate) they get a row of their own. */}
+      {shell.hasTopBar ? (
+        <>
+          {leftSlot && <div className="absolute -top-12 left-[calc(0.75rem+var(--safe-left))] flex h-12 w-12 items-center justify-start">{leftSlot}</div>}
+          {right && <div className="absolute -top-12 right-[calc(0.75rem+var(--safe-right))] flex h-12 w-12 items-center justify-end">{right}</div>}
+        </>
+      ) : (
+        (leftSlot || right) && (
+          <div className="flex h-12 shrink-0 items-center justify-between px-3">
+            <span>{leftSlot}</span>
+            <span>{right}</span>
+          </div>
+        )
+      )}
       <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-[calc(1.25rem+var(--safe-right))] pl-[calc(1.25rem+var(--safe-left))]">
         {/* The group — visual, title, content — sits in the middle of the space between the top
             bar and the action bar. */}
@@ -103,7 +137,7 @@ function Frame({
           {children && <div className="mx-auto mt-5 w-full max-w-[360px] space-y-2.5">{children}</div>}
         </div>
       </div>
-      <ActionBar above={above}>{primary}</ActionBar>
+      <ActionBar above={shell.ble === "ok" ? above : undefined}>{action}</ActionBar>
     </div>
   );
 }
@@ -543,17 +577,15 @@ export function StepPair({ flow, patch, go }: StepProps) {
         )
       }
       left={
-        phase === "approval" && (
-          <BarButton
-            label="取消配對"
-            onClick={() => {
-              abort.current?.abort();
-              go("scan");
-            }}
-          >
-            <X />
-          </BarButton>
-        )
+        <BarButton
+          label="取消配對"
+          onClick={() => {
+            abort.current?.abort();
+            go("scan");
+          }}
+        >
+          <X />
+        </BarButton>
       }
     />
   );
@@ -695,8 +727,9 @@ export function LicenseEntry({
 }) {
   // Mock builds start with the full-feature key filled in so every flow can be reviewed.
   const [key, setKey] = useState(IS_MOCK ? "SYNCPRO12026DEMO" : "");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ text: string; boxes: number[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   const submit = async () => {
     setBusy(true);
@@ -707,7 +740,14 @@ export function LicenseEntry({
     if (r.ok) {
       navigator.vibrate?.(20);
       onActivated(r.license);
-    } else setError(ACTIVATION_ERROR[r.reason]);
+      return;
+    }
+    // Point at the box that is wrong, not the whole key: the edition prefix (box 1) for an
+    // unknown or expired key, a 0000 block for one bound elsewhere.
+    const parts = key.includes("-") ? key.split("-") : (normaliseKey(key).match(/.{1,4}/g) ?? []);
+    const boxes =
+      r.reason === "bound" ? parts.flatMap((p, i) => (p === "0000" ? [i] : [])) : r.reason === "format" ? [0, 1, 2, 3] : [0];
+    setError({ text: ACTIVATION_ERROR[r.reason], boxes });
   };
 
   return (
@@ -731,6 +771,11 @@ export function LicenseEntry({
           </BarButton>
         )
       }
+      right={
+        <BarButton label="掃描授權卡" onClick={() => setScanning(true)}>
+          <ScanLine />
+        </BarButton>
+      }
     >
       <KeyInput
         value={key}
@@ -738,14 +783,14 @@ export function LicenseEntry({
           setKey(v);
           setError(null);
         }}
-        invalid={!!error}
+        invalid={error?.boxes}
         disabled={busy}
         autoFocus
       />
       <AnimatePresence initial={false}>
         {error && (
           <m.p
-            key={error}
+            key={error.text}
             role="alert"
             className="text-status-error text-center text-[13px]"
             initial={{ opacity: 0, height: 0 }}
@@ -753,7 +798,7 @@ export function LicenseEntry({
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2, ease: EASE_OUT }}
           >
-            {error}
+            {error.text}
           </m.p>
         )}
       </AnimatePresence>
@@ -763,7 +808,79 @@ export function LicenseEntry({
           {formatKey("CTRL01AB2026DEMO")}
         </button>
       </MockHint>
+
+      <CardScanner
+        open={scanning}
+        onClose={() => setScanning(false)}
+        onKey={(k) => {
+          setScanning(false);
+          setKey(k);
+          setError(null);
+        }}
+      />
     </Frame>
+  );
+}
+
+/**
+ * Full-screen camera over the licence card: a card-shaped viewfinder and a moving scan line,
+ * no text. It reads the key printed on the card (QR / text) and fills the boxes.
+ * Mock: no camera — a dark field, and the key "found" after 1.8 s.
+ * Real: getUserMedia + BarcodeDetector (OCR fallback); the OS asks for the camera the first time.
+ */
+function CardScanner({ open, onClose, onKey }: { open: boolean; onClose: () => void; onKey: (key: string) => void }) {
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      navigator.vibrate?.(20);
+      onKey("SYNC-PRO1-2026-DEMO");
+    }, 1800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <m.div
+          role="dialog"
+          aria-modal
+          aria-label="掃描授權卡"
+          className="fixed inset-0 z-[80] bg-black"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, #2a2a33, #050507 70%)" }} />
+          <button
+            onClick={onClose}
+            aria-label="關閉"
+            className="absolute top-[calc(var(--safe-top)+0.5rem)] left-[calc(var(--safe-left)+0.75rem)] z-10 grid size-10 cursor-pointer place-items-center rounded-full bg-white/10 text-white backdrop-blur"
+          >
+            <X className="size-5" />
+          </button>
+          {/* Card-shaped viewfinder (ID-1 ratio) with corner marks and a scan line. */}
+          <div className="absolute top-1/2 left-1/2 aspect-[1.586] w-[78%] max-w-[340px] -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute inset-0 rounded-2xl shadow-[0_0_0_100vmax_rgba(0,0,0,0.55)]" />
+            {[
+              "top-0 left-0 border-t-4 border-l-4 rounded-tl-2xl",
+              "top-0 right-0 border-t-4 border-r-4 rounded-tr-2xl",
+              "bottom-0 left-0 border-b-4 border-l-4 rounded-bl-2xl",
+              "bottom-0 right-0 border-b-4 border-r-4 rounded-br-2xl",
+            ].map((c) => (
+              <span key={c} className={cn("absolute size-8 border-white", c)} />
+            ))}
+            <m.span
+              className="bg-primary-accent absolute inset-x-4 h-0.5 rounded-full shadow-[0_0_12px_var(--primary-accent)]"
+              initial={{ top: "12%" }}
+              animate={{ top: ["12%", "88%", "12%"] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </div>
+        </m.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -785,25 +902,44 @@ export function StepWifi({ flow, patch, go }: StepProps) {
   const [nets, setNets] = useState<WifiNetwork[] | null>(null);
   const [manual, setManual] = useState(false);
   const [scanTick, setScanTick] = useState(0);
+  // The phone's own SSID — undefined until read, null when the OS won't tell us (location
+  // permission refused / unavailable). Null simply means: no badge, no mismatch warning.
+  const [phoneSsid, setPhoneSsid] = useState<string | null | undefined>(undefined);
+  // The password takes focus only after a tap — never on entry, where the keyboard would
+  // cover the list before the guard has seen it.
+  const [userPicked, setUserPicked] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void getDogLink()
+      .phone.wifiSsid()
+      .then((s) => alive && setPhoneSsid(s));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
     void getDogLink()
       .ble.scanWifi()
-      .then((n) => {
-        if (!alive) return;
-        setNets(n);
-        // Preselect the phone's own network when the dog can hear it.
-        if (!flow.ssid || !n.some((x) => x.ssid === flow.ssid)) {
-          const mine = n.find((x) => x.phone);
-          if (mine) patch({ ssid: mine.ssid, sameNet: true });
-        }
-      });
+      .then((n) => alive && setNets(n));
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanTick]);
+
+  const isPhone = (n: WifiNetwork) => phoneSsid != null && n.ssid === phoneSsid;
+  const sameOf = (ssid: string) => (phoneSsid == null ? null : ssid === phoneSsid);
+
+  // Preselect the phone's network once both lists are in, unless the guard already chose.
+  useEffect(() => {
+    if (!nets || phoneSsid === undefined || userPicked || manual) return;
+    if (flow.ssid && nets.some((x) => x.ssid === flow.ssid)) return;
+    const mine = nets.find(isPhone);
+    if (mine) patch({ ssid: mine.ssid, sameNet: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nets, phoneSsid]);
 
   const sel = manual ? null : (nets?.find((n) => n.ssid === flow.ssid) ?? null);
   const needsPsk = manual || (sel ? sel.security !== "open" : false);
@@ -811,9 +947,10 @@ export function StepWifi({ flow, patch, go }: StepProps) {
 
   const pick = (n: WifiNetwork) => {
     setManual(false);
-    if (n.ssid !== flow.ssid) patch({ ssid: n.ssid, psk: "", wifiError: null, sameNet: !!n.phone });
+    setUserPicked(true);
+    if (n.ssid !== flow.ssid) patch({ ssid: n.ssid, psk: "", wifiError: null, sameNet: sameOf(n.ssid) });
   };
-  const sameNet = manual ? null : sel ? !!sel.phone : null;
+  const sameNet = manual ? (flow.ssid ? sameOf(flow.ssid) : null) : sel ? sameOf(sel.ssid) : null;
 
   const password = (
     <Field label="密碼" error={flow.wifiError ?? undefined}>
@@ -823,7 +960,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
         name="psk"
         autoComplete="current-password"
         enterKeyHint="go"
-        autoFocus
+        autoFocus={userPicked}
         value={flow.psk}
         aria-invalid={!!flow.wifiError}
         onChange={(e) => patch({ psk: e.target.value, wifiError: null })}
@@ -867,7 +1004,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
                 onSelect={() => pick(n)}
                 tile={<WifiBars rssi={n.rssi} />}
                 title={n.ssid}
-                badge={n.phone && <span className="text-primary-accent bg-primary/10 shrink-0 rounded px-1 text-[11px] font-medium">手機所在</span>}
+                badge={isPhone(n) && <span className="text-primary-accent bg-primary/10 shrink-0 rounded px-1 text-[11px] font-medium">手機所在</span>}
                 sub={
                   <span className="flex items-center gap-1">
                     {n.security !== "open" && <Lock className="size-3 shrink-0" />}
@@ -891,6 +1028,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
               on={manual}
               onSelect={() => {
                 setManual(true);
+                setUserPicked(true);
                 patch({ ssid: "", psk: "", wifiError: null, sameNet: null });
               }}
               tile={<Plus />}
@@ -991,6 +1129,13 @@ export function StepWait({ flow, patch, go }: StepProps) {
   return (
     <Frame
       visual={<NetLink phase={online ? "online" : stuck ? "failed" : "joining"} sameNet={flow.sameNet} progress={elapsed / 30} />}
+      left={
+        !online && (
+          <BarButton label="取消連線" onClick={() => go("wifi")}>
+            <X />
+          </BarButton>
+        )
+      }
       title={online ? "狗已上線" : stuck ? "還沒連上" : "狗正在連上 Wi-Fi"}
       sub={online ? (flow.endpoint?.ip ?? "讀取位址…") : stuck ? "訊號太弱，或網路需要網頁登入" : `${flow.ssid} · ${elapsed} 秒`}
       live

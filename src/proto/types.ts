@@ -61,8 +61,6 @@ export interface WifiNetwork {
   rssi: number;
   band: "2.4" | "5" | "6";
   security: "open" | "wpa2" | "wpa3" | "enterprise";
-  /** The network this phone is on (the phone tells the app; the dog does not know). */
-  phone?: boolean;
 }
 
 export interface Endpoint {

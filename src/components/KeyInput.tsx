@@ -48,12 +48,15 @@ export function KeyInput({
 }: {
   value: string;
   onChange: (key: string) => void;
-  invalid?: boolean;
+  /** true: the whole key is wrong; a list: only those boxes (0-based) are. */
+  invalid?: boolean | number[];
   disabled?: boolean;
   autoFocus?: boolean;
 }) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const boxes = split(value);
+  const bad = (i: number) => (Array.isArray(invalid) ? invalid.includes(i) : !!invalid);
+  const shaking = Array.isArray(invalid) ? invalid.length > 0 : !!invalid;
 
   /** Focus a box with the caret at `pos` (after React has written the new value). */
   const focusAt = (i: number, pos: number | "end") => {
@@ -150,7 +153,7 @@ export function KeyInput({
       className="flex items-center gap-1.5"
       role="group"
       aria-label="License 金鑰，4 組、每組 4 碼"
-      animate={invalid ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
+      animate={shaking ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
       transition={{ duration: 0.36 }}
     >
       {boxes.map((g, i) => (
@@ -160,6 +163,7 @@ export function KeyInput({
               refs.current[i] = el;
             }}
             aria-label={`第 ${i + 1} 組`}
+            aria-invalid={bad(i) || undefined}
             autoFocus={autoFocus && i === 0}
             autoCapitalize="characters"
             autoComplete="off"
@@ -180,7 +184,7 @@ export function KeyInput({
             className={cn(
               "bg-background h-11 w-full min-w-0 rounded-lg border text-center font-mono text-[16px] font-semibold tracking-[0.12em] uppercase outline-none",
               "focus-visible:border-primary focus-visible:ring-primary/30 focus-visible:ring-2 disabled:opacity-50",
-              invalid ? "border-status-error/60" : "border-input"
+              bad(i) ? "border-status-error text-status-error" : "border-input"
             )}
           />
           {i < KEY_GROUPS - 1 && <span aria-hidden className="text-muted-foreground/60 shrink-0">–</span>}

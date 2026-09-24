@@ -64,12 +64,54 @@ interface InternalRun {
 export interface MockDevSettings {
   ownerOnline: boolean;
   bleFlaky: boolean;
+  /** Location permission for reading the phone's SSID: not asked yet / allowed / refused. */
+  locationPermission: "ask" | "granted" | "denied";
+}
+
+/** A stand-in for an OS permission prompt, answered by <MockOsPrompt>. */
+export interface MockOsPrompt {
+  title: string;
+  body: string;
+  answer: (ok: boolean) => void;
 }
 
 
 export class MockWorld {
   readonly scenario;
-  readonly dev: MockDevSettings = { ownerOnline: true, bleFlaky: false };
+  readonly dev: MockDevSettings = { ownerOnline: true, bleFlaky: false, locationPermission: "ask" };
+
+  // ── BLE link during onboarding (review panel can drop it) ───────────────────
+  readonly bleLink = new Emitter<"up" | "down">(true);
+  private bleDown = false;
+  private bleTimer: ReturnType<typeof setTimeout> | null = null;
+  private bleWaiters: (() => void)[] = [];
+  readonly osPrompt = new Emitter<MockOsPrompt | null>(true);
+
+  /** Drop the BLE link; it comes back by itself after `ms`, or stays down until restored. */
+  dropBle(ms?: number) {
+    if (this.bleTimer) clearTimeout(this.bleTimer);
+    this.bleDown = true;
+    this.bleLink.emit("down");
+    if (ms) this.bleTimer = setTimeout(() => this.restoreBle(), ms);
+  }
+
+  restoreBle() {
+    if (this.bleTimer) clearTimeout(this.bleTimer);
+    this.bleDown = false;
+    this.bleLink.emit("up");
+    const w = this.bleWaiters;
+    this.bleWaiters = [];
+    w.forEach((f) => f());
+  }
+
+  get bleIsDown() {
+    return this.bleDown;
+  }
+
+  /** BLE operations stall while the link is down and carry on when it is back. */
+  bleReady(): Promise<void> {
+    return this.bleDown ? new Promise((r) => this.bleWaiters.push(r)) : Promise.resolve();
+  }
 
   // Dog state
   pose: Pose = { ...DOCK };

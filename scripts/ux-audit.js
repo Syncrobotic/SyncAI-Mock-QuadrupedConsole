@@ -157,6 +157,13 @@ async (page) => {
     const title = await page.evaluate(() => (document.querySelector('[role="tablist"]') ? "done" : document.querySelector("h1")?.textContent?.trim() || "…"));
     if (title === "done") break;
     await step(`${String(i + 1).padStart(2, "0")} ${title}`);
+    // A system prompt (permission) comes first: answer it and look at the step again.
+    const osAllow = page.locator('[role="dialog"] button:enabled').filter({ hasText: /^(允許|好)$/ });
+    if (await osAllow.count()) {
+      await osAllow.first().click();
+      await wait(1500);
+      continue;
+    }
     const pw = page.locator('input[type="password"]:visible');
     if (await pw.count()) {
       await pw.fill("password123");

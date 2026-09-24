@@ -2,6 +2,9 @@
 
 import { useEffect } from "react";
 import { Toaster } from "sonner";
+
+import { MockOsPrompt } from "@/components/MockOsPrompt";
+import { IS_MOCK } from "@/lib/env";
 import { useTheme } from "next-themes";
 
 import { PhoneFrame } from "@/components/PhoneFrame";
@@ -32,6 +35,7 @@ export function App() {
   return (
     <PhoneFrame>
       {onboarding ? <Onboarding /> : <Console key={epoch} />}
+      {IS_MOCK && <MockOsPrompt />}
       {/* Inside the frame: the frame is a containing block for `fixed`, so
           toasts land on the phone, not on the desktop around it. */}
       <Toaster

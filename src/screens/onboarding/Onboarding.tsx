@@ -1,8 +1,9 @@
 "use client";
 
 import { AnimatePresence, m } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
-import { useState } from "react";
+import { createContext, useEffect, useState } from "react";
+
+import { getDogLink } from "@/link";
 
 import { StepLicense, StepPair, StepSafety, StepScan, StepSplash, StepWait, StepWifi } from "./steps";
 import { EASE_OUT, Stepper } from "./visuals";
@@ -38,6 +39,24 @@ export interface Flow {
   sameNet: boolean | null;
 }
 
+/**
+ * What every step's Frame needs from the shell: the default top-left action (back), and the
+ * state of the BLE link once a dog is paired — lost → the primary shows 重新連線中…, failed
+ * (15 s) → 重試. Steps don't handle a dropped link themselves; their BLE calls just wait.
+ */
+export interface OnboardingCtx {
+  /** False outside onboarding (the Console's licence gate reuses the key step): no top bar. */
+  hasTopBar: boolean;
+  back: (() => void) | null;
+  ble: "ok" | "lost" | "failed";
+  retryBle: () => void;
+}
+
+export const OnboardingContext = createContext<OnboardingCtx>({ hasTopBar: false, back: null, ble: "ok", retryBle: () => {} });
+
+/** Steps that talk to the dog over BLE after pairing — where a dropped link matters. */
+const BLE_STEPS: Step[] = ["pair", "license", "wifi", "wait"];
+
 export interface StepProps {
   flow: Flow;
   patch: (p: Partial<Flow>) => void;
@@ -56,7 +75,8 @@ export function Onboarding() {
     dog: null,
     session: null,
     role: null,
-    ssid: "SyncAI-Office",
+    // Unknown until the phone reports its own network (Wi-Fi step, with permission).
+    ssid: "",
     psk: "",
     wifiFailures: 0,
     wifiError: null,
@@ -66,8 +86,31 @@ export function Onboarding() {
   const patch = (p: Partial<Flow>) => setFlow((f) => ({ ...f, ...p }));
   const props: StepProps = { flow, patch, go: setStep };
 
-  // Back is offered only where going back is safe and meaningful.
-  const back: Partial<Record<Step, Step>> = { scan: "splash" };
+  // Every step has a top-left action: back (‹) here; the automatic steps (pair, wait) put
+  // a cancel (✕) there themselves.
+  const back: Partial<Record<Step, Step>> = { scan: "splash", license: "scan", wifi: "license", safety: "wifi" };
+
+  // BLE link watch.
+  const [ble, setBle] = useState<OnboardingCtx["ble"]>("ok");
+  useEffect(() => getDogLink().ble.link.subscribe((v) => setBle(v === "down" ? "lost" : "ok")), []);
+  useEffect(() => {
+    if (ble !== "lost" || !flow.dog) return;
+    const dogId = flow.dog.id;
+    // Try again every 3 s; after 15 s hand it to the guard (重試).
+    const retry = setInterval(() => void getDogLink().ble.reconnect(dogId).then((ok) => ok && setBle("ok")), 3000);
+    const give = setTimeout(() => setBle((b) => (b === "lost" ? "failed" : b)), 15_000);
+    return () => {
+      clearInterval(retry);
+      clearTimeout(give);
+    };
+  }, [ble, flow.dog]);
+
+  const ctx: OnboardingCtx = {
+    hasTopBar: step !== "splash",
+    back: back[step] ? () => setStep(back[step]!) : null,
+    ble: flow.session && BLE_STEPS.includes(step) ? ble : "ok",
+    retryBle: () => setBle("lost"),
+  };
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
@@ -84,14 +127,8 @@ export function Onboarding() {
         // Top bar: [48px slot] [segmented progress] [48px slot]. The side slots belong to the
         // step (back, cancel, skip — see Frame's left/right); the progress never moves.
         <header className="relative box-content flex h-12 shrink-0 items-center gap-2 pt-[var(--safe-top)] pr-[calc(0.75rem+var(--safe-right))] pl-[calc(0.75rem+var(--safe-left))]">
-          {/* Equal side slots keep the progress centred; a step's own action (cancel, skip) fills one. */}
-          <div className="flex w-12 shrink-0 items-center">
-            {back[step] && (
-              <button onClick={() => setStep(back[step]!)} className="hover:bg-accent grid size-8 cursor-pointer place-items-center rounded-lg" aria-label="上一步">
-                <ChevronLeft className="size-5" />
-              </button>
-            )}
-          </div>
+          {/* Equal side slots keep the progress centred; the step's Frame fills them (back / cancel / skip). */}
+          <div className="w-12 shrink-0" />
           <div className="min-w-0 flex-1">
             <Stepper phase={PHASE_OF[step]} />
           </div>
@@ -100,6 +137,7 @@ export function Onboarding() {
       )}
 
       {/* One transition layer only: the step slides in the direction of travel. */}
+      <OnboardingContext.Provider value={ctx}>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <AnimatePresence mode="wait" initial={false} custom={dir}>
           <m.div
@@ -125,6 +163,7 @@ export function Onboarding() {
           </m.div>
         </AnimatePresence>
       </div>
+      </OnboardingContext.Provider>
     </div>
   );
 }
