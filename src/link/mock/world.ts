@@ -196,8 +196,13 @@ export class MockWorld {
     const license = this.license.features.map((f) =>
       f.feature === "mission" && !this.scenario.missionLicense ? { ...f, granted: false } : f
     );
+    // Load moves a little between reads, as it would on the dog.
+    const t = Date.now() / 1000;
+    const wobble = (base: number, amp: number, period: number) => Math.round(Math.min(99, Math.max(1, base + Math.sin(t / period) * amp + (Math.random() - 0.5) * amp * 0.4)));
     return {
       ...this._device,
+      cpu: wobble(this._device.cpu, 9, 7),
+      memPct: wobble(this._device.memPct, 3, 23),
       license,
       licenseExpiresAt: this.license.expiresAt ?? 0,
       licenseEdition: this.license.edition,

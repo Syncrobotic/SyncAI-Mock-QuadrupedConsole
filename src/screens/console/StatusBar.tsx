@@ -25,10 +25,10 @@ import {
   type Flash,
   type FlashTone,
 } from "@/lib/notify";
-import { cn, formatClock } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { ROLE_LABEL } from "@/proto/types";
 import { get, set, useStore, type SheetSnap } from "@/store";
-import { beginAddDog, switchDog } from "@/store/controller";
+import { beginAddDog, refreshDevice, switchDog } from "@/store/controller";
 import { CONN_LABEL, MODE_LABEL, rawRttLevel } from "@/store/logic";
 
 import { AlertRow, useAlerts, type Alert } from "./Banners";
@@ -80,9 +80,17 @@ function openDetails(landscape: boolean) {
   set({ statusOpen: true, ...(snapBeforeDetails !== null && { snap: 0 as SheetSnap }) });
 }
 
-function closeDetails() {
+/**
+ * Close the details. `restore` puts the sheet back where it was before they opened — only
+ * when the guard closed them from the island. When the sheet itself moved (dragged, a tab
+ * tapped), the sheet's new height wins: restoring would yank it back.
+ */
+export function closeDetails({ restore = true }: { restore?: boolean } = {}) {
   if (!get().statusOpen) return;
-  set({ statusOpen: false, ...(snapBeforeDetails !== null && { snap: snapBeforeDetails }) });
+  set({
+    statusOpen: false,
+    ...(restore && snapBeforeDetails !== null && { snap: snapBeforeDetails }),
+  });
   snapBeforeDetails = null;
 }
 
@@ -141,8 +149,12 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
     const measure = () =>
       setCap(
         Math.max(
-          160,
-          Math.round(bounds.getBoundingClientRect().bottom - el.getBoundingClientRect().top - (landscape ? 76 : 60))
+          120,
+          Math.round(
+            bounds.getBoundingClientRect().bottom -
+              el.getBoundingClientRect().top -
+              (landscape ? 76 : 60)
+          )
         )
       );
     const ro = new ResizeObserver(measure);
@@ -162,6 +174,9 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
   const h = useMotionValue(0);
   const [measured, setMeasured] = useState(false);
   useLayoutEffect(() => {
+    // A new face ends any pull: a pull that never saw its release (the details closed some
+    // other way mid-gesture) would otherwise leave the island deaf to its content.
+    pulling.current = false;
     const el = current.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
@@ -210,9 +225,10 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
         style={measured ? { height: h } : undefined}
         // One look in every face: a notification changes what the island says, never its
         // colour, border, shadow or height. Only opening the details makes it bigger.
-        className="bg-surface/95 relative overflow-hidden rounded-xl border shadow-sm backdrop-blur"
+        className="bg-surface/95 @container relative overflow-hidden rounded-xl border shadow-sm backdrop-blur"
       >
-        <div className="grid items-start">
+        {/* One column no wider than the card: an auto column grows to its content and clips it. */}
+        <div className="grid grid-cols-1 items-start">
           <AnimatePresence initial={false}>
             <m.div
               key={face}
@@ -254,7 +270,12 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
                 <StatusRow
                   landscape={landscape}
                   open={false}
-                  onToggle={() => openDetails(landscape)}
+                  onToggle={() => {
+                    // A fresh open starts with no pull in hand.
+                    pulling.current = false;
+                    setHeld(false);
+                    openDetails(landscape);
+                  }}
                   alerts={alerts}
                 />
               )}
@@ -422,8 +443,9 @@ function StatusRow({
 
       <span aria-hidden className="bg-border h-6 w-px shrink-0" />
 
+      {/* Speed only where the name still fits beside it (an SE on its side is ~240 pt). */}
       {landscape && live && (
-        <span className="shrink-0 text-[12px] font-semibold tabular-nums">
+        <span className="hidden shrink-0 text-[12px] font-semibold tabular-nums @[300px]:inline-block">
           {(t?.speed ?? 0).toFixed(1)}
           <span className="text-muted-foreground ml-0.5 text-[11px] font-normal">m/s</span>
         </span>
@@ -476,19 +498,11 @@ function StatusRow({
 }
 
 function Details() {
-  const t = useStore((s) => s.telemetry);
-  const conn = useStore((s) => s.conn);
-  const session = useStore((s) => s.session);
-  const cred = useStore((s) => s.credential);
-  const device = useStore((s) => s.device);
-  const lastError = useStore((s) => s.lastError);
   const alerts = useAlerts();
-  const channel =
-    conn === "Online" || conn === "Degraded" ? "WS · TLS pinned" : conn === "BleOnly" ? "BLE" : "—";
 
   return (
     <div className="min-h-0 flex-1 scrollbar-none space-y-3 overflow-y-auto overscroll-contain border-t px-3 pt-3 pb-1">
-      <Dogs />
+      <Gauges />
       {alerts.length > 0 && (
         <div className="space-y-1.5 border-t pt-3">
           {alerts.map((a) => (
@@ -496,17 +510,124 @@ function Details() {
           ))}
         </div>
       )}
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 border-t pt-3 text-[12px]">
-        <Item k="通道" v={channel} />
-        <Item k="狀態" v={`${CONN_LABEL[conn]} · ${conn}`} />
-        <Item k="端點" v={cred?.endpoint ? `${cred.endpoint.ip}:${cred.endpoint.port}` : "—"} />
-        <Item k="JWT 到期" v={session ? formatClock(session.jwtExpiresAt) : "—"} />
-        <Item k="小腦" v={device?.versions.cerebellum ?? "—"} />
-        <Item k="Gateway" v={device?.versions.gateway ?? "—"} />
-        <Item k="電量預估" v={t ? `約 ${t.batteryMinutes} 分鐘` : "—"} />
-        <Item k="最近錯誤" v={lastError ?? "—"} />
-      </dl>
+      <div className="border-t pt-2">
+        <Dogs />
+      </div>
     </div>
+  );
+}
+
+/**
+ * The dog's load at a glance: four rings. Neutral until it is bad (the command strip's rule):
+ * CPU / MEM / DISK turn amber at 75% and red at 90%; the battery turns amber under 35% and
+ * red under 20%, and says minutes left rather than a percentage. While the details are open
+ * the device info is re-read every 3 s.
+ */
+function Gauges() {
+  // Off the WS nothing here is current: the last reading would pass for a live one. Show —.
+  const live = useStore((s) => s.conn === "Online" || s.conn === "Degraded");
+  const device = useStore((s) => (live ? s.device : null));
+  const battery = useStore((s) => (live ? (s.telemetry?.battery ?? null) : null));
+  const minutes = useStore((s) => (live ? (s.telemetry?.batteryMinutes ?? null) : null));
+  useEffect(() => {
+    const t = setInterval(() => void refreshDevice(), 3000);
+    return () => clearInterval(t);
+  }, []);
+  const load = (v: number | undefined) =>
+    v === undefined ? "none" : v >= 90 ? "bad" : v >= 75 ? "warn" : "ok";
+  const charge = battery === null ? "none" : battery < 20 ? "bad" : battery < 35 ? "warn" : "ok";
+  return (
+    <div className="grid grid-cols-4 gap-1">
+      <Ring label="CPU" value={device?.cpu} tone={load(device?.cpu)} />
+      <Ring label="MEM" value={device?.memPct} tone={load(device?.memPct)} />
+      <Ring label="DISK" value={device?.storagePct} tone={load(device?.storagePct)} />
+      <Ring
+        label="電量"
+        value={battery ?? undefined}
+        tone={charge}
+        centre={
+          minutes !== null
+            ? { value: String(minutes), unit: "分", spoken: `約 ${minutes} 分鐘` }
+            : undefined
+        }
+      />
+    </div>
+  );
+}
+
+const RING_TONE = {
+  ok: "stroke-primary-accent",
+  warn: "stroke-severity-warning",
+  bad: "stroke-status-error",
+  none: "stroke-transparent",
+} as const;
+
+/**
+ * One ring: the arc is the percentage; the centre is the percentage too, or — for the
+ * battery — what the guard actually plans with, the minutes left.
+ */
+function Ring({
+  label,
+  value,
+  tone,
+  centre,
+}: {
+  label: string;
+  value: number | undefined;
+  tone: keyof typeof RING_TONE;
+  centre?: { value: string; unit: string; spoken: string };
+}) {
+  const R = 25;
+  const C = 2 * Math.PI * R;
+  const pct = value === undefined ? 0 : Math.max(0, Math.min(100, value));
+  const text =
+    value === undefined
+      ? null
+      : (centre ?? { value: String(Math.round(pct)), unit: "%", spoken: `${Math.round(pct)}%` });
+  return (
+    <figure
+      className="flex flex-col items-center gap-1"
+      aria-label={`${label} ${text ? text.spoken : "未知"}`}
+    >
+      {/* Fluid up to 60 pt: four fit a landscape island (~240 pt) as well as a portrait one. */}
+      <div className="@container relative aspect-square w-full max-w-[60px]">
+        <svg viewBox="0 0 60 60" className="size-full -rotate-90" aria-hidden>
+          <circle cx="30" cy="30" r={R} fill="none" strokeWidth="4" className="stroke-muted" />
+          {value !== undefined && (
+            <circle
+              cx="30"
+              cy="30"
+              r={R}
+              fill="none"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={C * (1 - pct / 100)}
+              className={cn(
+                "transition-[stroke-dashoffset,stroke] duration-500 ease-out motion-reduce:transition-none",
+                RING_TONE[tone]
+              )}
+            />
+          )}
+        </svg>
+        {/* Number and unit on one baseline, centred as one. */}
+        <span aria-hidden className="absolute inset-0 grid place-items-center">
+          <span className="flex items-baseline">
+            {/* A ring under 56 pt (landscape SE) takes 12 pt digits so "156分" stays inside it. */}
+            <span className="text-[12px] font-semibold tracking-tight tabular-nums @[56px]:text-[13px]">
+              {text ? text.value : "—"}
+            </span>
+            {text && <span className="text-muted-foreground text-[11px]">{text.unit}</span>}
+          </span>
+        </span>
+      </div>
+      <figcaption
+        aria-hidden
+        className="text-muted-foreground text-[11px] leading-tight font-medium"
+      >
+        {label}
+      </figcaption>
+    </figure>
   );
 }
 
@@ -560,14 +681,5 @@ function Dogs() {
         </button>
       </li>
     </ul>
-  );
-}
-
-function Item({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-muted-foreground text-[11px]">{k}</dt>
-      <dd className="truncate font-medium tabular-nums">{v}</dd>
-    </div>
   );
 }

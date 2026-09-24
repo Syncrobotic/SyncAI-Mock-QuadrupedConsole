@@ -1,6 +1,7 @@
 "use client";
 
 import { Gamepad2, Smartphone } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { EStopZone } from "@/components/kit";
 import { cn } from "@/lib/utils";
@@ -11,14 +12,15 @@ import { MapChips } from "./Banners";
 import { EStopBar } from "./EStopBar";
 import { FaultOverlay, Overlays } from "./Overlays";
 import { DogHeader } from "./StatusBar";
-import { CallLayer } from "./talk/CallLayer";
+import { CallButton, CallLayer } from "./talk/CallLayer";
 import { TeleopTab } from "./teleop/TeleopTab";
+import { TOOL, TOOL_ON } from "./MapToolbar";
 
 /**
  * §5: landscape is supported on the teleop tab only — the call lives inside it.
  *
  * Layout: the map (or, in a call with the video swapped in, the video) is the whole screen;
- * the status header top-left, the E-Stop top-centre — still one tap, still never covered.
+ * the status island top-left; 影像 and the E-Stop (one tap, never covered) top-right.
  * The call's small window sits under the header; tap it to swap map and video. Other tabs
  * ask for portrait instead of squeezing a sheet into 390px of height.
  */
@@ -28,17 +30,34 @@ export function LandscapeConsole() {
   const statusOpen = useStore((s) => s.statusOpen);
   const supported = tab === "teleop";
 
+  // Dialogs place themselves clear of the E-Stop (EStopZone), measured like the portrait one.
+  const root = useRef<HTMLDivElement>(null);
+  const estop = useRef<HTMLDivElement>(null);
+  const [zone, setZone] = useState<{ top: number; bottom: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const measure = () => {
+      const e = estop.current?.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      if (e) setZone({ top: e.top - r.top, bottom: e.bottom - r.top, height: r.height });
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    // No E-Stop zone for dialogs here: the E-Stop is at the top, dialogs centre
-    // below it and never reach it at this height.
-    <EStopZone.Provider value={null}>
+    <EStopZone.Provider value={zone}>
       {/* The map runs edge to edge, under the cutout and the home bar; every control lives in
           the inset layer, so nothing lands under the notch on either side. */}
-      <div className="bg-map-ground relative h-full overflow-hidden">
+      <div ref={root} className="bg-map-ground relative h-full overflow-hidden">
         {supported && (
           <div
-            className={cn(videoMain ? "absolute z-20 aspect-video w-44 overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15" : "absolute inset-0")}
-            style={videoMain ? { top: "calc(var(--safe-top) + 104px)", left: "calc(var(--safe-left) + 12px)" } : undefined}
+            className={cn(videoMain ? "absolute z-20 aspect-video w-36 overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15" : "absolute inset-0")}
+            // Just under the island, small enough to stay clear of the left stick on a short phone.
+            style={videoMain ? { top: "calc(var(--safe-top) + 60px)", left: "calc(var(--safe-left) + 8px)" } : undefined}
           >
             <MapView bare />
             {videoMain && (
@@ -56,12 +75,23 @@ export function LandscapeConsole() {
           )}
           {supported && <TeleopTab landscape />}
 
-          <div className="pointer-events-none absolute inset-x-2 top-2 z-30 flex items-start gap-2">
-            <div className="flex w-[300px] shrink-0 flex-col gap-1.5">
+          {/* Island left, 影像 and the E-Stop top-right. Both thumbs are on the sticks in
+              landscape: the top-right corner is a short reach up for the right thumb, and it
+              leaves the island the width for name, speed, battery and signal (an SE on its side
+              squeezed the name to 巡邏犬… when the E-Stop sat in the middle). No z-index on the
+              row itself: that would trap the E-Stop's z-[60] under a dialog's backdrop (z-50). */}
+          <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start gap-2">
+            <div className="relative z-30 flex min-w-0 flex-[0_1_340px] flex-col gap-1.5">
               <DogHeader landscape />
               {!statusOpen && <MapChips />}
             </div>
-            <div className="pointer-events-auto mx-auto shrink-0">
+            <div className="flex-1" />
+            {supported && (
+              <div className="pointer-events-auto relative z-30 mt-0.5">
+                <CallButton className={cn(TOOL, videoMain && TOOL_ON)} />
+              </div>
+            )}
+            <div ref={estop} className="pointer-events-auto relative z-[60] w-[152px] shrink-0">
               <EStopBar compact />
             </div>
           </div>

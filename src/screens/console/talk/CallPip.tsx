@@ -85,9 +85,9 @@ export function CallPip({ landscape = false }: { landscape?: boolean }) {
       className={cn(
         "absolute z-10 aspect-video w-32 cursor-pointer touch-none overflow-hidden rounded-xl border bg-black shadow-2xl ring-1 ring-white/15",
         !drag && "transition-[top,left,right,bottom] duration-200 ease-out",
-        // Landscape: the bottom corners are the joysticks and the top-right is
-        // the readouts, so it lives top-left under the header, and stays there.
-        landscape && "top-[104px] left-3",
+        // Landscape: the bottom corners are the joysticks and the top-right is the E-Stop,
+        // so it lives top-left just under the island (and clear of the left stick), and stays.
+        landscape && "top-[60px] left-2 w-36",
         !landscape && PIP_CORNER[corner]
       )}
       style={drag ? { translate: `${drag.dx}px ${drag.dy}px` } : undefined}

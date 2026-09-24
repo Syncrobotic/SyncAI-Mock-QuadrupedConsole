@@ -15,7 +15,8 @@ import { EStopBar } from "./EStopBar";
 import { FaultOverlay, Overlays } from "./Overlays";
 import { LandscapeConsole } from "./LandscapeConsole";
 import { LicenseGate } from "./LicenseGate";
-import { DogHeader } from "./StatusBar";
+import { MapToolbar } from "./MapToolbar";
+import { closeDetails, DogHeader } from "./StatusBar";
 import { DeviceTab, DeviceSummary } from "./device/DeviceTab";
 import { EventsSummary, EventsTab, useUnreadEvents } from "./events/EventsTab";
 import { MissionSummary, MissionTab } from "./mission/MissionTab";
@@ -121,6 +122,13 @@ export function Console() {
     return () => ro.disconnect();
   }, [unlicensed, landscape]);
 
+  // The sheet and the open status island share the screen: when the sheet comes up (a tab
+  // tapped, a snap), the island closes — the map would squeeze it until its bar is clipped
+  // and it could not be closed. The sheet keeps its new height.
+  useEffect(() => {
+    if (snap !== 0) closeDetails({ restore: false });
+  }, [snap]);
+
   // §7: the teleop tab is locked at 50% and enters follow view; §6: mission defaults to 2.5D top.
   useEffect(() => {
     if (tab === "teleop") set({ snap: 1, view: "follow" });
@@ -215,11 +223,9 @@ export function Console() {
           </div>
           {!collapsed && (videoMain || !statusOpen) && <CallLayer />}
           {!collapsed && <FaultOverlay />}
-          {/* §5 E-Stop, inside the map: bottom centre, always there — the collapsed map keeps
-              it too. z-[60] lifts it over any dialog's backdrop; dialogs sit clear of it. */}
-          <div ref={estop} className="absolute bottom-2 left-1/2 z-[60] -translate-x-1/2">
-            <EStopBar compact />
-          </div>
+          {/* §5 E-Stop, inside the map: the middle of the map's tool row, always there — the
+              collapsed map keeps it too. Dialogs sit clear of it (EStopZone). */}
+          <MapToolbar estopRef={estop} collapsed={collapsed} />
         </div>
         <Sheet height={sheetH} heights={heights} />
         <Overlays />
@@ -239,6 +245,8 @@ function Sheet({ height, heights }: { height: number; heights: [number, number, 
   const [live, setLive] = useState<number | null>(null);
 
   const onDown = (e: React.PointerEvent) => {
+    // Pulling the sheet closes the open status island (see Console).
+    closeDetails({ restore: false });
     drag.current = { y: e.clientY, h: height };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };

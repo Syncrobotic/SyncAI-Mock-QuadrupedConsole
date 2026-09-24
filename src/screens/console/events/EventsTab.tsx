@@ -1,9 +1,20 @@
 "use client";
 
-import { Bot, ChevronDown, Flag, Gamepad2, OctagonX, ScrollText, ShieldAlert, Sparkles, UserCheck } from "lucide-react";
+import { AnimatePresence, m } from "framer-motion";
+import {
+  Bot,
+  ChevronDown,
+  Flag,
+  Gamepad2,
+  OctagonX,
+  ScrollText,
+  ShieldAlert,
+  Sparkles,
+  UserCheck,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { EVENT_TYPES, clock, formatRelative } from "@/lib/rules";
+import { EVENT_TYPES, clock } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 import { set, useStore } from "@/store";
 import { rpc } from "@/store/controller";
@@ -34,7 +45,7 @@ const GROUP_OF: Record<DogEvent["kind"], Exclude<Group, "all">> = {
 
 const GROUPS: { value: Group; label: string }[] = [
   { value: "all", label: "全部" },
-  { value: "ai", label: "AI 偵測" },
+  { value: "ai", label: "AI" },
   { value: "mission", label: "任務" },
   { value: "safety", label: "安全" },
   { value: "system", label: "系統" },
@@ -53,8 +64,9 @@ const KIND_ICON: Record<DogEvent["kind"], typeof Bot> = {
   approval: UserCheck,
 };
 
+/** The icon's plate carries the level — no separate 緊急 / 警示 badge. */
 const LEVEL_TONE: Record<DogEvent["level"], string> = {
-  critical: "bg-severity-emergency/15 text-red-700 dark:text-red-300",
+  critical: "bg-status-error/15 text-status-error",
   warning: "bg-severity-warning/15 text-severity-warning",
   info: "bg-muted text-muted-foreground",
 };
@@ -71,14 +83,24 @@ function useEventLog() {
     };
   }, []);
   const seen = new Set<string>();
-  return [...live, ...history].filter((e) => (seen.has(e.id) ? false : (seen.add(e.id), true))).sort((a, b) => b.at - a.at);
+  return [...live, ...history]
+    .filter((e) => (seen.has(e.id) ? false : (seen.add(e.id), true)))
+    .sort((a, b) => b.at - a.at);
 }
 
 /** Warnings newer than the last visit to the tab — the dot on the tab bar. */
 export function useUnreadEvents() {
-  return useStore((s) => s.events.filter((e) => e.level !== "info" && e.at > s.eventsSeenAt).length);
+  return useStore(
+    (s) => s.events.filter((e) => e.level !== "info" && e.at > s.eventsSeenAt).length
+  );
 }
 
+/**
+ * One line per event: level-coloured icon, what happened, when. Grouped by day, each day one
+ * card with hairlines. An AI detection opens to where and how sure — nothing else (track ids
+ * and coordinates are for the dashboard). New events slide in at the top; a filter change
+ * lets the rows that stay glide into place.
+ */
 export function EventsTab() {
   const events = useEventLog();
   const liveCount = useStore((s) => s.events.length);
@@ -92,116 +114,193 @@ export function EventsTab() {
     set({ eventsSeenAt: Date.now() });
   }, [liveCount]);
 
-  const counts = Object.fromEntries(GROUPS.map((g) => [g.value, events.filter((e) => g.value === "all" || GROUP_OF[e.kind] === g.value).length]));
-  const shown = events.filter((e) => (group === "all" || GROUP_OF[e.kind] === group) && (!alertsOnly || e.level !== "info"));
+  const shown = events.filter(
+    (e) => (group === "all" || GROUP_OF[e.kind] === group) && (!alertsOnly || e.level !== "info")
+  );
 
-  // Day headers: 今天 / 昨天 / m/d.
+  // Day groups: 今天 / 昨天 / m/d.
   const day = (t: number) => {
     const d = new Date(t);
     const today = new Date(now);
-    const diff = Math.round((new Date(today.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000);
+    const diff = Math.round(
+      (new Date(today.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000
+    );
     return diff === 0 ? "今天" : diff === 1 ? "昨天" : `${d.getMonth() + 1}/${d.getDate()}`;
   };
+  const days: { label: string; items: DogEvent[] }[] = [];
+  for (const e of shown) {
+    const label = day(e.at);
+    if (days[days.length - 1]?.label !== label) days.push({ label, items: [] });
+    days[days.length - 1].items.push(e);
+  }
 
   return (
-    <div className="space-y-2 px-3 pb-4">
-      <div className="scrollbar-none -mx-3 flex gap-1.5 overflow-x-auto px-3 pb-0.5">
+    <div className="space-y-2.5 px-3 pb-4">
+      <div
+        role="toolbar"
+        aria-label="篩選事件"
+        className="-mx-3 flex scrollbar-none items-center gap-1 overflow-x-auto px-3"
+      >
         {GROUPS.map((g) => (
           <Chip key={g.value} on={group === g.value} onClick={() => setGroup(g.value)}>
             {g.label}
-            <span className={cn("tabular-nums", group === g.value ? "text-primary-foreground/80" : "text-muted-foreground")}>{counts[g.value]}</span>
           </Chip>
         ))}
-        <span className="bg-border mx-0.5 w-px shrink-0 self-stretch" aria-hidden />
+        <span className="bg-border mx-1 h-4 w-px shrink-0" aria-hidden />
         <Chip on={alertsOnly} onClick={() => setAlertsOnly((v) => !v)}>
-          只看警示
+          警示
         </Chip>
       </div>
 
       {shown.length === 0 && (
         <div className="text-muted-foreground flex flex-col items-center gap-2 py-10 text-[13px]">
           <ScrollText className="size-5" />
-          {events.length === 0 ? "還沒有事件" : "這個篩選下沒有事件"}
+          {events.length === 0 ? "還沒有事件" : "沒有符合的事件"}
         </div>
       )}
 
-      <ol className="space-y-1.5">
-        {shown.map((e, i) => {
-          const header = i === 0 || day(shown[i - 1].at) !== day(e.at) ? day(e.at) : null;
-          return (
-            <li key={e.id}>
-              {header && <p className="text-muted-foreground px-1 pt-1.5 pb-1 text-[11px] font-semibold tracking-wide">{header}</p>}
-              <EventRow e={e} now={now} open={open === e.id} onToggle={() => setOpen((o) => (o === e.id ? null : e.id))} />
-            </li>
-          );
-        })}
-      </ol>
+      {/* A filter swaps the list at once with one short fade — letting the old rows fade out
+          while the new ones fade in left an empty card for a few frames. Inside, only events
+          that arrive while it is on screen slide in (AnimatePresence initial={false}). */}
+      <m.div
+        key={`${group}-${alertsOnly}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.15 }}
+        className="space-y-2.5"
+      >
+        {days.map((d) => (
+          <section key={d.label}>
+            <h4 className="text-muted-foreground px-1 pb-1 text-[11px] font-semibold">{d.label}</h4>
+            <m.ol layout="position" className="bg-card divide-y overflow-hidden rounded-xl border">
+              <AnimatePresence initial={false}>
+                {d.items.map((e) => (
+                  <m.li
+                    key={e.id}
+                    layout="position"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+                  >
+                    <EventRow
+                      e={e}
+                      now={now}
+                      open={open === e.id}
+                      onToggle={() => setOpen((o) => (o === e.id ? null : e.id))}
+                    />
+                  </m.li>
+                ))}
+              </AnimatePresence>
+            </m.ol>
+          </section>
+        ))}
+      </m.div>
     </div>
   );
 }
 
-function EventRow({ e, now, open, onToggle }: { e: DogEvent; now: number; open: boolean; onToggle: () => void }) {
+/** Within the hour: how long ago (that is what "is this still going on?" needs); after: the time. */
+function when(at: number, now: number) {
+  const mins = Math.round((now - at) / 60_000);
+  return mins < 1 ? "剛剛" : mins < 60 ? `${mins} 分前` : clock(at);
+}
+
+function EventRow({
+  e,
+  now,
+  open,
+  onToggle,
+}: {
+  e: DogEvent;
+  now: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const zones = useStore((s) => s.plan?.zones);
   const Icon = KIND_ICON[e.kind];
   const d = e.detection;
   const zone = d && (zones?.find((z) => z.id === d.zoneId)?.name ?? d.zoneId);
   const recent = now - e.at < 3 * 60_000;
 
-  const body = (
+  const row = (
     <>
-      <span className={cn("mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg", LEVEL_TONE[e.level])}>
+      <span
+        className={cn("grid size-7 shrink-0 place-items-center rounded-lg", LEVEL_TONE[e.level])}
+      >
         <Icon className="size-3.5" />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13px] leading-snug">{e.text}</span>
-        <span className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[11px] tabular-nums">
-          {clock(e.at)}
-          <span aria-hidden>·</span>
-          {formatRelative(e.at, now)}
-          {e.level !== "info" && (
-            <span className={cn("rounded px-1 font-semibold", LEVEL_TONE[e.level])}>{e.level === "critical" ? "緊急" : "警示"}</span>
-          )}
-        </span>
+      <span
+        className={cn(
+          "min-w-0 flex-1 text-[13px] leading-snug",
+          e.level === "critical" && "font-medium"
+        )}
+      >
+        {e.text}
       </span>
-      {d && <ChevronDown className={cn("text-muted-foreground mt-1 size-4 shrink-0 transition-transform", open && "rotate-180")} />}
+      <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+        {when(e.at, now)}
+      </span>
+      {d && (
+        <ChevronDown
+          className={cn(
+            "text-muted-foreground size-4 shrink-0 transition-transform duration-200",
+            open && "rotate-180"
+          )}
+        />
+      )}
     </>
   );
 
-  if (!d) return <div className="bg-card flex items-start gap-2.5 rounded-xl border px-2.5 py-2">{body}</div>;
+  if (!d) return <div className="flex min-h-11 items-center gap-2.5 px-3 py-2">{row}</div>;
 
   return (
-    <div className="bg-card rounded-xl border">
-      <button onClick={onToggle} aria-expanded={open} className="flex w-full cursor-pointer items-start gap-2.5 px-2.5 py-2 text-left">
-        {body}
+    <>
+      <button
+        onClick={onToggle}
+        aria-expanded={open}
+        className="hover:bg-accent/50 flex min-h-11 w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left transition-colors"
+      >
+        {row}
       </button>
-      {open && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t px-3 py-2 text-[12px]">
-          <dt className="text-muted-foreground">類型</dt>
-          <dd>{EVENT_TYPES[d.type].label}</dd>
-          <dt className="text-muted-foreground">區域</dt>
-          <dd>{zone}</dd>
-          <dt className="text-muted-foreground">信心</dt>
-          <dd className="tabular-nums">{Math.round(d.confidence * 100)}%</dd>
-          <dt className="text-muted-foreground">位置</dt>
-          <dd className="tabular-nums">
-            ({d.x.toFixed(1)}, {d.y.toFixed(1)}) m{recent && <span className="text-primary-accent"> · 地圖上有標記</span>}
-          </dd>
-          <dt className="text-muted-foreground">追蹤</dt>
-          <dd className="font-mono text-[11px]">{d.trackId}</dd>
-        </dl>
-      )}
-    </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <m.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+            className="overflow-hidden"
+          >
+            <p className="text-muted-foreground pr-3 pb-2.5 pl-[50px] text-[12px]">
+              {EVENT_TYPES[d.type].label} · {zone} · 信心 {Math.round(d.confidence * 100)}%
+              {recent && <span className="text-primary-accent"> · 地圖上有標記</span>}
+            </p>
+          </m.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+function Chip({
+  on,
+  onClick,
+  children,
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
       aria-pressed={on}
       className={cn(
-        "flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium transition-colors",
-        on ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-accent"
+        "flex h-7 shrink-0 cursor-pointer items-center rounded-full border px-2.5 text-[11px] font-medium transition-colors",
+        on
+          ? "bg-primary/12 text-primary-accent border-primary/40 dark:bg-primary/20"
+          : "text-muted-foreground hover:text-foreground hover:bg-accent"
       )}
     >
       {children}
@@ -215,7 +314,9 @@ export function EventsSummary() {
   if (!last) return <span>還沒有新事件</span>;
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      {unread > 0 && <span className="text-severity-warning shrink-0 font-semibold">{unread} 則新警示 ·</span>}
+      {unread > 0 && (
+        <span className="text-severity-warning shrink-0 font-semibold">{unread} 則新警示 ·</span>
+      )}
       <span className="truncate">
         {clock(last.at)} {last.text}
       </span>

@@ -73,7 +73,15 @@ export function EStopBar({ compact = false }: { compact?: boolean }) {
   };
 
   const label =
-    phase === "sending" ? "送出中…" : phase === "unconfirmed" ? "未確認 · 再按一次" : phase === "ble_ack" ? "已經由藍牙送達" : "E-STOP";
+    phase === "sending"
+      ? "送出中…"
+      : phase === "unconfirmed"
+        ? compact
+          ? "再按一次" // the key pulses and rings: that says 未確認
+          : "未確認 · 再按一次"
+        : phase === "ble_ack"
+          ? "已經由藍牙送達"
+          : "E-STOP";
 
   return (
     <button
@@ -83,7 +91,7 @@ export function EStopBar({ compact = false }: { compact?: boolean }) {
       aria-live="assertive"
       className={cn(
         "relative z-[60] flex shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl text-white select-none",
-        compact ? "h-11 min-w-[136px] gap-2 px-4 whitespace-nowrap" : "h-12 w-full gap-2.5",
+        compact ? "h-11 w-full gap-2 px-3 whitespace-nowrap" : "h-12 w-full gap-2.5",
         phase === "idle"
           ? cn("font-black tracking-[0.18em] uppercase", compact ? "text-[14px]" : "text-[16px]")
           : cn("font-bold tracking-normal", compact ? "text-[13px]" : "text-[15px]"),
@@ -139,7 +147,7 @@ function Stopped({ by, at, canRelease, compact }: { by?: string; at?: number; ca
       aria-label={canRelease ? "長按 2 秒解除緊急停止" : "已緊急停止，需由擁有者解除"}
       className={cn(
         "bg-estop-pressed ring-estop/60 relative z-[60] flex shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl text-white ring-2 select-none disabled:cursor-default",
-        compact ? "h-11 min-w-[136px] px-4 whitespace-nowrap" : "h-12 w-full"
+        compact ? "h-11 w-full px-3 whitespace-nowrap" : "h-12 w-full"
       )}
     >
       {holding && (
@@ -149,13 +157,13 @@ function Stopped({ by, at, canRelease, compact }: { by?: string; at?: number; ca
           style={{ animation: `hold-fill ${HOLD_MS}ms linear forwards` }}
         />
       )}
-      <span className="relative flex flex-col items-center leading-tight">
+      <span className="relative flex max-w-full min-w-0 flex-col items-center leading-tight">
         <span className={cn("flex items-center gap-1.5 font-bold", compact ? "text-[13px]" : "text-[15px]")}>
           <OctagonX className="size-4" />
           {/* Compact: who stopped it is on the status island. */}
           {compact ? "已緊急停止" : "已緊急停止 · 由擁有者解除"}
         </span>
-        <span className="text-[11px] text-white/75">
+        <span className="max-w-full truncate text-[11px] text-white/75">
           {canRelease ? (
             <span className="inline-flex items-center gap-1">
               <ShieldCheck className="size-3" />

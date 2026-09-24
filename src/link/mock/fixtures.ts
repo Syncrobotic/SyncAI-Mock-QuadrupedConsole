@@ -266,6 +266,7 @@ export function seedDevice(now: number, missionLicense: boolean): DeviceInfo {
       { name: "perceptiond", state: "up" },
     ],
     cpu: 34,
+    memPct: 58,
     tempC: 51,
     storagePct: 41,
     network: { ssid: "SyncAI-Office", ip: "192.168.50.23", signal: -61 },

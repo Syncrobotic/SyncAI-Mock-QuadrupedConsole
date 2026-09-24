@@ -422,6 +422,8 @@ export interface DeviceInfo {
   bootAt: number;
   services: { name: string; state: GatewayHealthState }[];
   cpu: number;
+  /** Memory in use, % of total. */
+  memPct: number;
   tempC: number;
   storagePct: number;
   network: { ssid: string | null; ip: string | null; signal: number };

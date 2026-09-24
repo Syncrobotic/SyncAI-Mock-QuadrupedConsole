@@ -32,49 +32,49 @@ async function startCall() {
 }
 
 /**
- * The call, inside the teleop tab. It lives on the map panel, not in the sheet — the sheet
- * is the sticks' and must never scroll them away:
+ * The 影像 tool of the map's tool row (MapToolbar; the landscape top row). No call: starts
+ * one. In a call: a red dot, and a tap brings the video to the main view.
+ */
+export function CallButton({ className, disabled = false }: { className: string; disabled?: boolean }) {
+  const active = useStore((s) => s.call.active);
+  const access = useAccess("talk");
+  const [starting, setStarting] = useState(false);
+  return (
+    <button
+      disabled={disabled}
+      onClick={async () => {
+        if (active) return set((s) => ({ tab: "teleop", call: { ...s.call, videoMain: true } }));
+        if (access.locked) return void toast(access.reason);
+        setStarting(true);
+        try {
+          await startCall();
+        } finally {
+          setStarting(false);
+        }
+      }}
+      aria-label={active ? "影像通話中：放大影像" : access.locked ? `影像通話：${access.reason}` : "開啟影像通話"}
+      className={cn(className, "relative disabled:pointer-events-none disabled:opacity-40", access.locked && !active && "text-muted-foreground")}
+    >
+      {starting ? <Loader2 className="animate-spin" /> : access.locked && !active ? <Lock /> : <VideoIcon />}
+      {active && <span aria-hidden className="bg-status-error ring-surface absolute top-1.5 right-1.5 size-2 rounded-full ring-2" />}
+    </button>
+  );
+}
+
+/**
+ * The call, inside the teleop tab. It lives on the map panel, not in the sheet:
  *
- *   no call      → a 「影像」 chip bottom-left (where the video will appear)
+ *   no call      → nothing here: the 影像 tool starts one (CallButton)
  *   map main     → the video as a draggable picture-in-picture; tap it to swap
  *   video main   → the video fills the panel, the map shrinks to a window (tap to swap back)
- *                  and the call controls float along the bottom
+ *                  and the call controls float along the bottom, above the tool row
  *
  * On any other tab a running call stays as picture-in-picture with its audio (§9).
  */
 export function CallLayer({ landscape = false }: { landscape?: boolean }) {
-  const tab = useStore((s) => s.tab);
   const active = useStore((s) => s.call.active);
   const videoMain = useStore((s) => s.call.videoMain && s.tab === "teleop");
-  const access = useAccess("talk");
-  const [starting, setStarting] = useState(false);
-
-  if (!active) {
-    if (tab !== "teleop") return null;
-    return (
-      <button
-        onClick={async () => {
-          if (access.locked) return void toast(access.reason);
-          setStarting(true);
-          try {
-            await startCall();
-          } finally {
-            setStarting(false);
-          }
-        }}
-        aria-label={access.locked ? `影像通話：${access.reason}` : "開啟影像通話"}
-        className={cn(
-          "bg-surface/95 hover:bg-accent absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium shadow-lg backdrop-blur transition-colors",
-          landscape ? "top-[104px] left-3" : "bottom-2 left-2",
-          access.locked && "text-muted-foreground"
-        )}
-      >
-        {starting ? <Loader2 className="size-3.5 animate-spin" /> : access.locked ? <Lock className="size-3.5" /> : <VideoIcon className="size-3.5" />}
-        影像
-      </button>
-    );
-  }
-
+  if (!active) return null;
   if (!videoMain) return <CallPip landscape={landscape} />;
   return <VideoMain landscape={landscape} />;
 }
