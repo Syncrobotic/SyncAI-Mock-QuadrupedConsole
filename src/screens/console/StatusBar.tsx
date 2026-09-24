@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, m } from "framer-motion";
+import { AnimatePresence, animate, m, useMotionValue } from "framer-motion";
 import {
   BatteryCharging,
   BatteryLow,
@@ -37,12 +37,11 @@ import { AlertRow, useAlerts, type Alert } from "./Banners";
  * The status island: the one card at the top of the map. It is the dog's identity and live
  * readings — and the Console's notification surface: there is no banner strip and no toast.
  *
- * A notification (lib/notify) opens the island up into it, like the Dynamic Island: the
- * whole message, its detail and its action. It closes back into the status after a few
- * seconds, or when the guard swipes it up. A standing alert that needs the guard (BLE only,
- * unreachable, unstable) opens it the same way when it starts, and stays open until swiped
- * or resolved; after that its one line is the status' second line, and its action is in
- * the details.
+ * A notification (lib/notify) takes the island's row for a few seconds — icon, message,
+ * detail, action — in the same size and style as the status, and gives it back on a timer
+ * or when swiped up. A standing alert that needs the guard (BLE only, unreachable, unstable)
+ * is announced the same way when it starts and stays until swiped or resolved; after that
+ * its one line is the status' second line, and its action is in the details.
  *
  * Colour rule from the dashboard's command strip: a reading is neutral until it is bad.
  */
@@ -55,13 +54,6 @@ const TONE_TEXT: Record<Tone, string> = {
   info: "text-foreground font-medium",
   warn: "text-severity-warning font-medium",
   bad: "text-status-error font-semibold",
-};
-const TONE_BORDER: Record<Tone, string> = {
-  plain: "",
-  ok: "border-status-ok/40",
-  info: "border-primary/40",
-  warn: "border-severity-warning/50",
-  bad: "border-status-error/50",
 };
 const TONE_PLATE: Record<FlashTone, string> = {
   ok: "bg-status-ok/15 text-status-ok",
@@ -81,6 +73,30 @@ const alertTone = (a: Alert): FlashTone => (a.tone === "info" ? "info" : a.tone)
 /** Opening the details collapses the sheet so they have room (an SE's map is ~150px); closing puts it back. */
 let snapBeforeDetails: SheetSnap | null = null;
 
+function openDetails(landscape: boolean) {
+  const s = get();
+  if (s.statusOpen) return;
+  snapBeforeDetails = !landscape && s.snap !== 0 ? s.snap : null;
+  set({ statusOpen: true, ...(snapBeforeDetails !== null && { snap: 0 as SheetSnap }) });
+}
+
+function closeDetails() {
+  if (!get().statusOpen) return;
+  set({ statusOpen: false, ...(snapBeforeDetails !== null && { snap: snapBeforeDetails }) });
+  snapBeforeDetails = null;
+}
+
+const SPRING = { type: "spring", bounce: 0.15, duration: 0.42 } as const;
+
+/**
+ * One shape, three faces — like the Dynamic Island:
+ *   status  — the resting pill: name, mode, battery, signal;
+ *   notice  — a notification in the status row's place, same size; swipe it up to put it away;
+ *   details — tapping the status opens it into the details, with a bar at the bottom:
+ *             pull the bar up (the island shrinks with the finger) or tap it to close.
+ * A notification that arrives while the details are open appears at their top; the bar
+ * still closes the island.
+ */
 export function DogHeader({ landscape = false }: { landscape?: boolean }) {
   useFlashHost();
   const open = useStore((s) => s.statusOpen);
@@ -109,46 +125,92 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loudIds]);
 
-  const toggle = () => {
-    const s = get();
-    if (!s.statusOpen) {
-      snapBeforeDetails = !landscape && s.snap !== 0 ? s.snap : null;
-      set({ statusOpen: true, ...(snapBeforeDetails !== null && { snap: 0 as SheetSnap }) });
-    } else {
-      set({ statusOpen: false, ...(snapBeforeDetails !== null && { snap: snapBeforeDetails }) });
-      snapBeforeDetails = null;
-    }
-  };
-
   // A standing alert's words can change while it is open (the RTT in 連線不穩): read them live.
   const live = flash?.alertId ? alerts.find((a) => a.id === flash.alertId) : undefined;
   const shown = flash && live ? { ...flash, text: live.text, sub: live.sub } : flash;
 
-  // The card's height is the height of what it shows now — not of the one fading out.
-  const face = shown ? `n${shown.id}` : "status";
+  // How tall the open island may grow: down to the bottom of the map (the panel marked
+  // data-island-bounds) but not over the E-Stop's row at its bottom — and in landscape, not
+  // over the posture keys.
+  const root = useRef<HTMLDivElement>(null);
+  const [cap, setCap] = useState(480);
+  useLayoutEffect(() => {
+    const el = root.current;
+    const bounds = el?.closest("[data-island-bounds]");
+    if (!el || !bounds) return;
+    const measure = () =>
+      setCap(
+        Math.max(
+          160,
+          Math.round(bounds.getBoundingClientRect().bottom - el.getBoundingClientRect().top - (landscape ? 76 : 60))
+        )
+      );
+    const ro = new ResizeObserver(measure);
+    ro.observe(bounds);
+    measure();
+    return () => ro.disconnect();
+  }, [landscape]);
+
+  // The island's height is the height of the face it shows now — not of the one fading out.
+  // Measured and sprung (a layout transform would scale the content), and a motion value so
+  // the details' bar can pull it shorter under the finger.
+  const face = open ? "details" : shown ? `n${shown.id}` : "status";
   const current = useRef<HTMLDivElement>(null);
-  const [contentH, setContentH] = useState<number | null>(null);
+  const target = useRef(0);
+  // True while the details' bar is held (see onPull).
+  const pulling = useRef(false);
+  const h = useMotionValue(0);
+  const [measured, setMeasured] = useState(false);
   useLayoutEffect(() => {
     const el = current.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setContentH(el.offsetHeight));
+    const ro = new ResizeObserver(() => {
+      // While the bar is held the finger sets the height, not the content.
+      if (pulling.current) return;
+      const v = el.offsetHeight;
+      const first = target.current === 0;
+      target.current = v;
+      if (first) {
+        h.set(v);
+        setMeasured(true);
+      } else animate(h, v, SPRING);
+    });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [face]);
+  }, [face, h]);
+
+  // Pulling the bar: the island's height follows the finger, and the details inside are held
+  // to that height (their list shrinks and scrolls) so the bar stays on the island's edge.
+  const pulled = useRef(false);
+  const [held, setHeld] = useState(false);
+  const onPull = (dy: number) => {
+    if (Math.abs(dy) > 4) pulled.current = true;
+    if (!pulling.current) {
+      pulling.current = true;
+      setHeld(true);
+    }
+    // Never shorter than what stays put: the status row, a notification if any, the bar.
+    const floor = 44 + (shown ? 45 : 0) + 24 + 2;
+    h.set(Math.max(floor, target.current + Math.min(0, dy)));
+  };
+  const onRelease = (dy: number, vy: number) => {
+    const done = () => {
+      pulling.current = false;
+      setHeld(false);
+    };
+    if (dy < -40 || vy < -300) {
+      done();
+      closeDetails();
+    } else void animate(h, target.current, SPRING).then(done);
+  };
 
   return (
-    <div className="pointer-events-auto flex min-h-0 flex-col">
-      {/* The card's height follows what it shows (measured, not a layout transform: that
-          scales the card and leaves the content stuck to one edge). Old and new share one
-          grid cell pinned to the top: the old fades out while the card resizes around the new. */}
+    <div ref={root} className="pointer-events-auto flex min-h-0 flex-col">
       <m.div
-        initial={false}
-        animate={{ height: contentH ?? "auto" }}
-        transition={{ type: "spring", bounce: 0.15, duration: 0.38 }}
-        className={cn(
-          "bg-surface/90 relative overflow-hidden rounded-xl border shadow-sm backdrop-blur transition-[border-color,box-shadow] duration-300",
-          shown && cn("shadow-lg", TONE_BORDER[shown.tone])
-        )}
+        style={measured ? { height: h } : undefined}
+        // One look in every face: a notification changes what the island says, never its
+        // colour, border, shadow or height. Only opening the details makes it bigger.
+        className="bg-surface/95 relative overflow-hidden rounded-xl border shadow-sm backdrop-blur"
       >
         <div className="grid items-start">
           <AnimatePresence initial={false}>
@@ -161,10 +223,40 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
               transition={{ duration: 0.15 }}
               className="col-start-1 row-start-1"
             >
-              {shown ? (
-                <Notice flash={shown} />
+              {open ? (
+                <m.div
+                  className="flex flex-col"
+                  style={{ maxHeight: cap, height: held ? h : undefined }}
+                >
+                  {shown && (
+                    <div className="shrink-0 border-b">
+                      <Notice flash={shown} landscape={landscape} />
+                    </div>
+                  )}
+                  <StatusRow landscape={landscape} open onToggle={closeDetails} alerts={alerts} />
+                  <Details />
+                  <m.button
+                    aria-label="收起狀態"
+                    onPan={(_, i) => onPull(i.offset.y)}
+                    onPanEnd={(_, i) => onRelease(i.offset.y, i.velocity.y)}
+                    onClick={() => {
+                      if (pulled.current) pulled.current = false;
+                      else closeDetails();
+                    }}
+                    className="group flex h-6 w-full shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+                  >
+                    <span className="bg-muted-foreground/40 group-hover:bg-muted-foreground/70 h-1.5 w-10 rounded-full transition-colors" />
+                  </m.button>
+                </m.div>
+              ) : shown ? (
+                <Notice flash={shown} landscape={landscape} />
               ) : (
-                <StatusRow landscape={landscape} open={open} onToggle={toggle} alerts={alerts} />
+                <StatusRow
+                  landscape={landscape}
+                  open={false}
+                  onToggle={() => openDetails(landscape)}
+                  alerts={alerts}
+                />
               )}
             </m.div>
           </AnimatePresence>
@@ -174,61 +266,64 @@ export function DogHeader({ landscape = false }: { landscape?: boolean }) {
       <span className="sr-only" aria-live="polite">
         {shown?.text}
       </span>
-
-      <AnimatePresence>{open && <Details />}</AnimatePresence>
     </div>
   );
 }
 
-/** The island opened up into a notification. Swipe up (or 關閉) to put it away. */
-function Notice({ flash }: { flash: Flash }) {
+/**
+ * A notification in the island: the status row's exact shape — plate, two lines, one action
+ * — so the island does not change height or style when one arrives. Swipe it up to put it away.
+ */
+function Notice({ flash, landscape }: { flash: Flash; landscape: boolean }) {
   const Icon = FLASH_ICON[flash.tone];
+  // A tap opens the event log, where the notification's event is (portrait: the event tab
+  // does not exist in landscape).
+  const openEvents = () => {
+    if (landscape) return;
+    dismissFlash();
+    closeDetails();
+    set((s) => ({ tab: "events", snap: s.snap === 0 ? 1 : s.snap }));
+  };
   return (
     <m.div
       drag="y"
       dragConstraints={{ top: 0, bottom: 0 }}
       dragElastic={{ top: 0.7, bottom: 0.08 }}
       onDragEnd={(_, i) => {
-        if (i.offset.y < -24 || i.velocity.y < -300) dismissFlash();
+        if (i.offset.y < -16 || i.velocity.y < -300) dismissFlash();
       }}
-      className="cursor-grab touch-none active:cursor-grabbing"
+      onTap={openEvents}
+      className="flex h-11 cursor-grab touch-none items-center gap-2 pr-1.5 pl-2 active:cursor-grabbing"
     >
-      <div className="flex items-start gap-2.5 px-3 pt-2.5 pb-1.5">
-        <span
-          className={cn(
-            "grid size-8 shrink-0 place-items-center rounded-lg [&_svg]:size-4",
-            TONE_PLATE[flash.tone]
-          )}
-        >
-          {flash.icon ?? <Icon />}
-        </span>
-        <div className="min-w-0 flex-1 py-0.5">
-          <p className="text-[14px] leading-snug font-semibold">{flash.text}</p>
-          {flash.sub && (
-            <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[12px] leading-snug">
-              {flash.sub}
-            </p>
-          )}
-        </div>
-        {flash.action && (
-          <button
-            onClick={flash.action.run}
-            onPointerDownCapture={(e) => e.stopPropagation()}
-            className="bg-secondary hover:bg-accent relative mt-0.5 flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-2.5 text-[12px] font-semibold after:absolute after:-inset-x-1 after:-inset-y-2 after:content-['']"
-          >
-            {flash.action.icon}
-            {flash.action.label}
-          </button>
+      <span
+        className={cn(
+          "grid size-7 shrink-0 place-items-center rounded-lg [&_svg]:size-3.5",
+          TONE_PLATE[flash.tone]
         )}
-      </div>
-      {/* The grabber says "swipe me"; for keyboards and screen readers it is a button. */}
-      <button
-        onClick={dismissFlash}
-        onPointerDownCapture={(e) => e.stopPropagation()}
-        aria-label="關閉通知"
-        className="group relative flex h-3.5 w-full cursor-pointer items-start justify-center after:absolute after:inset-x-1/3 after:-inset-y-2 after:content-['']"
       >
-        <span className="bg-muted-foreground/35 group-hover:bg-muted-foreground/60 h-1 w-9 rounded-full transition-colors" />
+        {flash.icon ?? <Icon />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] leading-tight font-semibold">{flash.text}</span>
+        {flash.sub && (
+          <span className="text-muted-foreground block truncate text-[11px] leading-4">
+            {flash.sub}
+          </span>
+        )}
+      </span>
+      {flash.action && (
+        <button
+          onClick={flash.action.run}
+          onPointerDownCapture={(e) => e.stopPropagation()}
+          className="bg-secondary hover:bg-accent relative flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-2.5 text-[12px] font-semibold after:absolute after:-inset-x-1 after:-inset-y-2 after:content-['']"
+        >
+          {flash.action.icon}
+          {flash.action.label}
+        </button>
+      )}
+      {/* Swiping is the gesture; keyboards and screen readers get a button. */}
+      <button onClick={dismissFlash} className="sr-only focus:not-sr-only">
+        關閉通知
       </button>
     </m.div>
   );
@@ -303,7 +398,7 @@ function StatusRow({
       onClick={onToggle}
       aria-expanded={open}
       aria-label="狗的狀態與連線"
-      className="hover:bg-surface/60 focus-visible:ring-primary/40 flex w-full min-w-0 cursor-pointer items-center gap-2 py-1.5 pr-2.5 pl-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      className="hover:bg-surface/60 focus-visible:ring-primary/40 flex h-11 w-full min-w-0 cursor-pointer items-center gap-2 pr-2.5 pl-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
       <IconPlate icon={Dog} size="sm" />
       <span className="min-w-0 flex-1">
@@ -392,13 +487,7 @@ function Details() {
     conn === "Online" || conn === "Degraded" ? "WS · TLS pinned" : conn === "BleOnly" ? "BLE" : "—";
 
   return (
-    <m.div
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.15 }}
-      className="bg-popover/95 mt-1.5 min-h-0 space-y-3 overflow-y-auto overscroll-contain rounded-xl border p-3 shadow-xl backdrop-blur"
-    >
+    <div className="min-h-0 flex-1 scrollbar-none space-y-3 overflow-y-auto overscroll-contain border-t px-3 pt-3 pb-1">
       <Dogs />
       {alerts.length > 0 && (
         <div className="space-y-1.5 border-t pt-3">
@@ -417,7 +506,7 @@ function Details() {
         <Item k="電量預估" v={t ? `約 ${t.batteryMinutes} 分鐘` : "—"} />
         <Item k="最近錯誤" v={lastError ?? "—"} />
       </dl>
-    </m.div>
+    </div>
   );
 }
 

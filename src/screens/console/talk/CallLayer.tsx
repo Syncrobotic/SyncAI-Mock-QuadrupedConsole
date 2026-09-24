@@ -108,7 +108,13 @@ function VideoMain({ landscape }: { landscape: boolean }) {
       </div>
 
       {/* Stream facts sit just above the controls — the top belongs to the status header. */}
-      <div className={cn("pointer-events-none absolute z-10 flex gap-1", landscape ? "bottom-[118px] left-1/2 -translate-x-1/2" : "bottom-[60px] left-2")}>
+      {/* On the side away from the map's window, so the two never overlap. */}
+      <div
+        className={cn(
+          "pointer-events-none absolute z-10 flex gap-1",
+          landscape ? "bottom-[118px] left-1/2 -translate-x-1/2" : call.corner === "br" ? "bottom-[112px] left-2" : "right-2 bottom-[112px]"
+        )}
+      >
         {session && <span className="rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white">{session.resolution}</span>}
         {session && (
           <span className={cn("rounded px-1.5 py-0.5 font-mono text-[11px]", latency > 800 ? "bg-red-600 text-white" : "bg-black/60 text-white")}>
@@ -121,7 +127,7 @@ function VideoMain({ landscape }: { landscape: boolean }) {
       </div>
 
       <div className={cn("absolute z-10 grid grid-cols-5 gap-1.5", // Landscape: above the posture row, between the two sticks.
-          landscape ? "bottom-[64px] left-1/2 w-[330px] -translate-x-1/2" : "inset-x-2 bottom-2")}>
+          landscape ? "bottom-[64px] left-1/2 w-[330px] -translate-x-1/2" : "inset-x-2 bottom-[60px]")}>
         <Ctl label={call.mic ? "麥克風開" : "麥克風"} active={call.mic} disabled={micDisabled || call.ptt} onClick={() => setMic(!call.mic)} icon={call.mic ? <Mic /> : <MicOff />} />
         <button
           disabled={micDisabled || call.mic}

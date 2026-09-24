@@ -3,7 +3,7 @@
 import { Gamepad2, Lock, MapPinned, ScrollText, Settings2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { ActivePlate, EStopZone, TabBoundary } from "@/components/kit";
+import { EStopZone, TabBoundary } from "@/components/kit";
 import { useLandscape } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import { MapView } from "@/map3d/MapView";
@@ -54,26 +54,49 @@ export function useAccess(tab: Area): Access {
  * the canvas is exactly the visible band — its centre is what the guard sees,
  * which is what keeps the dog in frame in follow view.
  */
+const COLLAPSED_HEADER = 64;
+/** The E-Stop's row at the bottom of the map panel: 44px key + 8px inset + 8px air. */
+const ESTOP_ROW = 60;
+
+/**
+ * Swapped (video main), the map's window takes the corner the video's window had — the small
+ * window never jumps sides. Bottom corners sit above the call controls (which sit above the E-Stop).
+ */
+const MAP_WINDOW = { tl: "top-[72px] left-2", tr: "top-[72px] right-2", bl: "bottom-[112px] left-2", br: "right-2 bottom-[112px]" } as const;
+
 export function Console() {
   const tab = useStore((s) => s.tab);
   const snap = useStore((s) => s.snap);
   const statusOpen = useStore((s) => s.statusOpen);
   const unlicensed = useStore((s) => s.device?.licenseEdition === "none");
   const videoMain = useStore((s) => s.call.active && s.call.videoMain && s.tab === "teleop");
+  const pipCorner = useStore((s) => s.call.corner);
   const landscape = useLandscape();
   const root = useRef<HTMLDivElement>(null);
   const estop = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ h: 760, pad: 16 });
   const [zone, setZone] = useState<{ top: number; bottom: number; height: number } | null>(null);
   const mapPanel = useRef<HTMLDivElement>(null);
-  const [mapPanelH, setMapPanelH] = useState(400);
+  const mapLayer = useRef<HTMLDivElement>(null);
+  // Three thresholds of the map panel's height. The panel resizes every frame while the
+  // sheet moves; React only hears about it when one of these flips.
+  const [collapsed, setCollapsed] = useState(false);
+  const [roomy, setRoomy] = useState(true);
+  const [shortMap, setShortMap] = useState(false);
 
-  // Rounded to 8px: only the collapsed threshold and the call PiP size read it,
-  // so a per-frame resize during the sheet animation re-renders at most a few times.
   useLayoutEffect(() => {
     const el = mapPanel.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setMapPanelH(Math.round(el.clientHeight / 8) * 8));
+    const ro = new ResizeObserver(() => {
+      const h = el.clientHeight;
+      // The map fades in with the room it gets, so its corner controls never pop in
+      // squeezed against the header. Written straight to the style: no render per frame.
+      if (mapLayer.current) mapLayer.current.style.opacity = String(Math.min(1, Math.max(0, (h - COLLAPSED_HEADER - ESTOP_ROW) / 140)));
+      setCollapsed(h < COLLAPSED_HEADER + ESTOP_ROW + 40);
+      // Banners wait until there is room below the header.
+      setRoomy(h >= COLLAPSED_HEADER + 96);
+      setShortMap(h < 260);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [unlicensed, landscape]);
@@ -92,7 +115,8 @@ export function Console() {
     };
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    if (estop.current?.previousElementSibling) ro.observe(estop.current.previousElementSibling);
+    // The E-Stop rides the bottom of the map panel: it moves whenever the panel resizes.
+    if (mapPanel.current) ro.observe(mapPanel.current);
     measure();
     return () => ro.disconnect();
   }, [unlicensed, landscape]);
@@ -106,8 +130,6 @@ export function Console() {
 
   const usable = box.h - box.pad;
   const GAP = 8;
-  const ESTOP = 56;
-  const COLLAPSED_HEADER = 64;
   // Collapsed is "tab bar + one summary line", sized to that — not 20% of the
   // screen, which left 40–70px of blank sheet the map could have had.
   const COLLAPSED_SHEET = 96;
@@ -117,21 +139,19 @@ export function Console() {
   const heights: [number, number, number] = [
     COLLAPSED_SHEET,
     tab === "teleop" ? teleopOpen : Math.round(usable * SNAP_PCT[1]),
-    usable - ESTOP - COLLAPSED_HEADER - 2 * GAP,
+    // At 90% the map keeps its header and the E-Stop: the E-Stop is never collapsed away.
+    usable - COLLAPSED_HEADER - ESTOP_ROW - GAP,
   ];
   let sheetH = heights[snap];
 
-  // At 90% the map is left with exactly its header's height (heights[2]). The
-  // panel is always flex-1, so it follows the sheet frame by frame — while
-  // dragging and during the snap animation — and "collapsed" is what the
-  // panel's measured height says, not the snap: the map fades out as the
-  // sheet covers it instead of switching off at a threshold.
+  // At 90% the map is left with exactly its header's height (heights[2]). The panel is
+  // always flex-1, so it follows the sheet frame by frame — while dragging and during the
+  // snap animation — and "collapsed" is what its measured height says, not the snap.
   if (snap === 2 && tab === "teleop") sheetH = heights[1];
-  const collapsed = mapPanelH < COLLAPSED_HEADER + 40;
-  // The map fades in with the room it gets, so its corner controls never pop in
-  // squeezed against the header; banners wait until there is room below it.
-  const mapOpacity = Math.min(1, Math.max(0, (mapPanelH - COLLAPSED_HEADER) / 140));
-  const roomy = mapPanelH >= COLLAPSED_HEADER + 96;
+  // The canvas is never resized while the panel moves (a WebGL resize per frame is what
+  // made it stutter): it is drawn at the tallest the map gets and centred in the panel,
+  // which clips it. Centred, so follow view keeps the dog in the middle of what is seen.
+  const mapStage = usable - COLLAPSED_SHEET - GAP;
 
   // Safe areas: notch / Dynamic Island on top, home indicator at the bottom.
   // The background runs under the cutout and the home bar; the panels start inside the safe area.
@@ -157,23 +177,25 @@ export function Console() {
       <div ref={root} className={shell}>
         <div
           ref={mapPanel}
+          data-island-bounds
+          style={{ "--map-stage": `${mapStage}px` } as React.CSSProperties}
           className={cn(
-            "relative min-h-16 flex-1 overflow-hidden rounded-xl border transition-colors duration-300",
+            "relative min-h-[124px] flex-1 overflow-hidden rounded-xl border transition-colors duration-300",
             collapsed ? "bg-surface" : "bg-map-ground"
           )}
         >
           {/* In a call with the video as the main view, the map shrinks to a window at the right —
               smaller on a short panel so it stays clear of the status header. */}
           <div
+            ref={mapLayer}
             aria-hidden={collapsed || undefined}
             className={cn(
               "transition-opacity duration-100 motion-reduce:transition-none",
               collapsed && "pointer-events-none",
               videoMain
-                ? cn("absolute right-2 bottom-[60px] z-20 aspect-video overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15", mapPanelH < 260 ? "w-24" : "w-36")
+                ? cn("absolute z-20 aspect-video overflow-hidden rounded-xl border shadow-2xl ring-1 ring-white/15", MAP_WINDOW[pipCorner], shortMap ? "w-24" : "w-32")
                 : "absolute inset-0"
             )}
-            style={videoMain ? undefined : { opacity: mapOpacity }}
           >
             <MapView bare={videoMain} />
             {videoMain && (
@@ -193,9 +215,11 @@ export function Console() {
           </div>
           {!collapsed && (videoMain || !statusOpen) && <CallLayer />}
           {!collapsed && <FaultOverlay />}
-        </div>
-        <div ref={estop}>
-          <EStopBar />
+          {/* §5 E-Stop, inside the map: bottom centre, always there — the collapsed map keeps
+              it too. z-[60] lifts it over any dialog's backdrop; dialogs sit clear of it. */}
+          <div ref={estop} className="absolute bottom-2 left-1/2 z-[60] -translate-x-1/2">
+            <EStopBar compact />
+          </div>
         </div>
         <Sheet height={sheetH} heights={heights} />
         <Overlays />
@@ -272,7 +296,10 @@ function TabBar() {
   );
 }
 
-/** The dashboard rail's selected row, turned sideways: violet plate, white label. */
+/**
+ * Selected = a light tint and the accent colour. It used to be the dashboard rail's solid
+ * violet plate with a white label — the heaviest thing on the screen after the E-Stop.
+ */
 function TabButton({ id, label, icon: Icon, active }: { id: Tab; label: string; icon: typeof Gamepad2; active: boolean }) {
   const access = useAccess(id);
   const unread = useUnreadEvents();
@@ -285,10 +312,9 @@ function TabButton({ id, label, icon: Icon, active }: { id: Tab; label: string; 
       onClick={() => set((s) => ({ tab: id, snap: s.snap === 0 ? 1 : s.snap }))}
       className={cn(
         "group relative flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-[12px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none",
-        active ? "font-semibold text-white" : "text-muted-foreground hover:text-foreground hover:bg-violet-500/8"
+        active ? "bg-primary/12 text-primary-accent dark:bg-primary/20 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-violet-500/8"
       )}
     >
-      {active && <ActivePlate className="rounded-lg" />}
       <span className="relative flex items-center gap-1.5">
         {access.locked ? <Lock className="size-3.5 opacity-70" /> : <Icon className="size-3.5" />}
         {label}

@@ -100,6 +100,8 @@ export interface State {
     facing: "user" | "environment";
     /** In the teleop tab: the video fills the map panel and the map shrinks to a window. */
     videoMain: boolean;
+    /** Where the small window sits — the video's or, swapped, the map's: the same corner. */
+    corner: "tl" | "tr" | "bl" | "br";
   };
   /** When the event tab was last open — newer warnings put a dot on it. */
   eventsSeenAt: number;
@@ -162,7 +164,7 @@ export const useStore = create<State>(() => ({
   view: "free",
   layers: { plan: true, cloud: false, grid: false, trail: true, fence: true },
   measure: null,
-  call: { active: false, mic: false, ptt: false, speaker: true, thermal: false, thermalOpacity: 60, facing: "user", videoMain: false },
+  call: { active: false, mic: false, ptt: false, speaker: true, thermal: false, thermalOpacity: 60, facing: "user", videoMain: false, corner: "bl" },
   eventsSeenAt: Date.now(),
   userSpeedCap: 0.8,
   snapshotViewer: null,

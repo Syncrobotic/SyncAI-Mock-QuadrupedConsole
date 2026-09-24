@@ -38,7 +38,7 @@ export function FaultOverlay() {
   // map; the device tab at 90% sits over it when the guard needs it.
   if (!fault || (tab === "device" && snap === 2)) return null;
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-center overflow-y-auto bg-red-950/95 px-6 text-red-50">
+    <div className="absolute inset-0 z-30 flex flex-col justify-center overflow-y-auto bg-red-950/95 px-6 pb-14 text-red-50">
       <OctagonAlert className="mb-3 size-10 text-red-300" />
       <p className="font-mono text-sm text-red-300">FAULT {fault.code}</p>
       <h2 className="mt-1 text-2xl font-bold">{fault.message}</h2>

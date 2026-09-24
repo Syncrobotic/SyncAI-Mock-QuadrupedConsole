@@ -25,6 +25,7 @@ import { TeleopTab } from "./teleop/TeleopTab";
 export function LandscapeConsole() {
   const tab = useStore((s) => s.tab);
   const videoMain = useStore((s) => s.call.active && s.call.videoMain);
+  const statusOpen = useStore((s) => s.statusOpen);
   const supported = tab === "teleop";
 
   return (
@@ -47,7 +48,7 @@ export function LandscapeConsole() {
         )}
 
         {/* Click-through: each control opts back in (pointer-events is inherited). */}
-        <div className="pointer-events-none absolute top-[var(--safe-top)] right-[var(--safe-right)] bottom-[var(--safe-bottom)] left-[var(--safe-left)]">
+        <div data-island-bounds className="pointer-events-none absolute top-[var(--safe-top)] right-[var(--safe-right)] bottom-[var(--safe-bottom)] left-[var(--safe-left)]">
           {supported && (
             <div className="pointer-events-auto contents">
               <CallLayer landscape />
@@ -58,10 +59,10 @@ export function LandscapeConsole() {
           <div className="pointer-events-none absolute inset-x-2 top-2 z-30 flex items-start gap-2">
             <div className="flex w-[300px] shrink-0 flex-col gap-1.5">
               <DogHeader landscape />
-              <MapChips />
+              {!statusOpen && <MapChips />}
             </div>
-            <div className="pointer-events-auto mx-auto w-[240px] shrink-0">
-              <EStopBar />
+            <div className="pointer-events-auto mx-auto shrink-0">
+              <EStopBar compact />
             </div>
           </div>
         </div>

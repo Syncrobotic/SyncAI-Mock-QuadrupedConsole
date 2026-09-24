@@ -135,53 +135,6 @@ export function PanelHeader({ icon, title, subtitle, action }: { icon: LucideIco
   );
 }
 
-// ── Active plate (dashboard nav `ActivePlate`) ─────────────────────────────
-
-export function ActivePlate({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "absolute inset-0 rounded-xl bg-linear-to-r from-violet-600 to-violet-500 shadow-lg ring-1 shadow-violet-600/15 ring-white/15",
-        className
-      )}
-    />
-  );
-}
-
-// ── Readouts (dashboard command strip, pocket size) ─────────────────────────
-
-const READOUT_TONE = { neutral: "text-white", warn: "text-amber-300", bad: "text-red-400" } as const;
-
-/**
- * The dark plate with numbers on it. Same rule as the dashboard's command
- * strip: a reading is white until it is bad — colour is the signal, so it is
- * not spent on "fine".
- */
-export function Readouts({ items }: { items: { label: string; value: ReactNode; unit?: string; tone?: keyof typeof READOUT_TONE }[] }) {
-  return (
-    <div className="bg-plate relative overflow-hidden rounded-xl border border-white/8 text-white">
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-violet-500/60 to-transparent" />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 60% 120% at 10% -30%, rgba(124,111,208,0.20), transparent 62%)" }}
-      />
-      <div className="relative grid auto-cols-fr grid-flow-col divide-x divide-white/6">
-        {items.map((it) => (
-          <div key={it.label} className="px-2.5 py-1.5">
-            <p className="text-[11px] tracking-wide text-white/45 uppercase">{it.label}</p>
-            <p className={cn("mt-0.5 text-[17px] leading-none font-bold tabular-nums", READOUT_TONE[it.tone ?? "neutral"])}>
-              {it.value}
-              {it.unit && <span className="ml-0.5 text-[11px] font-medium text-white/45">{it.unit}</span>}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── Locked state (§5 鎖定態) ─────────────────────────────────────────────────
 
 export function LockedPanel({ reason, detail, children }: { reason: string; detail?: string; children?: ReactNode }) {

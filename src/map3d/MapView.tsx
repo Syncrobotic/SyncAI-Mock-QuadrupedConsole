@@ -37,7 +37,12 @@ export function MapView({ bare = false }: { bare?: boolean }) {
   return (
     <div ref={box} className="absolute inset-0">
       {/* §13: BleOnly / Unreachable show the last cache, greyed. */}
-      <div className={cn("absolute inset-0 transition-[filter,opacity] duration-300", stale && "opacity-60 grayscale")}>
+      {/* Portrait sets --map-stage on the panel: the canvas keeps that height, centred, while
+          the panel around it grows and shrinks — clipped, never resized mid-animation. */}
+      <div
+        className={cn("absolute inset-x-0 top-1/2 -translate-y-1/2 transition-[filter,opacity] duration-300", stale && "opacity-60 grayscale")}
+        style={{ height: bare ? "100%" : "max(100%, var(--map-stage, 100%))" }}
+      >
         <Canvas
           camera={{ position: [-22, 16, 12], fov: 50, near: 0.1, far: 300 }}
           dpr={[1, 2]}
@@ -83,7 +88,8 @@ function ViewButtons({ view, horizontal }: { view: MapViewMode; horizontal: bool
     );
 
   return (
-    <div ref={root} className="absolute right-2 bottom-2">
+    // A short map lays the buttons in a row; the row sits above the E-Stop (bottom centre).
+    <div ref={root} className={cn("absolute right-2", horizontal ? "bottom-[60px]" : "bottom-2")}>
       {open && (
         // Opens to the LEFT of the column, bottom-aligned, so it never reaches
         // up into the header and banners.

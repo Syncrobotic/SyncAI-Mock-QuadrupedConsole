@@ -5,8 +5,9 @@ import { get, set } from "@/store";
 
 /**
  * The Console's notifications. They do not get a strip of their own: the status island
- * (DogHeader) opens up into the notification — its whole text, detail and action — and
- * closes back into the status when it times out or the guard swipes it away. One at a
+ * (DogHeader) shows the notification — text, detail and action — in place of its status
+ * row, same size and style, and gives the row back when it times out or the guard swipes it
+ * away. One at a
  * time — a queue, with anything `bad` going straight to the front — so nothing ever covers
  * the E-Stop or a dialog's buttons.
  *

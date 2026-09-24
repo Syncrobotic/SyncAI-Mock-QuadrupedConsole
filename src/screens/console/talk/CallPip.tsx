@@ -11,6 +11,15 @@ import { Video } from "./Video";
 
 type Corner = "tl" | "tr" | "bl" | "br";
 
+/** Portrait corners of the small window. The swapped map window uses the same corner (Console). */
+export const PIP_CORNER: Record<Corner, string> = {
+  tl: "top-[72px] left-2",
+  tr: "top-[72px] right-2",
+  // Bottom corners sit above the E-Stop's row; br also clears the view buttons (right column).
+  bl: "bottom-[60px] left-2",
+  br: "right-[60px] bottom-[60px]",
+};
+
 /**
  * §9: the call's picture-in-picture over the map — video beside the joysticks
  * (the patrol mode), and what stays of a call on the other tabs, audio and all.
@@ -25,7 +34,7 @@ export function CallPip({ landscape = false }: { landscape?: boolean }) {
   const mic = useStore((s) => s.call.mic || s.call.ptt);
   const facing = useStore((s) => s.call.facing);
   const session = useMediaSession();
-  const [corner, setCorner] = useState<Corner>("bl");
+  const corner = useStore((s) => s.call.corner);
   const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
   const start = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const el = useRef<HTMLButtonElement>(null);
@@ -57,7 +66,8 @@ export function CallPip({ landscape = false }: { landscape?: boolean }) {
     if (b && parent) {
       const cx = b.left + b.width / 2 - parent.left;
       const cy = b.top + b.height / 2 - parent.top;
-      setCorner(`${cy < parent.height / 2 ? "t" : "b"}${cx < parent.width / 2 ? "l" : "r"}` as Corner);
+      const next = `${cy < parent.height / 2 ? "t" : "b"}${cx < parent.width / 2 ? "l" : "r"}` as Corner;
+      set((st) => ({ call: { ...st.call, corner: next } }));
     }
     setDrag(null);
   };
@@ -78,10 +88,7 @@ export function CallPip({ landscape = false }: { landscape?: boolean }) {
         // Landscape: the bottom corners are the joysticks and the top-right is
         // the readouts, so it lives top-left under the header, and stays there.
         landscape && "top-[104px] left-3",
-        !landscape && corner === "tl" && "top-[72px] left-2",
-        !landscape && corner === "tr" && "top-[72px] right-2",
-        !landscape && corner === "bl" && "bottom-2 left-2",
-        !landscape && corner === "br" && "right-[60px] bottom-2"
+        !landscape && PIP_CORNER[corner]
       )}
       style={drag ? { translate: `${drag.dx}px ${drag.dy}px` } : undefined}
       aria-label="放大影像（可拖曳）"
