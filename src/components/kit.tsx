@@ -290,7 +290,27 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
     <label className="block space-y-1.5">
       <span className="text-[13px] font-medium">{label}</span>
       {children}
-      {error ? <span role="alert" className="text-destructive block text-xs">{error}</span> : hint && <span className="text-muted-foreground block text-xs">{hint}</span>}
+      <AnimatePresence initial={false} mode="wait">
+        {error ? (
+          <m.span
+            key={`e:${error}`}
+            role="alert"
+            className="text-destructive block text-xs"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            {error}
+          </m.span>
+        ) : (
+          hint && (
+            <span key="hint" className="text-muted-foreground block text-xs">
+              {hint}
+            </span>
+          )
+        )}
+      </AnimatePresence>
     </label>
   );
 }

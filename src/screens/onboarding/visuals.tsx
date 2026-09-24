@@ -110,9 +110,79 @@ export function Link({ phase, progress = 0 }: { phase: LinkPhase; progress?: num
   );
 }
 
-function Node({ children, pulse, tone, progress }: { children: React.ReactNode; pulse: boolean; tone: Tone; progress?: number }) {
+// ── Network: phone — router — dog ───────────────────────────────────────────
+
+export type NetPhase = "pick" | "joining" | "online" | "failed";
+
+/**
+ * The Wi-Fi steps' picture: the topology being built. After this step the phone reaches the
+ * dog THROUGH the router, so the phone's link to the router matters as much as the dog's —
+ * a phone on a different network will not find the dog. That link is amber and dashed when
+ * the chosen network is not the phone's; `sameNet === null` (typed by hand) stays neutral.
+ */
+export function NetLink({ phase, sameNet, progress = 0 }: { phase: NetPhase; sameNet: boolean | null; progress?: number }) {
+  const online = phase === "online";
+  const phoneTone: Tone = sameNet === false ? "warn" : online ? "ok" : "brand";
+  const dogTone: Tone = phase === "failed" ? "bad" : online ? "ok" : "brand";
   return (
-    <div className="relative grid size-[clamp(52px,16vw,64px)] shrink-0 place-items-center">
+    <div className="flex w-full max-w-[360px] items-center px-5" aria-hidden>
+      <Node pulse={false} tone={phoneTone} small>
+        <Smartphone className="size-[42%]" />
+      </Node>
+      <Wire solid={sameNet === true} tone={phoneTone} dashed={sameNet !== true} />
+      <Node pulse={phase === "joining"} tone={online ? "ok" : "brand"} small>
+        <Router className="size-[44%]" />
+      </Node>
+      <Wire solid={online} tone={dogTone} moving={phase === "joining"} check={online} />
+      <Node pulse={phase === "joining"} tone={dogTone} small progress={phase === "joining" ? progress : undefined}>
+        <DogGlyph className="size-[52%]" />
+      </Node>
+    </div>
+  );
+}
+
+function Wire({ solid, tone, moving, check, dashed = true }: { solid: boolean; tone: Tone; moving?: boolean; check?: boolean; dashed?: boolean }) {
+  return (
+    <div className="relative mx-1.5 h-8 min-w-0 flex-1">
+      {dashed && (
+        <div className={cn("absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-dashed transition-colors duration-300", tone === "warn" ? "border-severity-warning/70" : tone === "bad" ? "border-status-error/60" : "border-muted-foreground/30")} />
+      )}
+      <m.div
+        className={cn("absolute inset-x-0 top-1/2 h-0.5 origin-left -translate-y-1/2 rounded-full", LINE[tone])}
+        initial={false}
+        animate={{ scaleX: solid ? 1 : 0, opacity: solid ? 1 : 0 }}
+        transition={{ duration: 0.45, ease: EASE_OUT }}
+      />
+      {moving &&
+        [0, 1, 2].map((i) => (
+          <m.span
+            key={i}
+            className="bg-primary-accent absolute top-1/2 size-1.5 -translate-y-1/2 rounded-full"
+            initial={{ left: "0%", opacity: 0 }}
+            animate={{ left: ["0%", "100%"], opacity: [0, 1, 1, 0] }}
+            transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.46, ease: "easeInOut" }}
+          />
+        ))}
+      <AnimatePresence>
+        {check && (
+          <m.span
+            key="ok"
+            className="bg-status-ok border-status-ok absolute top-1/2 left-1/2 grid size-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 text-white shadow-lg"
+            initial={{ scale: 0.3, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 420, damping: 22, delay: 0.25 }}
+          >
+            <Check className="size-3.5" strokeWidth={3} />
+          </m.span>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function Node({ children, pulse, tone, progress, small }: { children: React.ReactNode; pulse: boolean; tone: Tone; progress?: number; small?: boolean }) {
+  return (
+    <div className={cn("relative grid shrink-0 place-items-center", small ? "size-[clamp(46px,13vw,56px)]" : "size-[clamp(52px,16vw,64px)]")}>
       {pulse && (
         <m.span
           className={cn("absolute inset-0 rounded-full border-2", RING[tone])}

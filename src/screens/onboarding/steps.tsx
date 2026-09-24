@@ -2,7 +2,7 @@
 
 import { AnimatePresence, m } from "framer-motion";
 import { ArrowRight, BadgeCheck, Check, ChevronRight, CircleAlert, CircleHelp, Hand, KeyRound, Loader2, Lock, OctagonX, Plus, RotateCcw, Wifi, WifiHigh, WifiLow, WifiZero, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { isValidElement, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { BrandGlyph } from "@/components/brand-mark";
@@ -19,7 +19,7 @@ import { useStore } from "@/store";
 import { beginOnboarding, finishOnboarding } from "@/store/controller";
 
 import type { StepProps } from "./Onboarding";
-import { EASE_OUT, Link, Radar, popIn, rise } from "./visuals";
+import { EASE_OUT, Link, NetLink, Radar, popIn, rise } from "./visuals";
 
 /*
  * Every step is the same skeleton, top to bottom:
@@ -30,6 +30,27 @@ import { EASE_OUT, Link, Radar, popIn, rise } from "./visuals";
  */
 
 // ── Skeleton ────────────────────────────────────────────────────────────────
+
+/** Stacks the old and the new text in one grid cell and cross-fades them. */
+function Swap({ k, children, className, as = "p" }: { k: string; children: React.ReactNode; className?: string; as?: "h1" | "p" }) {
+  const Tag = as === "h1" ? m.h1 : m.p;
+  return (
+    <div className="grid">
+      <AnimatePresence initial={false}>
+        <Tag
+          key={k}
+          className={cn("[grid-area:1/1]", className)}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.22, ease: EASE_OUT }}
+        >
+          {children}
+        </Tag>
+      </AnimatePresence>
+    </div>
+  );
+}
 
 function Frame({
   visual,
@@ -68,8 +89,16 @@ function Frame({
         <div className="flex min-h-full flex-col justify-center py-4">
           <div className="flex h-[clamp(130px,24vh,190px)] shrink-0 items-center justify-center">{visual}</div>
           <div className="mt-3 text-center" aria-live={live ? "polite" : undefined}>
-            <h1 className="text-[20px] leading-tight font-semibold tracking-tight">{title}</h1>
-            {sub && <p className="text-muted-foreground mt-1.5 text-[13px]">{sub}</p>}
+            {/* Text that changes inside a step cross-fades in place; nothing animates on
+                entry — the step transition already did (one layer, never two). */}
+            <Swap k={title} className="text-[20px] leading-tight font-semibold tracking-tight" as="h1">
+              {title}
+            </Swap>
+            {sub && (
+              <Swap k={textOf(sub)} className="text-muted-foreground mt-1.5 text-[13px]">
+                {sub}
+              </Swap>
+            )}
           </div>
           {children && <div className="mx-auto mt-5 w-full max-w-[360px] space-y-2.5">{children}</div>}
         </div>
@@ -98,8 +127,32 @@ function ActionBar({ children, above }: { children: React.ReactNode; above?: Rea
   );
 }
 
-function Primary(props: React.ComponentProps<typeof Button>) {
-  return <Button {...props} className={cn("h-11 w-full rounded-xl text-[15px]", props.className)} />;
+/** The text of a node — keys the label swap below. */
+function textOf(n: React.ReactNode): string {
+  if (typeof n === "string" || typeof n === "number") return String(n);
+  if (Array.isArray(n)) return n.map(textOf).join("");
+  if (isValidElement(n)) return textOf((n.props as { children?: React.ReactNode }).children);
+  return "";
+}
+
+/** The step's one button. When its label changes in place (連線中… → 繼續) the label slides. */
+function Primary({ children, className, ...props }: React.ComponentProps<typeof Button>) {
+  return (
+    <Button {...props} className={cn("h-11 w-full overflow-hidden rounded-xl text-[15px]", className)}>
+      <AnimatePresence mode="popLayout" initial={false}>
+        <m.span
+          key={textOf(children)}
+          className="inline-flex items-center gap-2"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.18, ease: EASE_OUT }}
+        >
+          {children}
+        </m.span>
+      </AnimatePresence>
+    </Button>
+  );
 }
 
 /**
@@ -155,7 +208,19 @@ function ChoiceCard({
           {on && <span className="size-2 rounded-full bg-white" />}
         </span>
       </button>
-      {on && children && <div className="space-y-2 px-3 pb-3">{children}</div>}
+      <AnimatePresence initial={false}>
+        {on && children && (
+          <m.div
+            key="more"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: EASE_OUT }}
+          >
+            <div className="space-y-2 px-3 pb-3">{children}</div>
+          </m.div>
+        )}
+      </AnimatePresence>
     </m.div>
   );
 }
@@ -223,13 +288,17 @@ export function StepSplash({ go }: StepProps) {
         <m.p className="text-muted-foreground mt-2 text-[14px]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2, ease: EASE_OUT }}>
           機器狗的現場遙控器
         </m.p>
-        {(revoked || denied) && (
-          <p role="alert" className="text-status-error mt-6 flex items-center gap-1.5 text-[13px]">
-            <CircleAlert className="size-4 shrink-0" />
-            {denied ? "需要藍牙才能配對" : "這支手機已被撤銷，請重新配對"}
-          </p>
-        )}
-        {denied && <TextLink onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>開啟系統設定</TextLink>}
+        <AnimatePresence>
+          {(revoked || denied) && (
+            <m.div key={denied ? "denied" : "revoked"} className="mt-6 flex flex-col items-center" {...popIn}>
+              <p role="alert" className="text-status-error flex items-center gap-1.5 text-[13px]">
+                <CircleAlert className="size-4 shrink-0" />
+                {denied ? "需要藍牙才能配對" : "這支手機已被撤銷，請重新配對"}
+              </p>
+              {denied && <TextLink onClick={() => toast("MOCK · 真機上這裡會開啟系統設定")}>開啟系統設定</TextLink>}
+            </m.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <ActionBar>
@@ -673,11 +742,21 @@ export function LicenseEntry({
         disabled={busy}
         autoFocus
       />
-      {error && (
-        <p role="alert" className="text-status-error text-center text-[13px]">
-          {error}
-        </p>
-      )}
+      <AnimatePresence initial={false}>
+        {error && (
+          <m.p
+            key={error}
+            role="alert"
+            className="text-status-error text-center text-[13px]"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: EASE_OUT }}
+          >
+            {error}
+          </m.p>
+        )}
+      </AnimatePresence>
       <MockHint>
         <code className="font-mono">SYNC</code> 專業 · <code className="font-mono">BASE</code> 無 AI · <code className="font-mono">CTRL</code> 只操控 · 試{" "}
         <button className="cursor-pointer font-mono underline underline-offset-2" onClick={() => setKey("CTRL01AB2026DEMO")}>
@@ -717,7 +796,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
         // Preselect the phone's own network when the dog can hear it.
         if (!flow.ssid || !n.some((x) => x.ssid === flow.ssid)) {
           const mine = n.find((x) => x.phone);
-          if (mine) patch({ ssid: mine.ssid });
+          if (mine) patch({ ssid: mine.ssid, sameNet: true });
         }
       });
     return () => {
@@ -732,8 +811,9 @@ export function StepWifi({ flow, patch, go }: StepProps) {
 
   const pick = (n: WifiNetwork) => {
     setManual(false);
-    if (n.ssid !== flow.ssid) patch({ ssid: n.ssid, psk: "", wifiError: null });
+    if (n.ssid !== flow.ssid) patch({ ssid: n.ssid, psk: "", wifiError: null, sameNet: !!n.phone });
   };
+  const sameNet = manual ? null : sel ? !!sel.phone : null;
 
   const password = (
     <Field label="密碼" error={flow.wifiError ?? undefined}>
@@ -753,9 +833,9 @@ export function StepWifi({ flow, patch, go }: StepProps) {
 
   return (
     <Frame
-      visual={<Link phase="router" />}
+      visual={<NetLink phase="pick" sameNet={sameNet} />}
       title="選擇 Wi-Fi"
-      sub="狗收得到的網路，訊號以狗的位置為準"
+      sub={sameNet === false ? "手機不在這個網路，之後手機也要連過去" : "狗收得到的網路，訊號以狗的位置為準"}
       right={<BarButton onClick={() => setSkipAsk(true)}>略過</BarButton>}
       primary={
         // Submits the form (the action bar sits outside it), so Enter / Go works too.
@@ -811,7 +891,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
               on={manual}
               onSelect={() => {
                 setManual(true);
-                patch({ ssid: "", psk: "", wifiError: null });
+                patch({ ssid: "", psk: "", wifiError: null, sameNet: null });
               }}
               tile={<Plus />}
               title="其他網路…"
@@ -831,7 +911,11 @@ export function StepWifi({ flow, patch, go }: StepProps) {
           重新掃描
         </TextLink>
       )}
-      {flow.wifiFailures >= 2 && <p className="text-muted-foreground text-center text-[12px]">一直連不上？可以先略過，之後在裝置頁設定。</p>}
+      {flow.wifiFailures >= 2 && (
+        <m.p className="text-muted-foreground text-center text-[12px]" {...popIn}>
+          一直連不上？可以先略過，之後在裝置頁設定。
+        </m.p>
+      )}
       <MockHint>Lab-fail → 密碼錯 · Warehouse-slow → 25 秒 · 其他網路輸入含 none → 找不到</MockHint>
 
       <Modal open={skipAsk} onClose={() => setSkipAsk(false)}>
@@ -906,7 +990,7 @@ export function StepWait({ flow, patch, go }: StepProps) {
 
   return (
     <Frame
-      visual={<Link phase={online ? "online" : stuck ? "failed" : "wifi"} progress={elapsed / 30} />}
+      visual={<NetLink phase={online ? "online" : stuck ? "failed" : "joining"} sameNet={flow.sameNet} progress={elapsed / 30} />}
       title={online ? "狗已上線" : stuck ? "還沒連上" : "狗正在連上 Wi-Fi"}
       sub={online ? (flow.endpoint?.ip ?? "讀取位址…") : stuck ? "訊號太弱，或網路需要網頁登入" : `${flow.ssid} · ${elapsed} 秒`}
       live

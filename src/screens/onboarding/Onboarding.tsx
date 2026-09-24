@@ -34,6 +34,8 @@ export interface Flow {
   wifiFailures: number;
   wifiError: string | null;
   endpoint: Endpoint | null;
+  /** Is the chosen Wi-Fi the phone's own network? null when typed by hand (unknown). */
+  sameNet: boolean | null;
 }
 
 export interface StepProps {
@@ -59,6 +61,7 @@ export function Onboarding() {
     wifiFailures: 0,
     wifiError: null,
     endpoint: null,
+    sameNet: null,
   });
   const patch = (p: Partial<Flow>) => setFlow((f) => ({ ...f, ...p }));
   const props: StepProps = { flow, patch, go: setStep };
