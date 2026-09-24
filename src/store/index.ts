@@ -110,6 +110,8 @@ export interface State {
   forceLandscape: boolean;
   /** Review panel: which phone the desktop frame imitates — its cutout, bars and safe areas. */
   phoneModel: DeviceId;
+  /** Review panel: show the in-phone MOCK hints (off: the phone looks like the product). */
+  mockHints: boolean;
 }
 
 export type DeviceId = "iphone16pro" | "iphonese" | "pixel9" | "galaxys24" | "none";
@@ -164,6 +166,7 @@ export const useStore = create<State>(() => ({
   toastBottom: null,
   forceLandscape: false,
   phoneModel: "iphone16pro",
+  mockHints: false,
 }));
 
 export const set = useStore.setState;

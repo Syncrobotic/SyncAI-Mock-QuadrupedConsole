@@ -271,11 +271,14 @@ export function Radar({ dogs }: { dogs: DogAdvert[] }) {
 export const PHASES = ["配對", "授權", "網路", "安全"] as const;
 
 /**
- * Segmented progress: one 6px bar per stage, on the same line as the back button. No text
- * by default — pressing (or focusing) the bar floats up which stage this is, and it fades
- * again shortly after release. Screen readers get the stage from aria-valuetext.
+ * Segmented progress: one 6px bar per stage, on the same line as the back button.
+ *
+ * - The current stage fills in part (`sub`, 0–1) as its screens go by, so moving from 找狗
+ *   to 配對中 visibly advances even though both are stage 1.
+ * - No text by default. It is a real button: pressing (or focusing) it floats up the stage
+ *   name, which fades 1.2 s after release; screen readers get the same from its label.
  */
-export function Stepper({ phase }: { phase: number }) {
+export function Stepper({ phase, sub = 0.5 }: { phase: number; sub?: number }) {
   const [hint, setHint] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const show = () => {
@@ -286,29 +289,27 @@ export function Stepper({ phase }: { phase: number }) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setHint(false), 1200);
   };
+  const label = `${PHASES[phase]} · 第 ${phase + 1}/${PHASES.length} 步`;
   return (
-    <div
-      role="progressbar"
-      tabIndex={0}
-      aria-valuemin={1}
-      aria-valuemax={PHASES.length}
-      aria-valuenow={phase + 1}
-      aria-valuetext={`${PHASES[phase]}，第 ${phase + 1} 步，共 ${PHASES.length} 步`}
+    <button
+      type="button"
+      aria-label={`進度：${label}`}
       onPointerDown={show}
       onPointerUp={hide}
       onPointerLeave={hide}
       onPointerCancel={hide}
       onFocus={show}
       onBlur={hide}
-      className="relative mx-auto flex h-11 w-full max-w-[220px] cursor-pointer touch-none items-center gap-1.5 outline-none select-none"
+      data-no-slop
+      className="focus-visible:ring-primary/40 relative mx-auto flex h-11 w-full max-w-[220px] cursor-pointer touch-none items-center gap-1.5 rounded-lg outline-none select-none focus-visible:ring-2"
     >
-      {PHASES.map((label, i) => (
-        <span key={label} className="bg-muted relative h-1.5 flex-1 overflow-hidden rounded-full">
+      {PHASES.map((name, i) => (
+        <span key={name} aria-hidden className="bg-muted relative h-1.5 flex-1 overflow-hidden rounded-full">
           <m.span
             className={cn("absolute inset-0 origin-left rounded-full", i < phase ? "bg-primary" : "bg-primary-accent")}
             initial={false}
-            animate={{ scaleX: i <= phase ? 1 : 0 }}
-            transition={{ duration: 0.4, ease: EASE_OUT }}
+            animate={{ scaleX: i < phase ? 1 : i === phase ? Math.max(0.15, Math.min(1, sub)) : 0 }}
+            transition={{ duration: 0.45, ease: EASE_OUT }}
           />
         </span>
       ))}
@@ -316,17 +317,18 @@ export function Stepper({ phase }: { phase: number }) {
         {hint && (
           <m.span
             key="hint"
+            aria-hidden
             className="bg-popover text-popover-foreground absolute top-full left-1/2 z-10 -translate-x-1/2 rounded-lg border px-2.5 py-1 text-[12px] font-medium whitespace-nowrap shadow-lg"
             initial={{ opacity: 0, y: -4, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18, ease: EASE_OUT }}
           >
-            {PHASES[phase]} · 第 {phase + 1}/{PHASES.length} 步
+            {label}
           </m.span>
         )}
       </AnimatePresence>
-    </div>
+    </button>
   );
 }
 

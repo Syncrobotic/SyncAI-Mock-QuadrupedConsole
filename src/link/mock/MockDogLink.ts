@@ -117,6 +117,12 @@ function createBle(world: MockWorld): BleChannel {
       return structuredClone(world.license);
     },
 
+    async requestLicense() {
+      await world.bleReady();
+      await sleep(900);
+      world.emitEvent("approval", "info", "有手機請求啟用 License");
+    },
+
     async activateLicense(key) {
       await world.bleReady();
       await sleep(900);

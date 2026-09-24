@@ -40,6 +40,7 @@ export function ReviewPanel() {
   const scenario = useStore((s) => s.scenario);
   const landscape = useStore((s) => s.forceLandscape);
   const device = useStore((s) => s.phoneModel);
+  const mockHints = useStore((s) => s.mockHints);
   const world = mockWorld();
   const { theme, setTheme } = useTheme();
 
@@ -88,7 +89,8 @@ export function ReviewPanel() {
               </button>
             ))}
           </div>
-          <Toggle label="橫式（操控）" on={landscape} onChange={() => useStore.setState({ forceLandscape: !landscape })} />
+          <Toggle label="橫式" on={landscape} onChange={() => useStore.setState({ forceLandscape: !landscape })} />
+          <Toggle label="手機上顯示 MOCK 提示" on={mockHints} onChange={() => useStore.setState({ mockHints: !mockHints })} />
         </Group>
 
         <Group title="場景 ?scenario=">
@@ -175,16 +177,17 @@ export function ReviewPanel() {
               連線不需確認碼；新狗由第一支手機成為擁有者
             </li>
             <li>
-              Wi-Fi 名稱含 <code className="font-mono text-white/80">fail</code> → 密碼錯；
-              <code className="font-mono text-white/80">none</code> → 找不到；
-              <code className="font-mono text-white/80">slow</code> → 25 秒才連上
+              Wi-Fi：<code className="font-mono text-white/80">Lab-fail</code> → 密碼錯；
+              <code className="font-mono text-white/80">Warehouse-slow</code> → 25 秒才連上；
+              「其他網路」輸入含 <code className="font-mono text-white/80">none</code> → 找不到
             </li>
             <li>
               License 金鑰：<code className="font-mono text-white/80">SYNC-…</code> 專業版、
               <code className="font-mono text-white/80">BASE-…</code> 標準版（無 AI）、
               <code className="font-mono text-white/80">CTRL-…</code> 操控版（只有操控＋地圖）、含
               <code className="font-mono text-white/80">0000</code> 已綁定、
-              <code className="font-mono text-white/80">EXPD-…</code> 過期
+              <code className="font-mono text-white/80">EXPD-…</code> 過期；
+              預填的是全功能金鑰，試操控版用 <code className="font-mono text-white/80">CTRL-01AB-2026-DEMO</code>
             </li>
             <li>任務 tab 開編輯器時，在地圖上長按 0.5 秒放航點</li>
             <li>點地圖任一點顯示與狗的直線距離</li>

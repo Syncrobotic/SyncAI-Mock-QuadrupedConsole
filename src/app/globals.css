@@ -139,6 +139,12 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  /* A small spinner is the "still working" signal, not decoration: keep it turning (slowly),
+     or a reduced-motion user sees a frozen screen. Big motion (radar sweep, pulses) stays off. */
+  .animate-spin {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 /* The dashboard's auth backdrop grid. */

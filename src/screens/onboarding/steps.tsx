@@ -90,7 +90,7 @@ function Frame({
   // A dropped BLE link takes over the one button: waiting, then 重試 after 15 s.
   const action =
     shell.ble === "lost" ? (
-      <Primary loading>重新連線中…</Primary>
+      <Primary loading>重新連接中…</Primary>
     ) : shell.ble === "failed" ? (
       <Primary onClick={shell.retryBle}>
         <RotateCcw />
@@ -169,7 +169,7 @@ function textOf(n: React.ReactNode): string {
   return "";
 }
 
-/** The step's one button. When its label changes in place (連線中… → 繼續) the label slides. */
+/** The step's one button. When its label changes in place (連接中… → 繼續) the label slides. */
 function Primary({ children, className, ...props }: React.ComponentProps<typeof Button>) {
   return (
     <Button {...props} className={cn("h-11 w-full overflow-hidden rounded-xl text-[15px]", className)}>
@@ -337,7 +337,7 @@ export function StepSplash({ go }: StepProps) {
 
       <ActionBar>
         <Primary onClick={() => setAsking(true)}>
-          {denied ? "再試一次" : "開始配對"}
+          {denied ? "重試" : "開始配對"}
           <ArrowRight />
         </Primary>
       </ActionBar>
@@ -380,13 +380,15 @@ export function StepScan({ patch, go }: StepProps) {
   const [dogs, setDogs] = useState<DogAdvert[]>([]);
   const [sel, setSel] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
-  // The help link is not noise on arrival: it appears only after 15 s without any input.
+  // The help link is not noise on arrival. It appears after 8 s when no dog has shown up at
+  // all (that is when help is needed), or after 15 s without input when dogs are listed.
   const [idle, setIdle] = useState(false);
   const [poke, setPoke] = useState(0);
+  const none = dogs.length === 0;
   useEffect(() => {
-    const t = setTimeout(() => setIdle(true), 15_000);
+    const t = setTimeout(() => setIdle(true), none ? 8_000 : 15_000);
     return () => clearTimeout(t);
-  }, [poke]);
+  }, [poke, none]);
   const touched = () => {
     setIdle(false);
     setPoke((p) => p + 1);
@@ -505,7 +507,7 @@ export function StepPair({ flow, patch, go }: StepProps) {
       }
       if (!alive) return;
       if (!session) {
-        toast.error("連不上，請靠近狗再試一次");
+        toast.error("連接不上，請靠近狗再試一次");
         go("scan");
         return;
       }
@@ -546,7 +548,7 @@ export function StepPair({ flow, patch, go }: StepProps) {
   const ownerOffline = enrollment?.kind === "needs_approval" && !enrollment.ownerOnline;
   const role = enrollment?.kind === "granted" ? enrollment.role : null;
 
-  const title = { linking: "正在連線", key: "登記這支手機", granted: "配對完成", approval: "等待擁有者核准" }[phase];
+  const title = { linking: "正在連接", key: "登記這支手機", granted: "配對完成", approval: "等待擁有者核准" }[phase];
   const sub =
     phase === "granted" && role
       ? `你是這隻狗的${ROLE_LABEL[role]}`
@@ -573,7 +575,7 @@ export function StepPair({ flow, patch, go }: StepProps) {
         ) : phase === "approval" ? (
           <Primary onClick={() => void asViewer()}>先以檢視者加入</Primary>
         ) : (
-          <Primary loading>{phase === "key" ? "登記中…" : "連線中…"}</Primary>
+          <Primary loading>{phase === "key" ? "登記中…" : "連接中…"}</Primary>
         )
       }
       left={
@@ -601,6 +603,7 @@ export function StepLicense({ flow, go }: StepProps) {
   const [license, setLicense] = useState<LicenseInfo | null>(null);
   const [changing, setChanging] = useState(false);
   const [features, setFeatures] = useState(false);
+  const [asked, setAsked] = useState<"no" | "sending" | "sent">("no");
   const owner = flow.role === "owner";
 
   useEffect(() => {
@@ -640,9 +643,24 @@ export function StepLicense({ flow, go }: StepProps) {
         title="這隻狗還沒啟用"
         sub="請擁有者先輸入 License 金鑰"
         primary={
-          <Primary variant="outline" onClick={() => go("scan")}>
-            回到掃描
-          </Primary>
+          // The one thing a non-Owner can do: ask the Owner. Back (‹) leaves.
+          asked === "sent" ? (
+            <Primary disabled>
+              <Check />
+              已通知擁有者
+            </Primary>
+          ) : (
+            <Primary
+              loading={asked === "sending"}
+              onClick={async () => {
+                setAsked("sending");
+                await getDogLink().ble.requestLicense(flow.dog!.id);
+                setAsked("sent");
+              }}
+            >
+              通知擁有者
+            </Primary>
+          )
         }
       />
     );
@@ -1081,7 +1099,7 @@ export function StepWifi({ flow, patch, go }: StepProps) {
 // ── 5 Wait for the dog on Wi-Fi ─────────────────────────────────────────────
 
 const WIFI_TEXT: Record<WifiStatus, string> = {
-  connecting: "狗正在連線 Wi-Fi…",
+  connecting: "狗正在連上 Wi-Fi…",
   connected: "已連上",
   auth_failed: "密碼錯誤",
   not_found: "找不到這個網路",

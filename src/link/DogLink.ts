@@ -117,6 +117,8 @@ export interface BleChannel {
   requestViewer(dogId: string): Promise<Enrollment>;
   /** Licence state as the dog knows it (readable before Wi-Fi). */
   readLicense(): Promise<LicenseInfo>;
+  /** Not the Owner, dog unlicensed: ask the Owner's phone to activate one (a push to it). */
+  requestLicense(dogId: string): Promise<void>;
   /** Owner only: bind a licence key to this dog. Goes over BLE — the dog may have no network yet. */
   activateLicense(key: string): Promise<LicenseActivation>;
   /** The BLE link to the dog being set up: "down" when it drops mid-onboarding. Replays the last value. */

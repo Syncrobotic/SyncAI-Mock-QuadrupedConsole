@@ -1,8 +1,10 @@
 "use client";
 
 import { AnimatePresence, m } from "framer-motion";
+import { Smartphone } from "lucide-react";
 import { createContext, useEffect, useState } from "react";
 
+import { useLandscape } from "@/hooks/use-landscape";
 import { getDogLink } from "@/link";
 
 import { StepLicense, StepPair, StepSafety, StepScan, StepSplash, StepWait, StepWifi } from "./steps";
@@ -25,6 +27,8 @@ export type Step = "splash" | "scan" | "pair" | "license" | "wifi" | "wait" | "s
 export const STEPS: Step[] = ["splash", "scan", "pair", "license", "wifi", "wait", "safety"];
 
 const PHASE_OF: Record<Exclude<Step, "splash">, number> = { scan: 0, pair: 0, license: 1, wifi: 2, wait: 2, safety: 3 };
+/** How far into its stage each screen is — the current bar fills in part. */
+const SUB_OF: Record<Exclude<Step, "splash">, number> = { scan: 0.35, pair: 0.7, license: 0.5, wifi: 0.35, wait: 0.7, safety: 0.5 };
 
 export interface Flow {
   dog: DogAdvert | null;
@@ -41,7 +45,7 @@ export interface Flow {
 
 /**
  * What every step's Frame needs from the shell: the default top-left action (back), and the
- * state of the BLE link once a dog is paired — lost → the primary shows 重新連線中…, failed
+ * state of the BLE link once a dog is paired — lost → the primary shows 重新連接中…, failed
  * (15 s) → 重試. Steps don't handle a dropped link themselves; their BLE calls just wait.
  */
 export interface OnboardingCtx {
@@ -105,6 +109,15 @@ export function Onboarding() {
     };
   }, [ble, flow.dog]);
 
+  // Onboarding is portrait only. Ask the OS to lock it (honoured by installed/fullscreen
+  // web apps and by the native shell); where it isn't, a sideways phone gets the rotate cover.
+  const landscape = useLandscape();
+  useEffect(() => {
+    const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    o?.lock?.("portrait").catch(() => {});
+    return () => o?.unlock?.();
+  }, []);
+
   const ctx: OnboardingCtx = {
     hasTopBar: step !== "splash",
     back: back[step] ? () => setStep(back[step]!) : null,
@@ -130,7 +143,7 @@ export function Onboarding() {
           {/* Equal side slots keep the progress centred; the step's Frame fills them (back / cancel / skip). */}
           <div className="w-12 shrink-0" />
           <div className="min-w-0 flex-1">
-            <Stepper phase={PHASE_OF[step]} />
+            <Stepper phase={PHASE_OF[step]} sub={SUB_OF[step]} />
           </div>
           <div className="w-12 shrink-0" />
         </header>
@@ -164,6 +177,30 @@ export function Onboarding() {
         </AnimatePresence>
       </div>
       </OnboardingContext.Provider>
+
+      <AnimatePresence>
+        {landscape && (
+          <m.div
+            key="rotate"
+            className="bg-background absolute inset-0 z-[90] flex flex-col items-center justify-center gap-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* The phone turns upright: the whole message, one icon and one line. */}
+            <m.span
+              className="text-primary-accent"
+              initial={{ rotate: -90 }}
+              animate={{ rotate: [-90, 0, 0, -90] }}
+              transition={{ duration: 2.4, repeat: Infinity, times: [0, 0.35, 0.75, 1], ease: "easeInOut" }}
+            >
+              <Smartphone className="size-10" />
+            </m.span>
+            <p className="text-[15px] font-medium">請轉成直式</p>
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
